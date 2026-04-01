@@ -31,6 +31,18 @@ The initial implementation is expected to cover:
 - drift detection failures
 - Fastify route behavior for happy path and key error path cases
 
+## Current Automated Coverage
+
+The implemented test suite covers:
+
+- `SessionLease` acquire, release, and conflict handling
+- `StructuredOutputExtractor` success and not-found failure cases
+- `ArtifactManifestWriter` persistence behavior
+- `DriftDetector` selector-missing failure behavior
+- route-level health, session open, project select, conversation start, wait, snapshot, markdown export, and structured review extract flows
+
+The integration tests mock the adapter boundary so the bridge HTTP layer, registry, exporters, and failure mapping can be verified without launching a real browser.
+
 ## Future Acceptance Tests
 
 Once the orchestrator exists, task-level acceptance tests should verify the full chain:

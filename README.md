@@ -16,7 +16,7 @@ This repository currently provides:
 
 - A monorepo skeleton with durable boundaries between apps, services, and shared contracts.
 - Architecture documentation and ADRs for the three-plane system.
-- A dedicated `chatgpt-web-bridge` service package that will expose a typed HTTP API for browser-backed review automation.
+- A working `chatgpt-web-bridge` service with typed Fastify routes, in-memory session/conversation state, artifact export, DOM drift checks, and mockable browser boundaries.
 - A placeholder `orchestrator` app with contracts and examples, but not a full task loop implementation.
 
 ## Layout
@@ -32,9 +32,9 @@ services/
   chatgpt-web-bridge/
 ```
 
-## Planned Bridge API
+## Implemented Bridge API
 
-The bridge service is designed around these routes:
+The bridge service currently exposes these routes:
 
 - `GET /health`
 - `POST /api/sessions/open`
@@ -57,11 +57,19 @@ npm install
 Run the bridge tests:
 
 ```bash
-npm test --workspace @review-then-codex/chatgpt-web-bridge
+npm test
 ```
 
 Start the bridge service:
 
 ```bash
 npm run dev --workspace @review-then-codex/chatgpt-web-bridge
+```
+
+The bridge listens on `127.0.0.1:3100` by default. Override with `HOST`, `PORT`, and `BRIDGE_ARTIFACT_DIR` as needed.
+
+Run type checks across the monorepo:
+
+```bash
+npm run typecheck
 ```

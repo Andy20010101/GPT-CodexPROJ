@@ -36,6 +36,27 @@ The service package is divided into:
 - `exporters/`: markdown export and structured extraction
 - `guards/`: preflight validation and artifact manifest persistence
 
+## HTTP API
+
+All routes return a uniform envelope:
+
+- success: `{ ok: true, data: ... }`
+- failure: `{ ok: false, error: { code, message, details? } }`
+
+The implemented routes are:
+
+- `GET /health`
+- `POST /api/sessions/open`
+- `POST /api/projects/select`
+- `POST /api/conversations/start`
+- `POST /api/conversations/:id/message`
+- `POST /api/conversations/:id/wait`
+- `GET /api/conversations/:id/snapshot`
+- `POST /api/conversations/:id/export/markdown`
+- `POST /api/conversations/:id/extract/structured-review`
+
+The request and response schemas live in `packages/shared-contracts/chatgpt`, then get parsed again at the route layer before service execution.
+
 ## Artifacts
 
 Artifacts are written under `services/chatgpt-web-bridge/artifacts/`. The initial implementation records:
@@ -44,10 +65,38 @@ Artifacts are written under `services/chatgpt-web-bridge/artifacts/`. The initia
 - structured review JSON exports
 - manifest JSON describing the run context
 
+Each manifest records:
+
+- timestamp
+- sessionId
+- conversationId
+- projectName
+- model
+- input files
+- exported artifact paths
+
 ## Session Lease
 
 Each live session can be leased by only one job at a time. This prevents two upstream callers from interleaving DOM actions against the same page.
 
+The lease is enforced in the service layer around project selection, conversation start, message send, wait, and snapshot operations.
+
 ## DOM Drift Handling
 
 ChatGPT Web is not a stable API surface. The bridge therefore treats selector presence as a preflight concern and raises structured drift errors when key elements disappear instead of failing silently.
+
+Current drift handling is intentionally minimal but explicit:
+
+- selectors are centralized in `src/dom/selectors.ts`
+- required page probes are checked by `PreflightGuard`
+- missing critical selectors raise `DOM_DRIFT_DETECTED`
+- visible login prompts or auth redirects raise `CHATGPT_NOT_READY`
+
+## Current Limits
+
+The service is designed for extension, but the current scope is deliberately conservative:
+
+- session and conversation registries are in memory only
+- browser integration targets a logged-in ChatGPT page and does not use an official API
+- route-level tests use a mock adapter instead of opening a real browser
+- the orchestrator contract is reserved, not yet implemented

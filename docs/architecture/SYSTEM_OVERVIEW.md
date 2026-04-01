@@ -53,3 +53,11 @@ The future orchestrator should treat the bridge as a service boundary rather tha
 4. Wait for completion.
 5. Export markdown and extract structured review JSON.
 6. Record artifacts and attach them to the task evidence set.
+
+## Current Implementation Boundary
+
+Today the repository implements the Review Plane service and the shared contract surface around it:
+
+- `packages/shared-contracts/chatgpt` defines the Zod-first request and response contracts.
+- `services/chatgpt-web-bridge` implements the Fastify API, session lease, export pipeline, and mock-friendly adapter boundary.
+- `apps/orchestrator` remains a skeleton so the control plane boundary is explicit but not faked.
