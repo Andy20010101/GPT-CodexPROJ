@@ -60,4 +60,4 @@ Today the repository implements the Review Plane service and the shared contract
 
 - `packages/shared-contracts/chatgpt` defines the Zod-first request and response contracts.
 - `services/chatgpt-web-bridge` implements the Fastify API, session lease, export pipeline, and mock-friendly adapter boundary.
-- `apps/orchestrator` remains a skeleton so the control plane boundary is explicit but not faked.
+- `apps/orchestrator` now implements the first control-plane skeleton for freezes, task loops, evidence, and gates without pretending to be a full workflow runtime.

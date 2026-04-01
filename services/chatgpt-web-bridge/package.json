@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "test": "vitest run",
+    "test:real": "tsx tests/real/bridge-smoke.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

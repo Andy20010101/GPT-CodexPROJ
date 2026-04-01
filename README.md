@@ -17,7 +17,7 @@ This repository currently provides:
 - A monorepo skeleton with durable boundaries between apps, services, and shared contracts.
 - Architecture documentation and ADRs for the three-plane system.
 - A working `chatgpt-web-bridge` service with typed Fastify routes, in-memory session/conversation state, artifact export, DOM drift checks, and mockable browser boundaries.
-- A placeholder `orchestrator` app with contracts and examples, but not a full task loop implementation.
+- A first control-plane orchestrator skeleton with requirement freeze, architecture freeze, task graph registration, gate-aware task loop transitions, evidence ledger persistence, and a typed bridge client.
 
 ## Layout
 
@@ -31,6 +31,16 @@ packages/
 services/
   chatgpt-web-bridge/
 ```
+
+## Current Maturity
+
+The repository now has:
+
+- a working Review Plane service
+- a working Control Plane skeleton with file-backed persistence and tests
+- shared bridge contracts reused across planes
+
+The orchestrator is intentionally not a full workflow engine yet. It models the control-plane lifecycle and enforces state and gate rules, but it does not pretend that a real execution agent runtime is already present.
 
 ## Implemented Bridge API
 
@@ -73,3 +83,11 @@ Run type checks across the monorepo:
 ```bash
 npm run typecheck
 ```
+
+## Connecting a Real Execution Agent Next
+
+The next major step is to plug an execution agent such as Codex into the orchestrator task loop. The missing pieces are:
+
+1. a task dispatch contract from `TaskEnvelope` into an execution runner
+2. execution-side evidence adapters that write test output, patch metadata, and review results back into the evidence ledger
+3. a higher-level runtime or API surface that sequences multi-task runs instead of calling the service objects directly

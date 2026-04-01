@@ -5,7 +5,9 @@
   "description": "Control-plane skeleton for requirement freeze, architecture freeze, task loops, evidence, and gates.",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "test": "vitest run tests/unit",
+    "test": "vitest run tests/unit tests/integration",
+    "test:integration": "vitest run tests/integration",
+    "test:unit": "vitest run tests/unit",
     "test:all": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

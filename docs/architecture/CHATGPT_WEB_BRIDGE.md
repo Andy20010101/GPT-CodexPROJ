@@ -99,4 +99,21 @@ The service is designed for extension, but the current scope is deliberately con
 - session and conversation registries are in memory only
 - browser integration targets a logged-in ChatGPT page and does not use an official API
 - route-level tests use a mock adapter instead of opening a real browser
-- the orchestrator contract is reserved, not yet implemented
+- the orchestrator is implemented only as a first control-plane skeleton, not yet as a full workflow runtime
+
+## Opt-In Real Smoke Harness
+
+For manual bridge validation, the repository now includes `services/chatgpt-web-bridge/tests/real/bridge-smoke.ts`.
+
+Characteristics:
+
+- it is not part of the default `npm test` path
+- it is intended for local manual runs only
+- it requires `ENABLE_REAL_CHATGPT_TESTS=true`
+- it also requires a reachable logged-in browser debug endpoint through `CHATGPT_BROWSER_URL`
+
+The harness currently checks:
+
+- `GET /health`
+- session open plus preflight behavior
+- optional project selection when `CHATGPT_PROJECT_NAME` is supplied
