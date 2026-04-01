@@ -2,8 +2,19 @@
   "name": "@review-then-codex/orchestrator",
   "version": "0.1.0",
   "private": true,
-  "description": "Future control plane skeleton.",
+  "description": "Control-plane skeleton for requirement freeze, architecture freeze, task loops, evidence, and gates.",
   "scripts": {
+    "dev": "tsx src/index.ts",
+    "test": "vitest run tests/unit",
+    "test:all": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@review-then-codex/shared-contracts": "file:../../packages/shared-contracts",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.5",
+    "vitest": "^2.0.5"
   }
 }

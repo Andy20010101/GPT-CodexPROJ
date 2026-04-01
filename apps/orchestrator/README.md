@@ -1,11 +1,13 @@
-# Orchestrator Skeleton
+# Orchestrator Control Plane
 
-This app is a placeholder for the future Control Plane.
+This package hosts the first control-plane skeleton for `review-then-codex-system`.
 
 Current scope:
 
-- contract folder for future task and gate schemas
-- examples folder for frozen input samples
-- no workflow runtime yet
+- requirement freeze and architecture freeze contracts
+- task graph and task envelope persistence
+- task-loop state rules with gate-aware transitions
+- evidence ledger and gate result recording
+- a typed bridge client boundary for `chatgpt-web-bridge`
 
-The orchestrator should call `chatgpt-web-bridge` through its typed HTTP API instead of importing browser-specific modules.
+The orchestrator does not drive a full agent runtime yet. It persists run state to files and exposes service boundaries that can later back an API or a workflow runtime.
