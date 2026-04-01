@@ -1,0 +1,9 @@
+{
+  "name": "@review-then-codex/orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Future control plane skeleton.",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

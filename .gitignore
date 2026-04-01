@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+
+services/chatgpt-web-bridge/artifacts/*.json
+services/chatgpt-web-bridge/artifacts/*.md
+services/chatgpt-web-bridge/artifacts/*.tmp
+!services/chatgpt-web-bridge/artifacts/.gitkeep
