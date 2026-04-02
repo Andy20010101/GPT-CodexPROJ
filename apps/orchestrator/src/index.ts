@@ -18,22 +18,32 @@ import { DaemonStatusService } from './services/daemon-status-service';
 import { DrainService } from './services/drain-service';
 import { HeartbeatService } from './services/heartbeat-service';
 import { FailureClassificationService } from './services/failure-classification-service';
+import { FailureToTaskService } from './services/failure-to-task-service';
 import { JobDispositionService } from './services/job-disposition-service';
 import { PriorityQueueService } from './services/priority-queue-service';
 import { ProcessControlService } from './services/process-control-service';
 import { QuotaControlService } from './services/quota-control-service';
 import { RecoveryService } from './services/recovery-service';
+import { DebugSnapshotService } from './services/debug-snapshot-service';
+import { E2eValidationService } from './services/e2e-validation-service';
 import { ReleaseGateService } from './services/release-gate-service';
 import { ReleaseReviewService } from './services/release-review-service';
+import { RemediationPlaybookService } from './services/remediation-playbook-service';
+import { RemediationService } from './services/remediation-service';
 import { ReviewGateService } from './services/review-gate-service';
 import { ReviewService } from './services/review-service';
+import { RetainedWorkspaceService } from './services/retained-workspace-service';
 import { RetryService } from './services/retry-service';
+import { RollbackService } from './services/rollback-service';
 import { RunnerLifecycleService } from './services/runner-lifecycle-service';
+import { RunnerResumeService } from './services/runner-resume-service';
 import { RunAcceptanceService } from './services/run-acceptance-service';
 import { RunQueueService } from './services/run-queue-service';
 import { ArchitectureFreezeService } from './services/architecture-freeze-service';
 import { SchedulingPolicyService } from './services/scheduling-policy-service';
 import { RequirementFreezeService } from './services/requirement-freeze-service';
+import { SelfRepairPolicyService } from './services/self-repair-policy-service';
+import { StabilityGovernanceService } from './services/stability-governance-service';
 import { StaleJobReclaimService } from './services/stale-job-reclaim-service';
 import { TaskSchedulerService } from './services/task-scheduler-service';
 import { TaskGraphService } from './services/task-graph-service';
@@ -48,6 +58,7 @@ import { WorkspaceRuntimeService } from './services/workspace-runtime-service';
 import { WorktreeService } from './services/worktree-service';
 import { FileCancellationRepository } from './storage/file-cancellation-repository';
 import { FileDaemonRepository } from './storage/file-daemon-repository';
+import { FileDebugSnapshotRepository } from './storage/file-debug-snapshot-repository';
 import { FileEvidenceRepository } from './storage/file-evidence-repository';
 import { FileExecutionRepository } from './storage/file-execution-repository';
 import { FileFailureRepository } from './storage/file-failure-repository';
@@ -56,9 +67,12 @@ import { FileJobRepository } from './storage/file-job-repository';
 import { FileProcessRepository } from './storage/file-process-repository';
 import { FileQueueRepository } from './storage/file-queue-repository';
 import { FileReleaseRepository } from './storage/file-release-repository';
+import { FileRemediationRepository } from './storage/file-remediation-repository';
 import { FileReviewRepository } from './storage/file-review-repository';
+import { FileRollbackRepository } from './storage/file-rollback-repository';
 import { FileRunRepository } from './storage/file-run-repository';
 import { FileSchedulingRepository } from './storage/file-scheduling-repository';
+import { FileStabilityRepository } from './storage/file-stability-repository';
 import { FileTaskRepository } from './storage/file-task-repository';
 import { FileWorkerRepository } from './storage/file-worker-repository';
 import { FileWorkspaceLifecycleRepository } from './storage/file-workspace-lifecycle-repository';
@@ -94,11 +108,21 @@ export type OrchestratorRuntimeBundle = {
   cancellationService: CancellationService;
   concurrencyControlService: ConcurrencyControlService;
   failureClassificationService: FailureClassificationService;
+  failureToTaskService: FailureToTaskService;
   jobDispositionService: JobDispositionService;
+  debugSnapshotService: DebugSnapshotService;
+  e2eValidationService: E2eValidationService;
   processControlService: ProcessControlService;
   quotaControlService: QuotaControlService;
+  remediationPlaybookService: RemediationPlaybookService;
+  remediationService: RemediationService;
+  retainedWorkspaceService: RetainedWorkspaceService;
+  rollbackService: RollbackService;
   runnerLifecycleService: RunnerLifecycleService;
+  runnerResumeService: RunnerResumeService;
   schedulingPolicyService: SchedulingPolicyService;
+  selfRepairPolicyService: SelfRepairPolicyService;
+  stabilityGovernanceService: StabilityGovernanceService;
   daemonRuntimeService: DaemonRuntimeService;
   daemonStatusService: DaemonStatusService;
   drainService: DrainService;
@@ -115,6 +139,7 @@ export type OrchestratorRuntimeBundle = {
   runRepository: FileRunRepository;
   taskRepository: FileTaskRepository;
   evidenceRepository: FileEvidenceRepository;
+  debugSnapshotRepository: FileDebugSnapshotRepository;
   daemonRepository: FileDaemonRepository;
   workerRepository: FileWorkerRepository;
   heartbeatRepository: FileHeartbeatRepository;
@@ -124,7 +149,10 @@ export type OrchestratorRuntimeBundle = {
   processRepository: FileProcessRepository;
   queueRepository: FileQueueRepository;
   releaseRepository: FileReleaseRepository;
+  remediationRepository: FileRemediationRepository;
+  rollbackRepository: FileRollbackRepository;
   schedulingRepository: FileSchedulingRepository;
+  stabilityRepository: FileStabilityRepository;
   workspaceLifecycleRepository: FileWorkspaceLifecycleRepository;
 };
 
@@ -158,6 +186,7 @@ export function createOrchestratorRuntimeBundle(
   const taskRepository = new FileTaskRepository(resolvedArtifactDir);
   const evidenceRepository = new FileEvidenceRepository(resolvedArtifactDir);
   const daemonRepository = new FileDaemonRepository(resolvedArtifactDir);
+  const debugSnapshotRepository = new FileDebugSnapshotRepository(resolvedArtifactDir);
   const executionRepository = new FileExecutionRepository(resolvedArtifactDir);
   const failureRepository = new FileFailureRepository(resolvedArtifactDir);
   const heartbeatRepository = new FileHeartbeatRepository(resolvedArtifactDir);
@@ -166,8 +195,11 @@ export function createOrchestratorRuntimeBundle(
   const cancellationRepository = new FileCancellationRepository(resolvedArtifactDir);
   const queueRepository = new FileQueueRepository(resolvedArtifactDir);
   const releaseRepository = new FileReleaseRepository(resolvedArtifactDir);
+  const remediationRepository = new FileRemediationRepository(resolvedArtifactDir);
   const reviewRepository = new FileReviewRepository(resolvedArtifactDir);
+  const rollbackRepository = new FileRollbackRepository(resolvedArtifactDir);
   const schedulingRepository = new FileSchedulingRepository(resolvedArtifactDir);
+  const stabilityRepository = new FileStabilityRepository(resolvedArtifactDir);
   const workerRepository = new FileWorkerRepository(resolvedArtifactDir);
   const workspaceLifecycleRepository = new FileWorkspaceLifecycleRepository(resolvedArtifactDir);
   const workspaceRepository = new FileWorkspaceRepository(resolvedArtifactDir);
@@ -197,6 +229,10 @@ export function createOrchestratorRuntimeBundle(
     workspaceLifecycleRepository,
     workspaceCleanupService,
     evidenceLedgerService,
+  );
+  const retainedWorkspaceService = new RetainedWorkspaceService(
+    workspaceLifecycleRepository,
+    workspaceRepository,
   );
   const processControlService = new ProcessControlService(
     processRepository,
@@ -288,11 +324,41 @@ export function createOrchestratorRuntimeBundle(
     failureRepository,
     evidenceLedgerService,
   );
+  const rollbackService = new RollbackService(
+    runRepository,
+    rollbackRepository,
+    evidenceLedgerService,
+  );
+  const debugSnapshotService = new DebugSnapshotService(
+    runRepository,
+    debugSnapshotRepository,
+    evidenceLedgerService,
+    workspaceCleanupPolicy,
+  );
+  const remediationPlaybookService = new RemediationPlaybookService();
+  const failureToTaskService = new FailureToTaskService(remediationPlaybookService);
+  const selfRepairPolicyService = new SelfRepairPolicyService();
+  const remediationService = new RemediationService(
+    runRepository,
+    remediationRepository,
+    evidenceLedgerService,
+    remediationPlaybookService,
+    failureToTaskService,
+    selfRepairPolicyService,
+    workspaceGcService,
+  );
   const jobDispositionService = new JobDispositionService(
     resolvedArtifactDir,
     runRepository,
     failureClassificationService,
     evidenceLedgerService,
+  );
+  const runnerResumeService = new RunnerResumeService(
+    runRepository,
+    processRepository,
+    stabilityRepository,
+    evidenceLedgerService,
+    retainedWorkspaceService,
   );
   const cancellationService = new CancellationService(
     runRepository,
@@ -374,6 +440,9 @@ export function createOrchestratorRuntimeBundle(
     cancellationService,
     workspaceCleanupService,
     jobDispositionService,
+    rollbackService,
+    debugSnapshotService,
+    retainedWorkspaceService,
     {
       workspaceSourceRepoPath: config.workspaceSourceRepoPath,
       retryPolicy,
@@ -385,6 +454,18 @@ export function createOrchestratorRuntimeBundle(
     queueRepository,
     runQueueService,
     retryService,
+    evidenceLedgerService,
+    runnerResumeService,
+  );
+  const stabilityGovernanceService = new StabilityGovernanceService(
+    runRepository,
+    jobRepository,
+    failureRepository,
+    rollbackRepository,
+    debugSnapshotRepository,
+    remediationRepository,
+    stabilityRepository,
+    workspaceLifecycleRepository,
     evidenceLedgerService,
   );
   const staleJobReclaimService = new StaleJobReclaimService(
@@ -438,6 +519,20 @@ export function createOrchestratorRuntimeBundle(
     recoveryService,
     retryPolicy,
   );
+  const e2eValidationService = new E2eValidationService(
+    orchestratorService,
+    workflowRuntimeService,
+    runRepository,
+    taskRepository,
+    executionRepository,
+    reviewRepository,
+    releaseRepository,
+    workspaceLifecycleRepository,
+    rollbackRepository,
+    stabilityRepository,
+    stabilityGovernanceService,
+    evidenceLedgerService,
+  );
   const daemonRuntimeService = new DaemonRuntimeService(
     daemonRepository,
     runRepository,
@@ -467,11 +562,21 @@ export function createOrchestratorRuntimeBundle(
     cancellationService,
     concurrencyControlService,
     failureClassificationService,
+    failureToTaskService,
     jobDispositionService,
+    debugSnapshotService,
+    e2eValidationService,
     processControlService,
     quotaControlService,
+    remediationPlaybookService,
+    remediationService,
+    retainedWorkspaceService,
+    rollbackService,
     runnerLifecycleService,
+    runnerResumeService,
     schedulingPolicyService,
+    selfRepairPolicyService,
+    stabilityGovernanceService,
     daemonRuntimeService,
     daemonStatusService,
     drainService,
@@ -488,6 +593,7 @@ export function createOrchestratorRuntimeBundle(
     runRepository,
     taskRepository,
     evidenceRepository,
+    debugSnapshotRepository,
     daemonRepository,
     workerRepository,
     heartbeatRepository,
@@ -497,7 +603,10 @@ export function createOrchestratorRuntimeBundle(
     processRepository,
     queueRepository,
     releaseRepository,
+    remediationRepository,
+    rollbackRepository,
     schedulingRepository,
+    stabilityRepository,
     workspaceLifecycleRepository,
   };
 }
@@ -516,8 +625,18 @@ export * from './services/drain-service';
 export * from './services/execution-service';
 export * from './services/executor-registry';
 export * from './services/failure-classification-service';
+export * from './services/failure-to-task-service';
 export * from './services/heartbeat-service';
 export * from './services/job-disposition-service';
+export * from './services/debug-snapshot-service';
+export * from './services/e2e-validation-service';
+export * from './services/remediation-playbook-service';
+export * from './services/remediation-service';
+export * from './services/retained-workspace-service';
+export * from './services/rollback-service';
+export * from './services/runner-resume-service';
+export * from './services/self-repair-policy-service';
+export * from './services/stability-governance-service';
 export * from './services/process-control-service';
 export * from './services/quota-control-service';
 export * from './services/release-gate-service';

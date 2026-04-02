@@ -6,6 +6,7 @@ import {
   RunRuntimeStateSchema,
   TaskGraphSchema,
   TaskEnvelopeSchema,
+  ValidationReportSchema,
 } from '../../contracts';
 import { RunRecordSchema } from '../../domain/run';
 import { successEnvelope } from './common';
@@ -60,3 +61,14 @@ export const RunSummaryResponseSchema = successEnvelope(
 );
 
 export const TaskListResponseSchema = successEnvelope(z.array(TaskEnvelopeSchema));
+
+export const ValidateE2eRequestSchema = z.object({
+  requestedBy: z.string().min(1).default('api'),
+  mode: z.enum(['mock_assisted', 'real']).default('mock_assisted'),
+});
+
+export const ValidateE2eResponseSchema = successEnvelope(
+  z.object({
+    report: ValidationReportSchema,
+  }),
+);

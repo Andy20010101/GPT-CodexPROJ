@@ -4,6 +4,7 @@ import { FileRunRepository } from '../storage/file-run-repository';
 import { RetryService } from './retry-service';
 import { RunQueueService } from './run-queue-service';
 import { EvidenceLedgerService } from './evidence-ledger-service';
+import { RunnerResumeService } from './runner-resume-service';
 
 export type RecoverySummary = {
   timestamp: string;
@@ -30,6 +31,7 @@ export class RecoveryService {
     private readonly runQueueService: RunQueueService,
     private readonly retryService: RetryService,
     private readonly evidenceLedgerService: EvidenceLedgerService,
+    private readonly runnerResumeService?: RunnerResumeService | undefined,
   ) {}
 
   public async recover(): Promise<RecoverySummary> {
@@ -57,6 +59,15 @@ export class RecoveryService {
 
       for (const job of jobs) {
         if (job.status === 'running' && !job.finishedAt) {
+          await this.runnerResumeService?.assess({
+            job,
+            ...(job.taskId ? { taskId: job.taskId } : {}),
+            executionId: readString(job.metadata.executionId),
+            workspaceId: readString(job.metadata.workspaceId),
+            metadata: {
+              recoveredBy: 'recovery-service',
+            },
+          });
           try {
             await this.retryService.retryJob({
               jobId: job.jobId,
@@ -114,4 +125,8 @@ export class RecoveryService {
 
     return summary;
   }
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

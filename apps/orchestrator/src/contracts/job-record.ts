@@ -13,6 +13,7 @@ export const JobStatusSchema = z.enum([
   'retriable',
   'blocked',
   'cancelled',
+  'manual_attention_required',
 ]);
 export type JobStatus = z.infer<typeof JobStatusSchema>;
 

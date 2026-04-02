@@ -75,4 +75,33 @@ export class FileReviewRepository {
     const raw = await readJsonFile<ReviewResult>(resultPath);
     return raw ? ReviewResultSchema.parse(raw) : null;
   }
+
+  public async listResultsForRun(runId: string): Promise<ReviewResult[]> {
+    const directoryPath = path.join(this.artifactDir, 'runs', runId, 'reviews');
+    const fs = await import('node:fs/promises');
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await fs.readdir(directoryPath, { withFileTypes: true });
+    } catch (error) {
+      const castError = error as NodeJS.ErrnoException;
+      if (castError.code === 'ENOENT') {
+        return [];
+      }
+      throw error;
+    }
+
+    const results: ReviewResult[] = [];
+    for (const entry of entries
+      .filter((item) => item.isDirectory())
+      .sort((left, right) => left.name.localeCompare(right.name))) {
+      const raw = await readJsonFile<ReviewResult>(
+        path.join(directoryPath, entry.name, 'result.json'),
+      );
+      if (raw) {
+        results.push(ReviewResultSchema.parse(raw));
+      }
+    }
+
+    return results;
+  }
 }

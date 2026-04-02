@@ -4,9 +4,13 @@ export const BridgeErrorCodeSchema = z.enum([
   'SESSION_NOT_FOUND',
   'SESSION_LEASE_CONFLICT',
   'PROJECT_NOT_FOUND',
+  'PROJECT_UNAVAILABLE',
   'CONVERSATION_NOT_FOUND',
+  'CONVERSATION_UNAVAILABLE',
   'DOM_DRIFT_DETECTED',
   'CHATGPT_NOT_READY',
+  'SESSION_RESUME_FAILED',
+  'BRIDGE_RECOVERY_FAILED',
   'STRUCTURED_OUTPUT_NOT_FOUND',
   'VALIDATION_ERROR',
   'INTERNAL_ERROR',
@@ -84,6 +88,31 @@ export const HealthDataSchema = z.object({
 
 export const HealthResponseSchema = successEnvelope(HealthDataSchema);
 
+export const BridgeHealthStatusSchema = z.enum([
+  'ready',
+  'degraded',
+  'needs_reauth',
+  'dom_drift_detected',
+  'project_unavailable',
+  'conversation_unavailable',
+]);
+
+export type BridgeHealthStatus = z.infer<typeof BridgeHealthStatusSchema>;
+
+export const BridgeHealthSummarySchema = z.object({
+  status: BridgeHealthStatusSchema,
+  checkedAt: z.string().datetime(),
+  activeSessions: z.number().int().min(0),
+  activeConversations: z.number().int().min(0),
+  issues: z.array(z.string().min(1)).default([]),
+  latestIncidentId: z.string().uuid().optional(),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export type BridgeHealthSummary = z.infer<typeof BridgeHealthSummarySchema>;
+
+export const BridgeHealthResponseSchema = successEnvelope(BridgeHealthSummarySchema);
+
 export const OpenSessionRequestSchema = z.object({
   browserUrl: z.string().url(),
   startupUrl: z.string().url().optional(),
@@ -91,6 +120,12 @@ export const OpenSessionRequestSchema = z.object({
 
 export const OpenSessionResponseSchema = successEnvelope(SessionSummarySchema);
 export type OpenSessionRequest = z.infer<typeof OpenSessionRequestSchema>;
+
+export const SessionPathParamsSchema = z.object({
+  sessionId: SessionIdSchema,
+});
+
+export type SessionPathParams = z.infer<typeof SessionPathParamsSchema>;
 
 export const SelectProjectRequestSchema = z.object({
   sessionId: SessionIdSchema,
@@ -170,3 +205,53 @@ export const StructuredReviewExtractSchema = z.object({
 export const StructuredReviewExtractResponseSchema = successEnvelope(StructuredReviewExtractSchema);
 
 export type StructuredReviewExtractRequest = z.infer<typeof StructuredReviewExtractRequestSchema>;
+
+export const ResumeSessionRequestSchema = z.object({});
+export type ResumeSessionRequest = z.infer<typeof ResumeSessionRequestSchema>;
+
+export const ResumeSessionResponseSchema = successEnvelope(
+  z.object({
+    session: SessionSummarySchema,
+    health: BridgeHealthSummarySchema,
+  }),
+);
+
+export const RecoverConversationRequestSchema = z.object({});
+export type RecoverConversationRequest = z.infer<typeof RecoverConversationRequestSchema>;
+
+export const RecoverConversationResponseSchema = successEnvelope(
+  z.object({
+    snapshot: ConversationSnapshotSchema,
+    health: BridgeHealthSummarySchema,
+  }),
+);
+
+export const DriftRecoveryAttemptSchema = z.object({
+  label: z.string().min(1),
+  outcome: z.enum(['succeeded', 'failed', 'skipped']),
+  details: z.unknown().optional(),
+});
+
+export type DriftRecoveryAttempt = z.infer<typeof DriftRecoveryAttemptSchema>;
+
+export const BridgeDriftIncidentSchema = z.object({
+  incidentId: z.string().uuid(),
+  sessionId: SessionIdSchema.optional(),
+  conversationId: ConversationIdSchema.optional(),
+  category: z.enum(['selector_fallback', 'page_health', 'session_resume', 'conversation_recovery']),
+  status: z.enum(['detected', 'recovered', 'failed']),
+  summary: z.string().min(1),
+  attempts: z.array(DriftRecoveryAttemptSchema).default([]),
+  pageUrl: z.string().url().optional(),
+  occurredAt: z.string().datetime(),
+  resolvedAt: z.string().datetime().optional(),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export type BridgeDriftIncident = z.infer<typeof BridgeDriftIncidentSchema>;
+
+export const DriftIncidentsResponseSchema = successEnvelope(
+  z.object({
+    incidents: z.array(BridgeDriftIncidentSchema),
+  }),
+);

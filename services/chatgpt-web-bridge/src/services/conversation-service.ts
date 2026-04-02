@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  BridgeDriftIncident,
+  BridgeHealthSummary,
   MarkdownExportRequest,
   MessageConversationRequest,
   OpenSessionRequest,
+  RecoverConversationRequest,
+  ResumeSessionRequest,
   SelectProjectRequest,
   StartConversationRequest,
   StructuredReviewExtractRequest,
@@ -18,12 +22,14 @@ import type { Logger } from 'pino';
 import { Conversation } from '../domain/conversation';
 import { Project } from '../domain/project';
 import { AppError } from '../types/error';
-import type { ChatGPTAdapter, ConversationRecord } from '../types/runtime';
+import type { ChatGPTAdapter, ConversationRecord, SessionRecord } from '../types/runtime';
 import { ExportService } from './export-service';
 import { SessionLease } from '../browser/session-lease';
+import { BridgeHealthService } from './bridge-health-service';
+import { SessionResumeGuard } from '../guards/session-resume-guard';
 
 export class ConversationService {
-  private readonly sessions = new Map<string, SessionSummary>();
+  private readonly sessions = new Map<string, SessionRecord>();
   private readonly conversations = new Map<string, ConversationRecord>();
 
   public constructor(
@@ -31,16 +37,23 @@ export class ConversationService {
     private readonly sessionLease: SessionLease,
     private readonly exportService: ExportService,
     private readonly logger: Pick<Logger, 'info'>,
+    private readonly bridgeHealthService?: BridgeHealthService,
+    private readonly sessionResumeGuard?: SessionResumeGuard,
   ) {}
 
   public async openSession(input: OpenSessionRequest): Promise<SessionSummary> {
     const sessionId = randomUUID();
-    const session = await this.adapter.openSession({
+    const openedSession = await this.adapter.openSession({
       sessionId,
       browserUrl: input.browserUrl,
       startupUrl: input.startupUrl,
     });
+    const session: SessionRecord = {
+      ...openedSession,
+      startupUrl: input.startupUrl,
+    };
     this.sessions.set(sessionId, session);
+    await this.recordReadyHealth(session);
     this.logger.info({ sessionId }, 'Opened ChatGPT bridge session');
     return session;
   }
@@ -58,6 +71,7 @@ export class ConversationService {
     );
 
     this.sessions.set(updatedSession.sessionId, updatedSession);
+    await this.recordReadyHealth(updatedSession);
     return updatedSession;
   }
 
@@ -100,6 +114,7 @@ export class ConversationService {
       snapshot: updatedSnapshot,
       inputFiles: [...input.inputFiles],
     });
+    await this.recordReadyHealth(updatedSession, updatedSnapshot.conversationId);
 
     return updatedSnapshot;
   }
@@ -123,6 +138,7 @@ export class ConversationService {
       snapshot: updatedSnapshot,
       inputFiles: updatedInputFiles,
     });
+    await this.recordReadyHealth(session, conversationId);
 
     return updatedSnapshot;
   }
@@ -144,6 +160,7 @@ export class ConversationService {
       snapshot,
       inputFiles: record.inputFiles,
     });
+    await this.recordReadyHealth(session, conversationId);
 
     return snapshot;
   }
@@ -162,6 +179,7 @@ export class ConversationService {
       snapshot,
       inputFiles: record.inputFiles,
     });
+    await this.recordReadyHealth(session, conversationId);
 
     return snapshot;
   }
@@ -196,7 +214,95 @@ export class ConversationService {
     });
   }
 
-  private requireSession(sessionId: string): SessionSummary {
+  public async getBridgeHealth(): Promise<BridgeHealthSummary> {
+    const latest = await this.bridgeHealthService?.getLatestHealth();
+    if (latest) {
+      return latest;
+    }
+
+    const summary: BridgeHealthSummary = {
+      status: 'ready',
+      checkedAt: new Date().toISOString(),
+      activeSessions: this.sessions.size,
+      activeConversations: this.conversations.size,
+      issues: [],
+      metadata: {},
+    };
+    await this.bridgeHealthService?.recordHealth(summary);
+    return summary;
+  }
+
+  public async listDriftIncidents(): Promise<BridgeDriftIncident[]> {
+    return (await this.bridgeHealthService?.listIncidents()) ?? [];
+  }
+
+  public async resumeSession(
+    sessionId: string,
+    input: ResumeSessionRequest,
+  ): Promise<{
+    session: SessionSummary;
+    health: BridgeHealthSummary;
+  }> {
+    void input;
+    const session = this.requireSession(sessionId);
+    if (!this.sessionResumeGuard) {
+      const health = await this.getBridgeHealth();
+      return { session, health };
+    }
+
+    const result = await this.sessionResumeGuard.resumeSession(session);
+    this.sessions.set(sessionId, result.session);
+    const health = await this.getBridgeHealth();
+    return {
+      session: result.session,
+      health: {
+        ...health,
+        status: result.health.status === 'ready' ? 'ready' : health.status,
+      },
+    };
+  }
+
+  public async recoverConversation(
+    conversationId: string,
+    input: RecoverConversationRequest,
+  ): Promise<{
+    snapshot: ConversationSnapshot;
+    health: BridgeHealthSummary;
+  }> {
+    void input;
+    const record = this.requireConversation(conversationId);
+    const session = this.requireSession(record.snapshot.sessionId);
+    if (!this.sessionResumeGuard) {
+      const snapshot = await this.getSnapshot(conversationId);
+      const health = await this.getBridgeHealth();
+      return { snapshot, health };
+    }
+
+    try {
+      const snapshot = await this.sessionResumeGuard.recoverConversation({
+        session,
+        conversation: record,
+      });
+      this.conversations.set(conversationId, {
+        snapshot,
+        inputFiles: record.inputFiles,
+      });
+      await this.recordReadyHealth(session, conversationId);
+      const health = await this.getBridgeHealth();
+      return { snapshot, health };
+    } catch (error) {
+      await this.recordRecoveryFailure({
+        sessionId: session.sessionId,
+        conversationId,
+        pageUrl: record.snapshot.pageUrl ?? session.pageUrl,
+        summary:
+          error instanceof Error ? error.message : 'Conversation recovery failed without details.',
+      });
+      throw error;
+    }
+  }
+
+  private requireSession(sessionId: string): SessionRecord {
     const session = this.sessions.get(sessionId);
     if (!session) {
       throw new AppError('SESSION_NOT_FOUND', 'ChatGPT session was not found', 404, {
@@ -245,5 +351,57 @@ export class ConversationService {
       messages,
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  private async recordReadyHealth(
+    session: SessionRecord,
+    conversationId?: string | undefined,
+  ): Promise<void> {
+    await this.bridgeHealthService?.recordHealth({
+      status: 'ready',
+      checkedAt: new Date().toISOString(),
+      activeSessions: this.sessions.size,
+      activeConversations: this.conversations.size,
+      issues: [],
+      metadata: {
+        sessionId: session.sessionId,
+        ...(conversationId ? { conversationId } : {}),
+      },
+    });
+  }
+
+  private async recordRecoveryFailure(input: {
+    sessionId: string;
+    conversationId: string;
+    pageUrl?: string | undefined;
+    summary: string;
+  }): Promise<void> {
+    if (!this.bridgeHealthService) {
+      return;
+    }
+
+    await this.bridgeHealthService.recordIncident({
+      incidentId: randomUUID(),
+      sessionId: input.sessionId,
+      conversationId: input.conversationId,
+      category: 'conversation_recovery',
+      status: 'failed',
+      summary: input.summary,
+      attempts: [],
+      ...(input.pageUrl ? { pageUrl: input.pageUrl } : {}),
+      occurredAt: new Date().toISOString(),
+      metadata: {},
+    });
+    await this.bridgeHealthService.recordHealth({
+      status: 'degraded',
+      checkedAt: new Date().toISOString(),
+      activeSessions: this.sessions.size,
+      activeConversations: this.conversations.size,
+      issues: [input.summary],
+      metadata: {
+        sessionId: input.sessionId,
+        conversationId: input.conversationId,
+      },
+    });
   }
 }

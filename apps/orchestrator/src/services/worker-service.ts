@@ -14,6 +14,9 @@ import { ReleaseReviewService } from './release-review-service';
 import { RunAcceptanceService } from './run-acceptance-service';
 import { CancellationService } from './cancellation-service';
 import { JobDispositionService } from './job-disposition-service';
+import { RollbackService } from './rollback-service';
+import { DebugSnapshotService } from './debug-snapshot-service';
+import { RetainedWorkspaceService } from './retained-workspace-service';
 import { WorkspaceCleanupService } from './workspace-cleanup-service';
 
 export class WorkerService {
@@ -29,6 +32,9 @@ export class WorkerService {
     private readonly cancellationService: CancellationService | undefined,
     private readonly workspaceCleanupService: WorkspaceCleanupService,
     private readonly jobDispositionService: JobDispositionService,
+    private readonly rollbackService: RollbackService,
+    private readonly debugSnapshotService: DebugSnapshotService,
+    private readonly retainedWorkspaceService: RetainedWorkspaceService,
     private readonly config: {
       workspaceSourceRepoPath: string;
       retryPolicy: RetryPolicy;
@@ -90,18 +96,26 @@ export class WorkerService {
       });
     }
 
-    const workspace = await this.orchestratorService.prepareWorkspaceRuntime({
-      runId: run.runId,
-      taskId: task.taskId,
-      executorType: task.executorType ?? 'codex',
-      baseRepoPath: this.config.workspaceSourceRepoPath,
-      metadata: {
-        jobId: job.jobId,
-      },
-    });
-    await this.workspaceCleanupService.registerWorkspace({
-      workspace,
-    });
+    const reusableWorkspace =
+      job.attempt > 1
+        ? await this.retainedWorkspaceService.findReusableWorkspace(run.runId, task.taskId)
+        : null;
+    const workspace =
+      reusableWorkspace ??
+      (await this.orchestratorService.prepareWorkspaceRuntime({
+        runId: run.runId,
+        taskId: task.taskId,
+        executorType: task.executorType ?? 'codex',
+        baseRepoPath: this.config.workspaceSourceRepoPath,
+        metadata: {
+          jobId: job.jobId,
+        },
+      }));
+    if (!reusableWorkspace) {
+      await this.workspaceCleanupService.registerWorkspace({
+        workspace,
+      });
+    }
     await this.workspaceCleanupService.markActive(run.runId, workspace.workspaceId);
     const command = readExecutionCommand(job.metadata.command ?? task.metadata.command);
     const execution = await this.orchestratorService.executeTask({
@@ -159,6 +173,26 @@ export class WorkerService {
           ? 'cancelled'
           : 'failed',
     });
+    const snapshot = await this.debugSnapshotService.capture({
+      runId: run.runId,
+      taskId: task.taskId,
+      executionResult: execution.result,
+      workspace,
+      reason: `Execution failed for job ${job.jobId}.`,
+      logPaths: execution.result.artifacts.flatMap((artifact) =>
+        artifact.path ? [artifact.path] : [],
+      ),
+    });
+    const rollback = await this.rollbackService.plan({
+      runId: run.runId,
+      taskId: task.taskId,
+      executionResult: execution.result,
+      workspace,
+      reason: `Execution ${execution.result.executionId} failed and requires rollback planning.`,
+      metadata: {
+        snapshotId: snapshot.snapshotId,
+      },
+    });
     const { disposition } = await this.jobDispositionService.forExecutionFailure({
       job,
       result: execution.result,
@@ -186,6 +220,8 @@ export class WorkerService {
         relatedEvidenceIds,
         metadata: {
           executionId: execution.result.executionId,
+          rollbackId: rollback.rollbackId,
+          snapshotId: snapshot.snapshotId,
         },
       });
     }
@@ -195,6 +231,8 @@ export class WorkerService {
         error,
         metadata: {
           executionId: execution.result.executionId,
+          rollbackId: rollback.rollbackId,
+          snapshotId: snapshot.snapshotId,
         },
       });
     }
@@ -205,6 +243,8 @@ export class WorkerService {
         relatedEvidenceIds,
         metadata: {
           executionId: execution.result.executionId,
+          rollbackId: rollback.rollbackId,
+          snapshotId: snapshot.snapshotId,
         },
       });
     }
@@ -214,6 +254,8 @@ export class WorkerService {
       relatedEvidenceIds,
       metadata: {
         executionId: execution.result.executionId,
+        rollbackId: rollback.rollbackId,
+        snapshotId: snapshot.snapshotId,
       },
     });
   }
@@ -290,6 +332,31 @@ export class WorkerService {
         workspace,
         reviewStatus: review.result.status,
       });
+      if (review.result.status === 'changes_requested' || review.result.status === 'rejected') {
+        const snapshot = await this.debugSnapshotService.capture({
+          runId: job.runId,
+          taskId: job.taskId,
+          executionResult: review.executionResult,
+          workspace,
+          reason: `Review ${review.result.reviewId} returned ${review.result.status}.`,
+          logPaths: review.executionResult.artifacts.flatMap((artifact) =>
+            artifact.path ? [artifact.path] : [],
+          ),
+        });
+        const rollback = await this.rollbackService.plan({
+          runId: job.runId,
+          taskId: job.taskId,
+          executionResult: review.executionResult,
+          workspace,
+          reason: `Review ${review.result.reviewId} requested changes or rejected the task.`,
+          metadata: {
+            reviewId: review.result.reviewId,
+            snapshotId: snapshot.snapshotId,
+          },
+        });
+        review.result.metadata.rollbackId = rollback.rollbackId;
+        review.result.metadata.snapshotId = snapshot.snapshotId;
+      }
     }
     const { disposition } = await this.jobDispositionService.forReviewFailure({
       job,

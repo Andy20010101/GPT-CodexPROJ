@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 
 import {
+  BridgeHealthResponseSchema,
   ConversationPathParamsSchema,
+  DriftIncidentsResponseSchema,
   GetSnapshotResponseSchema,
   MarkdownExportRequestSchema,
   MarkdownExportResponseSchema,
@@ -9,8 +11,13 @@ import {
   MessageConversationResponseSchema,
   OpenSessionRequestSchema,
   OpenSessionResponseSchema,
+  RecoverConversationRequestSchema,
+  RecoverConversationResponseSchema,
+  ResumeSessionRequestSchema,
+  ResumeSessionResponseSchema,
   SelectProjectRequestSchema,
   SelectProjectResponseSchema,
+  SessionPathParamsSchema,
   StartConversationRequestSchema,
   StartConversationResponseSchema,
   StructuredReviewExtractRequestSchema,
@@ -25,10 +32,22 @@ export function registerBridgeRoutes(
   app: FastifyInstance,
   conversationService: ConversationService,
 ): void {
+  app.get('/api/health/bridge', async () => {
+    const data = await conversationService.getBridgeHealth();
+    return BridgeHealthResponseSchema.parse({ ok: true, data });
+  });
+
   app.post('/api/sessions/open', async (request) => {
     const body = OpenSessionRequestSchema.parse(request.body);
     const data = await conversationService.openSession(body);
     return OpenSessionResponseSchema.parse({ ok: true, data });
+  });
+
+  app.post('/api/sessions/:sessionId/resume', async (request) => {
+    const params = SessionPathParamsSchema.parse(request.params);
+    const body = ResumeSessionRequestSchema.parse(request.body ?? {});
+    const data = await conversationService.resumeSession(params.sessionId, body);
+    return ResumeSessionResponseSchema.parse({ ok: true, data });
   });
 
   app.post('/api/projects/select', async (request) => {
@@ -75,5 +94,22 @@ export function registerBridgeRoutes(
     const body = StructuredReviewExtractRequestSchema.parse(request.body ?? {});
     const data = await conversationService.extractStructuredReview(params.id, body);
     return StructuredReviewExtractResponseSchema.parse({ ok: true, data });
+  });
+
+  app.post('/api/conversations/:id/recover', async (request) => {
+    const params = ConversationPathParamsSchema.parse(request.params);
+    const body = RecoverConversationRequestSchema.parse(request.body ?? {});
+    const data = await conversationService.recoverConversation(params.id, body);
+    return RecoverConversationResponseSchema.parse({ ok: true, data });
+  });
+
+  app.get('/api/drift/incidents', async () => {
+    const incidents = await conversationService.listDriftIncidents();
+    return DriftIncidentsResponseSchema.parse({
+      ok: true,
+      data: {
+        incidents,
+      },
+    });
   });
 }

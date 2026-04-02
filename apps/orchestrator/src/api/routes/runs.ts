@@ -9,6 +9,8 @@ import {
   RunResponseSchema,
   RunSummaryResponseSchema,
   TaskGraphRequestSchema,
+  ValidateE2eRequestSchema,
+  ValidateE2eResponseSchema,
 } from '../schemas/run-api';
 import type { OrchestratorRuntimeBundle } from '../../index';
 import { OrchestratorError } from '../../utils/error';
@@ -68,6 +70,22 @@ export function registerRunRoutes(app: FastifyInstance, bundle: OrchestratorRunt
         run,
         summary,
         runtimeState,
+      },
+    });
+  });
+
+  app.post('/api/runs/:runId/validate-e2e', async (request) => {
+    const params = RunPathParamsSchema.parse(request.params);
+    const body = ValidateE2eRequestSchema.parse(request.body ?? {});
+    const report = await bundle.e2eValidationService.validate({
+      runId: params.runId,
+      createdBy: body.requestedBy,
+      mode: body.mode,
+    });
+    return ValidateE2eResponseSchema.parse({
+      ok: true,
+      data: {
+        report,
       },
     });
   });

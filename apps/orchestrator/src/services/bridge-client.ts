@@ -1,15 +1,23 @@
 import {
   ApiFailureSchema,
+  BridgeHealthResponseSchema,
+  DriftIncidentsResponseSchema,
   MarkdownExportResponseSchema,
   MessageConversationResponseSchema,
   OpenSessionResponseSchema,
+  RecoverConversationResponseSchema,
+  ResumeSessionResponseSchema,
   SelectProjectResponseSchema,
   StartConversationResponseSchema,
   StructuredReviewExtractResponseSchema,
   WaitConversationResponseSchema,
+  type BridgeDriftIncident,
+  type BridgeHealthSummary,
   type MarkdownExportRequest,
   type MessageConversationRequest,
   type OpenSessionRequest,
+  type RecoverConversationRequest,
+  type ResumeSessionRequest,
   type SelectProjectRequest,
   type StartConversationRequest,
   type StructuredReviewExtractRequest,
@@ -37,13 +45,23 @@ export class BridgeClientError extends Error {
 }
 
 export interface BridgeClient {
+  getBridgeHealth(): Promise<BridgeHealthSummary>;
+  listDriftIncidents(): Promise<BridgeDriftIncident[]>;
   openSession(input: OpenSessionRequest): Promise<SessionSummary>;
+  resumeSession(
+    sessionId: string,
+    input: ResumeSessionRequest,
+  ): Promise<{ session: SessionSummary; health: BridgeHealthSummary }>;
   selectProject(input: SelectProjectRequest): Promise<SessionSummary>;
   startConversation(input: StartConversationRequest): Promise<ConversationSnapshot>;
   sendMessage(
     conversationId: string,
     input: MessageConversationRequest,
   ): Promise<ConversationSnapshot>;
+  recoverConversation(
+    conversationId: string,
+    input: RecoverConversationRequest,
+  ): Promise<{ snapshot: ConversationSnapshot; health: BridgeHealthSummary }>;
   waitForCompletion(
     conversationId: string,
     input: WaitConversationRequest,
@@ -64,11 +82,37 @@ export class HttpBridgeClient implements BridgeClient {
     private readonly fetchImplementation: BridgeFetch = fetch,
   ) {}
 
+  public async getBridgeHealth(): Promise<BridgeHealthSummary> {
+    return this.requestData('/api/health/bridge', {
+      method: 'GET',
+      responseSchema: BridgeHealthResponseSchema,
+    });
+  }
+
+  public async listDriftIncidents(): Promise<BridgeDriftIncident[]> {
+    const data = await this.requestData('/api/drift/incidents', {
+      method: 'GET',
+      responseSchema: DriftIncidentsResponseSchema,
+    });
+    return data.incidents;
+  }
+
   public async openSession(input: OpenSessionRequest): Promise<SessionSummary> {
     return this.requestData('/api/sessions/open', {
       method: 'POST',
       body: input,
       responseSchema: OpenSessionResponseSchema,
+    });
+  }
+
+  public async resumeSession(
+    sessionId: string,
+    input: ResumeSessionRequest,
+  ): Promise<{ session: SessionSummary; health: BridgeHealthSummary }> {
+    return this.requestData(`/api/sessions/${sessionId}/resume`, {
+      method: 'POST',
+      body: input,
+      responseSchema: ResumeSessionResponseSchema,
     });
   }
 
@@ -96,6 +140,17 @@ export class HttpBridgeClient implements BridgeClient {
       method: 'POST',
       body: input,
       responseSchema: MessageConversationResponseSchema,
+    });
+  }
+
+  public async recoverConversation(
+    conversationId: string,
+    input: RecoverConversationRequest,
+  ): Promise<{ snapshot: ConversationSnapshot; health: BridgeHealthSummary }> {
+    return this.requestData(`/api/conversations/${conversationId}/recover`, {
+      method: 'POST',
+      body: input,
+      responseSchema: RecoverConversationResponseSchema,
     });
   }
 

@@ -235,3 +235,87 @@ export function getRuntimeProcessesRoot(artifactDir: string): string {
 export function getRuntimeProcessFile(artifactDir: string, processHandleId: string): string {
   return path.join(getRuntimeProcessesRoot(artifactDir), `${processHandleId}.json`);
 }
+
+export function getRuntimeRemediationRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'remediation');
+}
+
+export function getRuntimeRemediationFile(artifactDir: string, remediationId: string): string {
+  return path.join(getRuntimeRemediationRoot(artifactDir), `${remediationId}.json`);
+}
+
+export function getRunRemediationRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'remediation');
+}
+
+export function getRunRemediationFile(
+  artifactDir: string,
+  runId: string,
+  remediationId: string,
+): string {
+  return path.join(getRunRemediationRoot(artifactDir, runId), `${remediationId}.json`);
+}
+
+export function getRuntimeRollbackRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'rollbacks');
+}
+
+export function getRuntimeRollbackFile(artifactDir: string, rollbackId: string): string {
+  return path.join(getRuntimeRollbackRoot(artifactDir), `${rollbackId}.json`);
+}
+
+export function getRunRollbackRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'rollbacks');
+}
+
+export function getRunRollbackFile(artifactDir: string, runId: string, rollbackId: string): string {
+  return path.join(getRunRollbackRoot(artifactDir, runId), `${rollbackId}.json`);
+}
+
+export function getRuntimeSnapshotsRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'snapshots');
+}
+
+export function getRuntimeSnapshotFile(artifactDir: string, snapshotId: string): string {
+  return path.join(getRuntimeSnapshotsRoot(artifactDir), `${snapshotId}.json`);
+}
+
+export function getRunSnapshotsRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'snapshots');
+}
+
+export function getRunSnapshotFile(artifactDir: string, runId: string, snapshotId: string): string {
+  return path.join(getRunSnapshotsRoot(artifactDir, runId), `${snapshotId}.json`);
+}
+
+export function getRuntimeStabilityRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'stability');
+}
+
+export function getRuntimeStabilityReportFile(artifactDir: string): string {
+  return path.join(getRuntimeStabilityRoot(artifactDir), 'stability-report.json');
+}
+
+export function getRunIncidentsRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'incidents');
+}
+
+export function getRunIncidentFile(artifactDir: string, runId: string, incidentId: string): string {
+  return path.join(getRunIncidentsRoot(artifactDir, runId), `${incidentId}.json`);
+}
+
+export function getRunValidationRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'validation');
+}
+
+export function getRunValidationReportFile(artifactDir: string, runId: string): string {
+  return path.join(getRunValidationRoot(artifactDir, runId), 'validation-report.json');
+}
+
+export function getRuntimeResumeRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'resume');
+}
+
+export function getRuntimeResumeFile(artifactDir: string, resumeStateId: string): string {
+  return path.join(getRuntimeResumeRoot(artifactDir), `${resumeStateId}.json`);
+}
