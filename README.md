@@ -21,6 +21,7 @@ This repository currently provides:
 - A first end-to-end single-task loop that can prepare an isolated workspace, execute through a local Codex CLI adapter, route structured review back through the bridge, and translate that review into `review_gate`.
 - A first multi-task runtime shell with a Fastify API, file-backed job queue, worker loop, retry/recovery handling, dependency-based task unlocking, release review, and run acceptance.
 - A first daemon-grade runtime shell with worker leases, heartbeats, stale-job reclaim, concurrency control, pause/resume/drain/shutdown controls, cancellation requests, and daemon status APIs.
+- A first runtime-hardening layer with subprocess lifecycle control, workspace retention and GC, priority-aware scheduling, quota-aware dequeue rules, failure taxonomy, and machine-readable job disposition.
 
 ## Layout
 
@@ -62,6 +63,11 @@ The repository now has:
   - `WorkerLeaseService` and `HeartbeatService` for running-job protection
   - `ConcurrencyControlService`, `CancellationService`, and `StaleJobReclaimService` for safe pickup and recovery
   - `DaemonStatusService` for metrics-like runtime summaries
+- a runtime-hardening layer with:
+  - `ProcessControlService` and `RunnerLifecycleService` for subprocess tracking, timeout handling, graceful terminate, and force kill
+  - `WorkspaceCleanupService` and `WorkspaceGcService` for cleanup, retain, TTL, and garbage collection policies
+  - `PriorityQueueService`, `QuotaControlService`, and `SchedulingPolicyService` for non-preemptive priority and quota-aware scheduling
+  - `FailureClassificationService` and `JobDispositionService` for machine-readable error taxonomy and retry/manual-attention routing
 - shared bridge contracts reused across planes
 
 The orchestrator is intentionally not a production workflow engine yet. It models the control-plane lifecycle, enforces state and gate rules, persists runtime/job/release evidence, and now exposes an API plus a daemon shell, but it does not pretend to be a distributed scheduler or that a remote Codex cloud runtime is already present.
@@ -151,6 +157,21 @@ DAEMON_LEASE_TTL_MS=2000
 DAEMON_STALE_THRESHOLD_MS=3000
 DAEMON_MAX_CONCURRENT_JOBS=2
 DAEMON_MAX_CONCURRENT_JOBS_PER_RUN=1
+DAEMON_GC_INTERVAL_MS=10000
+WORKSPACE_TTL_MS=3600000
+WORKSPACE_CLEANUP_MODE=delayed
+WORKSPACE_RETAIN_ON_FAILURE=true
+WORKSPACE_RETAIN_ON_REJECTED_REVIEW=true
+WORKSPACE_RETAIN_ON_DEBUG=true
+WORKSPACE_MAX_RETAINED_PER_RUN=5
+SCHEDULER_MAX_TASK_EXECUTION=2
+SCHEDULER_MAX_TASK_REVIEW=1
+SCHEDULER_MAX_RELEASE_REVIEW=1
+SCHEDULER_FAIRNESS_WINDOW_MS=20000
+SCHEDULER_RELEASE_BOOST_MS=10000
+RUNNER_TERMINATE_GRACE_MS=2000
+RUNNER_KILL_SIGNAL=SIGKILL
+RUNNER_FORCE_KILL_AFTER_MS=4000
 ```
 
 This is still a local runtime adapter. The repository does not claim that a production Codex API or cloud sandbox is already connected.
@@ -196,6 +217,8 @@ apps/orchestrator/artifacts/runs/<runId>/daemon/daemon-state.json
 apps/orchestrator/artifacts/runs/<runId>/workers/<workerId>.json
 apps/orchestrator/artifacts/runs/<runId>/heartbeats/<heartbeatId>.json
 apps/orchestrator/artifacts/runs/<runId>/cancellations/<cancellationId>.json
+apps/orchestrator/artifacts/runs/<runId>/workspaces/<workspaceId>.json
+apps/orchestrator/artifacts/runs/<runId>/workspace-runtime/<workspaceId>.json
 apps/orchestrator/artifacts/runs/<runId>/releases/<releaseReviewId>/
   request.json
   result.json
@@ -205,6 +228,11 @@ apps/orchestrator/artifacts/runs/<runId>/run-acceptance.json
 apps/orchestrator/artifacts/runtime/
   daemon-state.json
   metrics-summary.json
+  scheduling/scheduling-state.json
+  failures/
+  cleanup/
+  gc/
+  processes/
   workers/
   leases/
   heartbeats/
@@ -232,10 +260,23 @@ The orchestrator now exposes a typed Fastify API for the current runtime boundar
 - `POST /api/daemon/resume`
 - `POST /api/daemon/drain`
 - `POST /api/daemon/shutdown`
+- `GET /api/daemon/metrics`
 - `GET /api/workers`
 - `POST /api/jobs/:jobId/cancel`
+- `GET /api/jobs/:jobId/failure`
+- `GET /api/jobs/:jobId/process`
+- `GET /api/jobs/:jobId/cancellation`
+- `GET /api/runtime/scheduling`
+- `GET /api/runtime/workspaces`
+- `POST /api/runtime/workspaces/gc`
 
 The worker/runtime layer is still single-process and file-backed. That is deliberate. It gives the project resumability, leases, heartbeats, and auditable queue state without adding a database, Redis, or a distributed queue too early.
+
+Start the long-running daemon shell locally with:
+
+```bash
+npm run daemon --workspace @review-then-codex/orchestrator
+```
 
 ## Daemon Runtime Boundary
 
@@ -245,7 +286,11 @@ The repository now includes a daemon-grade worker shell, but its boundary is exp
 - one process-local worker pool
 - file-backed leases and heartbeats
 - cooperative cancellation
+- subprocess-level terminate and force-kill for local runners
 - graceful drain and shutdown
+- workspace retention, TTL-based GC, and failure-aware cleanup
+- priority and quota-aware dequeue decisions
+- machine-readable failure taxonomy and job disposition
 
 It does not yet provide HA failover, distributed leases, cross-process consensus, or strong idempotency guarantees under arbitrary restarts.
 
@@ -253,6 +298,6 @@ It does not yet provide HA failover, distributed leases, cross-process consensus
 
 The most useful next steps from here are:
 
-1. harden the local Codex CLI adapter into a safer execution runtime with better parsing, patch lifecycle control, and stronger idempotency under retry
+1. strengthen patch lifecycle and workspace rollback so retries and manual recovery can safely reuse retained workspaces
 2. stabilize real bridge sessions for longer review chains, including better drift handling and richer release-level review prompts
-3. extend the daemon shell into a more production-grade runtime with stronger cancellation, cross-process safety, richer metrics, and multi-daemon coordination
+3. extend the daemon shell with stronger observability, richer fairness controls, and eventual multi-instance coordination without pretending it already exists

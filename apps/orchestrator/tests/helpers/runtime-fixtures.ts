@@ -7,7 +7,9 @@ import { randomUUID } from 'node:crypto';
 import { createOrchestratorRuntimeBundle, type OrchestratorRuntimeBundle } from '../../src';
 import type {
   ArchitectureFreeze,
+  CleanupPolicy,
   RequirementFreeze,
+  SchedulingPolicy,
   TaskEnvelope,
   TaskGraph,
 } from '../../src/contracts';
@@ -319,6 +321,10 @@ export async function bootstrapRuntimeBundle(input: {
   edges?: TaskGraph['edges'];
   bridgeClient?: BridgeClient;
   codexRunner?: CodexRunner;
+  worktreeService?: WorktreeService;
+  daemonWorkerCount?: number;
+  schedulingPolicy?: SchedulingPolicy;
+  workspaceCleanupPolicy?: CleanupPolicy;
 }): Promise<{
   bundle: OrchestratorRuntimeBundle;
   runId: string;
@@ -348,7 +354,12 @@ export async function bootstrapRuntimeBundle(input: {
           metadata: {},
         },
       ]),
-    worktreeService: new FakeWorktreeService(),
+    worktreeService: input.worktreeService ?? new FakeWorktreeService(),
+    ...(input.daemonWorkerCount ? { daemonWorkerCount: input.daemonWorkerCount } : {}),
+    ...(input.schedulingPolicy ? { schedulingPolicy: input.schedulingPolicy } : {}),
+    ...(input.workspaceCleanupPolicy
+      ? { workspaceCleanupPolicy: input.workspaceCleanupPolicy }
+      : {}),
   });
   const run = await bundle.orchestratorService.createRun({
     title: 'Runtime run',

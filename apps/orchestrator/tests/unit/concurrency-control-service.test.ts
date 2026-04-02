@@ -5,7 +5,7 @@ import { createOrchestratorRuntimeBundle } from '../../src';
 import { createArtifactDir } from '../helpers/runtime-fixtures';
 
 describe('ConcurrencyControlService', () => {
-  it('defers jobs for global, per-run, and exclusive-key conflicts', async () => {
+  it('defers jobs for exclusive-key conflicts', async () => {
     const artifactDir = await createArtifactDir('concurrency-control-');
     const bundle = createOrchestratorRuntimeBundle({
       artifactDir,
@@ -59,6 +59,6 @@ describe('ConcurrencyControlService', () => {
 
     expect(decision.allowed).toBe(false);
     expect(decision.action).toBe('defer');
-    expect(decision.reason).toContain('Global concurrency limit');
+    expect(decision.reason).toContain('Exclusive concurrency key');
   });
 });

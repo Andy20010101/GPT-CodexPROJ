@@ -16,6 +16,7 @@ Current scope:
 - a Fastify API layer for run, task, job, and release operations
 - a workflow runtime layer with queueing, worker processing, retry, recovery, dependency unlock, release review, and run acceptance
 - a daemon runtime layer with worker leases, heartbeats, concurrency control, drain/shutdown control, cancellation requests, and status summaries
+- a runtime-hardening layer with subprocess lifecycle management, workspace cleanup/retention/GC, priority-aware scheduling, quota control, failure taxonomy, and job disposition
 - integration coverage for the control-plane happy path and failure rules
 
 The orchestrator now exposes both service boundaries and a first runtime shell, but it is still intentionally single-process and file-backed. It persists state to files, dispatches typed execution requests through adapters, and does not claim to be a production distributed scheduler.
@@ -40,13 +41,21 @@ Start the API:
 npm run dev --workspace @review-then-codex/orchestrator
 ```
 
+Start the daemon shell:
+
+```bash
+npm run daemon --workspace @review-then-codex/orchestrator
+```
+
 Artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/`.
 
 Execution attempt artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/executions/<executionId>/`.
 
 Review artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/reviews/<reviewId>/`.
 
-Workspace runtime records are written under `apps/orchestrator/artifacts/runs/<runId>/workspaces/<workspaceId>.json`.
+Workspace lifecycle records are written under `apps/orchestrator/artifacts/runs/<runId>/workspaces/<workspaceId>.json`.
+
+Workspace runtime descriptors are written under `apps/orchestrator/artifacts/runs/<runId>/workspace-runtime/<workspaceId>.json`.
 
 Job records are written under `apps/orchestrator/artifacts/runs/<runId>/jobs/<jobId>.json`.
 
@@ -57,3 +66,20 @@ Release review artifacts are written under `apps/orchestrator/artifacts/runs/<ru
 Daemon state is written under `apps/orchestrator/artifacts/runtime/daemon-state.json`.
 
 Worker, lease, heartbeat, and cancellation artifacts are written under `apps/orchestrator/artifacts/runtime/` and mirrored into run-level directories where applicable.
+
+Runtime-hardening artifacts are also written under:
+
+- `apps/orchestrator/artifacts/runtime/scheduling/scheduling-state.json`
+- `apps/orchestrator/artifacts/runtime/failures/<failureId>.json`
+- `apps/orchestrator/artifacts/runtime/cleanup/<cleanupId>.json`
+- `apps/orchestrator/artifacts/runtime/gc/<gcRunId>.json`
+- `apps/orchestrator/artifacts/runtime/processes/<processHandleId>.json`
+
+The current runtime is still intentionally:
+
+- single instance
+- single process
+- file backed
+- non-preemptive
+
+It is suitable as a local daemon baseline or a future `systemd`/`pm2`/container entrypoint, but it is not a distributed scheduler.
