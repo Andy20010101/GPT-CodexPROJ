@@ -10,6 +10,7 @@ import type {
   TaskEnvelope,
   TaskGraph,
   TaskTestPlanItem,
+  WorkspaceRuntime,
 } from '../contracts';
 import { createRunRecord, type RunRecord } from '../domain/run';
 import { assertRunStageTransition } from '../domain/stage';
@@ -27,6 +28,9 @@ import { TaskLoopService } from '../services/task-loop-service';
 import { ExecutionService, type ExecutionDispatch } from '../services/execution-service';
 import type { ExecutionFailureDisposition } from '../domain/execution';
 import type { ExecutorType } from '../contracts';
+import { WorkspaceRuntimeService } from '../services/workspace-runtime-service';
+import { ReviewService, type ReviewDispatch } from '../services/review-service';
+import { ReviewGateService } from '../services/review-gate-service';
 
 export class OrchestratorService {
   public constructor(
@@ -40,6 +44,9 @@ export class OrchestratorService {
     private readonly evidenceLedgerService: EvidenceLedgerService,
     private readonly gateEvaluator: GateEvaluator,
     private readonly executionService: ExecutionService,
+    private readonly workspaceRuntimeService: WorkspaceRuntimeService,
+    private readonly reviewService: ReviewService,
+    private readonly reviewGateService: ReviewGateService,
   ) {}
 
   public async createRun(input: {
@@ -121,7 +128,8 @@ export class OrchestratorService {
   public async createExecutionRequest(input: {
     runId: string;
     taskId: string;
-    workspacePath: string;
+    workspaceId?: string | undefined;
+    workspacePath?: string | undefined;
     executorType?: ExecutorType | undefined;
     command?: ExecutionCommand | undefined;
     relatedEvidenceIds?: readonly string[] | undefined;
@@ -134,12 +142,19 @@ export class OrchestratorService {
     return this.executionService.buildRequest({
       run,
       task,
-      workspacePath: input.workspacePath,
+      workspacePath: await this.resolveWorkspacePath(
+        input.runId,
+        input.workspaceId,
+        input.workspacePath,
+      ),
       executorType: input.executorType,
       command: input.command,
       architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
       relatedEvidenceIds: input.relatedEvidenceIds,
-      metadata: input.metadata,
+      metadata: {
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+        ...(input.metadata ?? {}),
+      },
     });
   }
 
@@ -147,7 +162,8 @@ export class OrchestratorService {
     runId: string;
     taskId: string;
     producer: string;
-    workspacePath: string;
+    workspaceId?: string | undefined;
+    workspacePath?: string | undefined;
     executorType?: ExecutorType | undefined;
     command?: ExecutionCommand | undefined;
     relatedEvidenceIds?: readonly string[] | undefined;
@@ -166,12 +182,19 @@ export class OrchestratorService {
       run: await this.runRepository.getRun(input.runId),
       task,
       producer: input.producer,
-      workspacePath: input.workspacePath,
+      workspacePath: await this.resolveWorkspacePath(
+        input.runId,
+        input.workspaceId,
+        input.workspacePath,
+      ),
       executorType: input.executorType,
       command: input.command,
       architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
       relatedEvidenceIds: input.relatedEvidenceIds,
-      metadata: input.metadata,
+      metadata: {
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+        ...(input.metadata ?? {}),
+      },
       onFailure: input.onFailure,
     });
 
@@ -361,6 +384,108 @@ export class OrchestratorService {
     return this.executionService.collectExecutionArtifacts(runId, taskId);
   }
 
+  public async prepareWorkspaceRuntime(input: {
+    runId: string;
+    taskId: string;
+    baseRepoPath: string;
+    executorType?: ExecutorType | undefined;
+    executionId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }): Promise<WorkspaceRuntime> {
+    const run = await this.runRepository.getRun(input.runId);
+    const task = await this.taskRepository.getTask(input.runId, input.taskId);
+
+    return this.workspaceRuntimeService.prepareWorkspace({
+      run,
+      taskId: input.taskId,
+      executorType: input.executorType ?? task.executorType ?? 'codex',
+      baseRepoPath: input.baseRepoPath,
+      executionId: input.executionId,
+      metadata: input.metadata,
+    });
+  }
+
+  public async cleanupWorkspaceRuntime(
+    runId: string,
+    workspaceId: string,
+  ): Promise<WorkspaceRuntime> {
+    return this.workspaceRuntimeService.cleanupWorkspace(runId, workspaceId);
+  }
+
+  public async describeWorkspaceRuntime(
+    runId: string,
+    workspaceId: string,
+  ): Promise<WorkspaceRuntime> {
+    return this.workspaceRuntimeService.describeWorkspace(runId, workspaceId);
+  }
+
+  public async reviewTaskExecution(input: {
+    runId: string;
+    taskId: string;
+    executionId: string;
+    producer: string;
+    reviewType?: 'task_review' | 'release_review' | undefined;
+    relatedEvidenceIds?: readonly string[] | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }): Promise<ReviewDispatch & { gateResult: GateResult; task: TaskEnvelope }> {
+    const run = await this.runRepository.getRun(input.runId);
+    let task = await this.taskRepository.getTask(input.runId, input.taskId);
+    if (task.status === 'tests_green') {
+      task = await this.taskLoopService.submitForReview(input.runId, input.taskId, [
+        `Review requested for execution ${input.executionId}.`,
+      ]);
+    } else if (task.status !== 'review_pending') {
+      throw new OrchestratorError(
+        'TASK_NOT_READY_FOR_REVIEW',
+        'Task review requires the task to be in tests_green or review_pending.',
+        {
+          runId: input.runId,
+          taskId: input.taskId,
+          status: task.status,
+        },
+      );
+    }
+
+    const executionResult = await this.executionService.getExecutionResult(
+      input.runId,
+      input.executionId,
+    );
+    if (!executionResult) {
+      throw new OrchestratorError(
+        'EXECUTION_NOT_FOUND',
+        `Execution ${input.executionId} was not found`,
+        {
+          runId: input.runId,
+          taskId: input.taskId,
+          executionId: input.executionId,
+        },
+      );
+    }
+
+    const review = await this.reviewService.reviewExecution({
+      run,
+      task,
+      executionResult,
+      reviewType: input.reviewType,
+      producer: input.producer,
+      architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
+      relatedEvidenceIds: input.relatedEvidenceIds,
+      metadata: input.metadata,
+    });
+    const gate = await this.reviewGateService.recordTaskReviewGate({
+      run,
+      task,
+      reviewResult: review.result,
+      evaluator: input.producer,
+    });
+
+    return {
+      ...review,
+      gateResult: gate.gateResult,
+      task: gate.task,
+    };
+  }
+
   private async assertExecutionReady(
     runId: string,
     taskId: string,
@@ -393,5 +518,28 @@ export class OrchestratorService {
         },
       );
     }
+  }
+
+  private async resolveWorkspacePath(
+    runId: string,
+    workspaceId?: string | undefined,
+    workspacePath?: string | undefined,
+  ): Promise<string> {
+    if (workspaceId) {
+      const record = await this.workspaceRuntimeService.getWorkspace(runId, workspaceId);
+      return record.workspacePath;
+    }
+
+    if (workspacePath) {
+      return workspacePath;
+    }
+
+    throw new OrchestratorError(
+      'WORKSPACE_RUNTIME_REQUIRED',
+      'Execution requires either a prepared workspaceId or an explicit workspacePath.',
+      {
+        runId,
+      },
+    );
   }
 }

@@ -19,6 +19,7 @@ export function assertTaskLoopTransition(
   options: {
     reviewGatePassed?: boolean | undefined;
     allowAcceptedRollback?: boolean | undefined;
+    allowReviewRework?: boolean | undefined;
   } = {},
 ): void {
   if (current === next) {
@@ -26,6 +27,14 @@ export function assertTaskLoopTransition(
   }
 
   if (current === 'accepted' && next === 'rejected' && options.allowAcceptedRollback) {
+    return;
+  }
+
+  if (
+    current === 'review_pending' &&
+    next === 'implementation_in_progress' &&
+    options.allowReviewRework
+  ) {
     return;
   }
 

@@ -141,6 +141,13 @@ export class ExecutionService {
   ): Promise<import('../contracts').ExecutionArtifact[]> {
     return this.executionEvidenceService.collectExecutionArtifacts(runId, taskId);
   }
+
+  public async getExecutionResult(
+    runId: string,
+    executionId: string,
+  ): Promise<import('../contracts').ExecutionResult | null> {
+    return this.executionEvidenceService.getExecutionResult(runId, executionId);
+  }
 }
 
 function buildArchitectureConstraints(freeze: ArchitectureFreeze | null | undefined): string[] {

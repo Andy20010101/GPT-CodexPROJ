@@ -151,6 +151,11 @@ export class CodexExecutor implements ExecutionExecutor {
         exitCode: 1,
         metadata: {
           runnerError: true,
+          ...(error instanceof Error && 'code' in error
+            ? {
+                errorCode: String((error as { code?: unknown }).code ?? 'RUNNER_ERROR'),
+              }
+            : {}),
         },
       });
     }

@@ -138,6 +138,13 @@ export class ExecutionEvidenceService {
     const results = await this.executionRepository.listResultsForTask(runId, taskId);
     return results.flatMap((result) => result.artifacts);
   }
+
+  public async getExecutionResult(
+    runId: string,
+    executionId: string,
+  ): Promise<ExecutionResult | null> {
+    return this.executionRepository.getResult(runId, executionId);
+  }
 }
 
 function mapArtifactKindToEvidenceKind(

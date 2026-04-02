@@ -27,3 +27,23 @@ export function getExecutionResultFile(
 ): string {
   return path.join(getExecutionRoot(artifactDir, runId, executionId), 'result.json');
 }
+
+export function getReviewRoot(artifactDir: string, runId: string, reviewId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'reviews', reviewId);
+}
+
+export function getReviewRequestFile(artifactDir: string, runId: string, reviewId: string): string {
+  return path.join(getReviewRoot(artifactDir, runId, reviewId), 'request.json');
+}
+
+export function getReviewResultFile(artifactDir: string, runId: string, reviewId: string): string {
+  return path.join(getReviewRoot(artifactDir, runId, reviewId), 'result.json');
+}
+
+export function getWorkspaceRecordFile(
+  artifactDir: string,
+  runId: string,
+  workspaceId: string,
+): string {
+  return path.join(getRunRoot(artifactDir, runId), 'workspaces', `${workspaceId}.json`);
+}

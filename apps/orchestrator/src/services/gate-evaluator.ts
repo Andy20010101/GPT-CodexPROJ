@@ -71,14 +71,18 @@ export class GateEvaluator {
         if (!input.task) {
           reasons.push('Task is required for review gate evaluation.');
         } else {
-          const hasReviewEvidence = input.evidence.some(
-            (entry) => entry.kind === 'review_note' || entry.kind === 'bridge_structured_review',
+          const reviewResultEvidence = input.evidence.find(
+            (entry) => entry.kind === 'review_result',
           );
+          const reviewStatus = reviewResultEvidence?.metadata.reviewStatus;
           if (input.task.status !== 'review_pending') {
             reasons.push('Task is not waiting for review.');
           }
-          if (!hasReviewEvidence) {
-            reasons.push('No review evidence is attached to the task.');
+          if (!reviewResultEvidence) {
+            reasons.push('No structured review result evidence is attached to the task.');
+          }
+          if (reviewStatus !== 'approved') {
+            reasons.push('Structured review did not approve the task.');
           }
         }
         break;
@@ -86,7 +90,10 @@ export class GateEvaluator {
       case 'acceptance_gate': {
         if (input.task) {
           const hasReviewEvidence = input.evidence.some(
-            (entry) => entry.kind === 'review_note' || entry.kind === 'bridge_structured_review',
+            (entry) =>
+              entry.kind === 'review_note' ||
+              entry.kind === 'bridge_structured_review' ||
+              entry.kind === 'review_result',
           );
           const hasTestEvidence = input.evidence.some((entry) => entry.kind === 'test_report');
           if (input.task.status !== 'accepted') {

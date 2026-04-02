@@ -14,11 +14,14 @@ export const EvidenceKindSchema = z.enum([
   'gate_result',
   'execution_request',
   'execution_result',
+  'review_request',
+  'review_result',
   'patch',
   'command_log',
   'build_log',
   'review_input',
   'review_output',
+  'workspace_runtime',
 ]);
 
 export type EvidenceKind = z.infer<typeof EvidenceKindSchema>;

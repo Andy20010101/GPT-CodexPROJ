@@ -144,6 +144,26 @@ export class TaskLoopService {
     return updatedTask;
   }
 
+  public async reopenImplementationAfterReview(
+    runId: string,
+    taskId: string,
+    implementationNotes: readonly string[] = [],
+  ): Promise<TaskEnvelope> {
+    const task = await this.taskRepository.getTask(runId, taskId);
+    assertTaskLoopTransition(task.status, 'implementation_in_progress', {
+      allowReviewRework: true,
+    });
+
+    const updatedTask = TaskEnvelopeSchema.parse({
+      ...task,
+      status: 'implementation_in_progress',
+      implementationNotes: [...task.implementationNotes, ...implementationNotes],
+      updatedAt: new Date().toISOString(),
+    });
+    await this.taskRepository.saveTask(updatedTask);
+    return updatedTask;
+  }
+
   public async acceptTask(runId: string, taskId: string): Promise<TaskEnvelope> {
     const task = await this.taskRepository.getTask(runId, taskId);
     const latestReviewGate = await this.evidenceRepository.findLatestGateResult(
@@ -151,9 +171,24 @@ export class TaskLoopService {
       'review_gate',
       taskId,
     );
+    const reviewGatePassed =
+      latestReviewGate?.passed === true &&
+      latestReviewGate.metadata.source === 'review-gate-service';
+
+    if (!reviewGatePassed) {
+      throw new OrchestratorError(
+        'REVIEW_GATE_REQUIRED',
+        'Task cannot be accepted before review-gate-service records a passing review gate.',
+        {
+          runId,
+          taskId,
+          latestReviewGate,
+        },
+      );
+    }
 
     assertTaskLoopTransition(task.status, 'accepted', {
-      reviewGatePassed: latestReviewGate?.passed ?? false,
+      reviewGatePassed,
     });
     const updatedTask = TaskEnvelopeSchema.parse({
       ...task,
