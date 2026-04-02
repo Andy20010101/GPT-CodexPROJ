@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ExecutorTypeSchema } from './executor-capability';
 import { AcceptanceCriterionSchema } from './requirement-freeze';
 import { TaskLoopStateSchema } from './task-loop-state';
 
@@ -23,6 +24,7 @@ export const TaskEnvelopeSchema = z.object({
   runId: z.string().uuid(),
   title: z.string().min(1),
   objective: z.string().min(1),
+  executorType: ExecutorTypeSchema.optional(),
   scope: TaskScopeSchema,
   allowedFiles: z.array(z.string().min(1)).min(1),
   disallowedFiles: z.array(z.string().min(1)).default([]),
@@ -31,6 +33,7 @@ export const TaskEnvelopeSchema = z.object({
   testPlan: z.array(TaskTestPlanItemSchema).default([]),
   implementationNotes: z.array(z.string().min(1)).default([]),
   evidenceIds: z.array(z.string().uuid()).default([]),
+  metadata: z.record(z.unknown()).default({}),
   status: TaskLoopStateSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

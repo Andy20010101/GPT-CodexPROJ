@@ -10,6 +10,11 @@ export async function writeJsonFile(filePath: string, value: unknown): Promise<v
   await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
+export async function writeTextFile(filePath: string, value: string): Promise<void> {
+  await ensureDirectory(path.dirname(filePath));
+  await fs.writeFile(filePath, value, 'utf8');
+}
+
 export async function readJsonFile<T>(filePath: string): Promise<T | null> {
   try {
     const content = await fs.readFile(filePath, 'utf8');

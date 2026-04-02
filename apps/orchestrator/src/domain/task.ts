@@ -5,7 +5,7 @@ const allowedTaskTransitions: Record<TaskLoopState, readonly TaskLoopState[]> = 
   drafted: ['tests_planned'],
   tests_planned: ['tests_red'],
   tests_red: ['implementation_in_progress'],
-  implementation_in_progress: ['tests_green'],
+  implementation_in_progress: ['tests_green', 'rejected'],
   tests_green: ['refactor_in_progress', 'review_pending'],
   refactor_in_progress: ['tests_green', 'review_pending'],
   review_pending: ['accepted', 'rejected'],

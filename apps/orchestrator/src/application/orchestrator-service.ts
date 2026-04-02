@@ -1,6 +1,9 @@
 import type {
   ArchitectureFreeze,
   EvidenceManifest,
+  ExecutionArtifact,
+  ExecutionCommand,
+  ExecutionRequest,
   GateResult,
   GateType,
   RequirementFreeze,
@@ -21,6 +24,9 @@ import { RequirementFreezeService } from '../services/requirement-freeze-service
 import { type RunStatusSummary } from '../services/orchestrator-summary';
 import { TaskGraphService } from '../services/task-graph-service';
 import { TaskLoopService } from '../services/task-loop-service';
+import { ExecutionService, type ExecutionDispatch } from '../services/execution-service';
+import type { ExecutionFailureDisposition } from '../domain/execution';
+import type { ExecutorType } from '../contracts';
 
 export class OrchestratorService {
   public constructor(
@@ -33,6 +39,7 @@ export class OrchestratorService {
     private readonly taskLoopService: TaskLoopService,
     private readonly evidenceLedgerService: EvidenceLedgerService,
     private readonly gateEvaluator: GateEvaluator,
+    private readonly executionService: ExecutionService,
   ) {}
 
   public async createRun(input: {
@@ -109,6 +116,87 @@ export class OrchestratorService {
 
   public async rejectTask(runId: string, taskId: string): Promise<TaskEnvelope> {
     return this.taskLoopService.rejectTask(runId, taskId);
+  }
+
+  public async createExecutionRequest(input: {
+    runId: string;
+    taskId: string;
+    workspacePath: string;
+    executorType?: ExecutorType | undefined;
+    command?: ExecutionCommand | undefined;
+    relatedEvidenceIds?: readonly string[] | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }): Promise<ExecutionRequest> {
+    const run = await this.runRepository.getRun(input.runId);
+    const task = await this.taskRepository.getTask(input.runId, input.taskId);
+    await this.assertExecutionReady(input.runId, input.taskId, task);
+
+    return this.executionService.buildRequest({
+      run,
+      task,
+      workspacePath: input.workspacePath,
+      executorType: input.executorType,
+      command: input.command,
+      architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
+      relatedEvidenceIds: input.relatedEvidenceIds,
+      metadata: input.metadata,
+    });
+  }
+
+  public async executeTask(input: {
+    runId: string;
+    taskId: string;
+    producer: string;
+    workspacePath: string;
+    executorType?: ExecutorType | undefined;
+    command?: ExecutionCommand | undefined;
+    relatedEvidenceIds?: readonly string[] | undefined;
+    metadata?: Record<string, unknown> | undefined;
+    onFailure?: ExecutionFailureDisposition | undefined;
+    submitForReviewOnSuccess?: boolean | undefined;
+  }): Promise<ExecutionDispatch & { task: TaskEnvelope }> {
+    let task = await this.taskRepository.getTask(input.runId, input.taskId);
+    await this.assertExecutionReady(input.runId, input.taskId, task);
+
+    if (task.status === 'tests_red') {
+      task = await this.taskLoopService.markImplementationStarted(input.runId, input.taskId);
+    }
+
+    const execution = await this.executionService.executeTask({
+      run: await this.runRepository.getRun(input.runId),
+      task,
+      producer: input.producer,
+      workspacePath: input.workspacePath,
+      executorType: input.executorType,
+      command: input.command,
+      architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
+      relatedEvidenceIds: input.relatedEvidenceIds,
+      metadata: input.metadata,
+      onFailure: input.onFailure,
+    });
+
+    let currentTask = task;
+    if (
+      execution.disposition.recommendedTaskState === 'tests_green' &&
+      currentTask.status === 'implementation_in_progress'
+    ) {
+      currentTask = await this.taskLoopService.markTestsGreen(input.runId, input.taskId);
+      if (input.submitForReviewOnSuccess) {
+        currentTask = await this.taskLoopService.submitForReview(input.runId, input.taskId, [
+          `Execution ${execution.result.executionId} produced passing test evidence.`,
+        ]);
+      }
+    } else if (
+      execution.disposition.recommendedTaskState === 'rejected' &&
+      currentTask.status === 'implementation_in_progress'
+    ) {
+      currentTask = await this.taskLoopService.rejectTask(input.runId, input.taskId);
+    }
+
+    return {
+      ...execution,
+      task: currentTask,
+    };
   }
 
   public async appendEvidence(
@@ -252,5 +340,58 @@ export class OrchestratorService {
       evidenceCount: evidence.length,
       gateTotals,
     };
+  }
+
+  public async summarizeExecutionForTask(
+    runId: string,
+    taskId: string,
+  ): Promise<{
+    totalExecutions: number;
+    byStatus: Record<'succeeded' | 'failed' | 'partial', number>;
+    artifactCount: number;
+    latestExecutionId: string | null;
+  }> {
+    return this.executionService.summarizeExecutionForTask(runId, taskId);
+  }
+
+  public async collectExecutionArtifacts(
+    runId: string,
+    taskId: string,
+  ): Promise<ExecutionArtifact[]> {
+    return this.executionService.collectExecutionArtifacts(runId, taskId);
+  }
+
+  private async assertExecutionReady(
+    runId: string,
+    taskId: string,
+    task: TaskEnvelope,
+  ): Promise<void> {
+    if (task.status !== 'tests_red' && task.status !== 'implementation_in_progress') {
+      throw new OrchestratorError(
+        'TASK_NOT_READY_FOR_EXECUTION',
+        'Execution requests require a task in tests_red or implementation_in_progress.',
+        {
+          runId,
+          taskId,
+          status: task.status,
+        },
+      );
+    }
+
+    const latestRedGate = await this.evidenceRepository.findLatestGateResult(
+      runId,
+      'red_test_gate',
+      taskId,
+    );
+    if (!latestRedGate?.passed) {
+      throw new OrchestratorError(
+        'RED_TEST_GATE_REQUIRED',
+        'Execution requests require a passing red test gate.',
+        {
+          runId,
+          taskId,
+        },
+      );
+    }
   }
 }

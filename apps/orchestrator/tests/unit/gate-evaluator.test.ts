@@ -87,6 +87,7 @@ function buildTask(runId: string, status: TaskEnvelope['status']): TaskEnvelope 
     ],
     implementationNotes: [],
     evidenceIds: [],
+    metadata: {},
     status,
     createdAt: '2026-04-01T12:06:00.000Z',
     updatedAt: '2026-04-01T12:06:00.000Z',
