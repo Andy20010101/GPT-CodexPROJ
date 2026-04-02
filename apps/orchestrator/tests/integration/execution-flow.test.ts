@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ArchitectureFreeze, RequirementFreeze, TaskEnvelope } from '../../src/contracts';
 import { createOrchestratorService } from '../../src';
+import type { BridgeClient } from '../../src/services/bridge-client';
 import { OrchestratorError } from '../../src/utils/error';
 
 function buildRequirementFreeze(runId: string): RequirementFreeze {
@@ -148,10 +150,124 @@ async function bootstrapExecutionReadyTask(artifactDir: string): Promise<{
   };
 }
 
+function createApprovedBridgeClient(): BridgeClient {
+  const conversationId = randomUUID();
+  const sessionId = randomUUID();
+
+  return {
+    async openSession() {
+      return {
+        sessionId,
+        browserUrl: 'https://chatgpt.com/',
+        connectedAt: '2026-04-02T12:07:30.000Z',
+      };
+    },
+    async selectProject(input) {
+      return {
+        sessionId: input.sessionId,
+        browserUrl: 'https://chatgpt.com/',
+        projectName: input.projectName,
+        model: input.model,
+        connectedAt: '2026-04-02T12:07:30.000Z',
+      };
+    },
+    async startConversation(input) {
+      return {
+        conversationId,
+        sessionId: input.sessionId,
+        projectName: input.projectName ?? 'Execution Review Project',
+        model: input.model,
+        status: 'running',
+        source: 'memory',
+        messages: [],
+        startedAt: '2026-04-02T12:08:00.000Z',
+        updatedAt: '2026-04-02T12:08:00.000Z',
+      };
+    },
+    async sendMessage() {
+      throw new Error('sendMessage should not be called when structured review is present');
+    },
+    async waitForCompletion() {
+      return {
+        conversationId,
+        sessionId,
+        projectName: 'Execution Review Project',
+        model: 'gpt-5.4',
+        status: 'completed',
+        source: 'memory',
+        messages: [],
+        startedAt: '2026-04-02T12:08:00.000Z',
+        updatedAt: '2026-04-02T12:08:30.000Z',
+      };
+    },
+    async exportMarkdown() {
+      return {
+        artifactPath: '/bridge/review.md',
+        manifestPath: '/bridge/review-manifest.json',
+        markdown: '# review\napproved\n',
+      };
+    },
+    async extractStructuredReview() {
+      return {
+        artifactPath: '/bridge/structured-review.json',
+        manifestPath: '/bridge/structured-review-manifest.json',
+        payload: {
+          status: 'approved',
+          summary: 'Review approved the execution artifacts.',
+          findings: [],
+          missingTests: [],
+          architectureConcerns: [],
+          recommendedActions: [],
+        },
+      };
+    },
+  };
+}
+
 describe('execution flow integration', () => {
   it('drives run -> execution -> review -> acceptance on the happy path', async () => {
     const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'execution-flow-happy-'));
-    const { orchestrator, runId, taskId } = await bootstrapExecutionReadyTask(artifactDir);
+    const orchestrator = createOrchestratorService({
+      artifactDir,
+      bridgeClient: createApprovedBridgeClient(),
+    });
+    const run = await orchestrator.createRun({
+      title: 'Execution integration run',
+      createdBy: 'tester',
+    });
+
+    await orchestrator.saveRequirementFreeze(run.runId, buildRequirementFreeze(run.runId));
+    await orchestrator.evaluateGate({
+      runId: run.runId,
+      gateType: 'requirement_gate',
+      evaluator: 'tester',
+    });
+    await orchestrator.saveArchitectureFreeze(run.runId, buildArchitectureFreeze(run.runId));
+    await orchestrator.evaluateGate({
+      runId: run.runId,
+      gateType: 'architecture_gate',
+      evaluator: 'tester',
+    });
+
+    const task = buildTask(run.runId);
+    await orchestrator.registerTaskGraph(run.runId, {
+      runId: run.runId,
+      tasks: [task],
+      edges: [],
+      registeredAt: '2026-04-02T12:07:00.000Z',
+    });
+    await orchestrator.attachTestPlan(run.runId, task.taskId, [
+      {
+        id: 'tp-1',
+        description: 'A red test must exist before implementation starts.',
+        verificationCommand: 'npm test',
+        expectedRedSignal: 'failing tests',
+        expectedGreenSignal: 'passing tests',
+      },
+    ]);
+    await orchestrator.markTestsRed(run.runId, task.taskId);
+    const runId = run.runId;
+    const taskId = task.taskId;
 
     await orchestrator.evaluateGate({
       runId,
@@ -198,28 +314,14 @@ describe('execution flow integration', () => {
     ) as { summary: string };
     expect(persistedResult.summary).toContain('completed successfully');
 
-    const reviewPath = path.join(artifactDir, 'runs', runId, 'reviews', `${taskId}.md`);
-    await fs.mkdir(path.dirname(reviewPath), { recursive: true });
-    await fs.writeFile(reviewPath, '# review\npass\n', 'utf8');
-    await orchestrator.appendEvidence({
+    const review = await orchestrator.reviewTaskExecution({
       runId,
       taskId,
-      stage: 'task_execution',
-      kind: 'review_note',
-      timestamp: '2026-04-02T12:08:00.000Z',
+      executionId: execution.result.executionId,
       producer: 'reviewer',
-      artifactPaths: [reviewPath],
-      summary: 'Manual review approved the execution result.',
-      metadata: {},
     });
-
-    const reviewGate = await orchestrator.evaluateGate({
-      runId,
-      taskId,
-      gateType: 'review_gate',
-      evaluator: 'reviewer',
-    });
-    expect(reviewGate.passed).toBe(true);
+    expect(review.result.status).toBe('approved');
+    expect(review.gateResult.passed).toBe(true);
 
     const acceptedTask = await orchestrator.acceptTask(runId, taskId);
     expect(acceptedTask.status).toBe('accepted');

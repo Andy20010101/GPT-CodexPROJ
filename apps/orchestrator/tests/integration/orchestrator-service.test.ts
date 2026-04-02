@@ -12,6 +12,7 @@ import type {
   TaskEnvelope,
   TaskGraph,
 } from '../../src/contracts';
+import { FileEvidenceRepository } from '../../src/storage/file-evidence-repository';
 import { OrchestratorError } from '../../src/utils/error';
 
 function buildRequirementFreeze(runId: string): RequirementFreeze {
@@ -163,6 +164,85 @@ async function bootstrapRun(artifactDir: string): Promise<{
   };
 }
 
+async function recordApprovedReviewGate(input: {
+  artifactDir: string;
+  orchestrator: ReturnType<typeof createOrchestratorService>;
+  runId: string;
+  taskId: string;
+}): Promise<void> {
+  const reviewId = randomUUID();
+  const timestamp = '2026-04-02T10:12:00.000Z';
+  const reviewArtifactPath = path.join(
+    input.artifactDir,
+    'runs',
+    input.runId,
+    'reviews',
+    `${reviewId}.json`,
+  );
+  await fs.mkdir(path.dirname(reviewArtifactPath), { recursive: true });
+  await fs.writeFile(
+    reviewArtifactPath,
+    `${JSON.stringify(
+      {
+        reviewId,
+        status: 'approved',
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+  await input.orchestrator.appendEvidence({
+    runId: input.runId,
+    taskId: input.taskId,
+    stage: 'task_execution',
+    kind: 'review_result',
+    timestamp,
+    producer: 'review-plane',
+    artifactPaths: [reviewArtifactPath],
+    summary: 'Structured review approved the task loop change.',
+    metadata: {
+      reviewId,
+      reviewStatus: 'approved',
+    },
+  });
+
+  const evidenceRepository = new FileEvidenceRepository(input.artifactDir);
+  const gateId = randomUUID();
+  const gateArtifactPath = await evidenceRepository.appendGateResult({
+    gateId,
+    runId: input.runId,
+    taskId: input.taskId,
+    gateType: 'review_gate',
+    stage: 'task_execution',
+    passed: true,
+    timestamp,
+    evaluator: 'review-plane',
+    reasons: [],
+    evidenceIds: [],
+    metadata: {
+      source: 'review-gate-service',
+      reviewId,
+      reviewStatus: 'approved',
+    },
+  });
+  await input.orchestrator.appendEvidence({
+    runId: input.runId,
+    taskId: input.taskId,
+    stage: 'task_execution',
+    kind: 'gate_result',
+    timestamp,
+    producer: 'review-plane',
+    artifactPaths: [gateArtifactPath],
+    summary: 'review_gate passed from approved structured review',
+    metadata: {
+      gateId,
+      reviewId,
+      reviewStatus: 'approved',
+    },
+  });
+}
+
 describe('OrchestratorService integration', () => {
   it('runs the happy path from run creation to accepted release review', async () => {
     const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'orchestrator-integration-happy-'));
@@ -202,27 +282,12 @@ describe('OrchestratorService integration', () => {
     });
 
     await orchestrator.submitForReview(runId, task.taskId, ['Ready for review.']);
-    await orchestrator.appendEvidence({
+    await recordApprovedReviewGate({
+      artifactDir,
+      orchestrator,
       runId,
       taskId: task.taskId,
-      stage: 'task_execution',
-      kind: 'review_note',
-      timestamp: '2026-04-02T10:12:00.000Z',
-      producer: 'review-plane',
-      artifactPaths: [path.join(artifactDir, 'runs', runId, 'review.md')],
-      summary: 'Review approved the task loop change',
-      metadata: {
-        decision: 'approve',
-      },
     });
-
-    const reviewGate = await orchestrator.evaluateGate({
-      runId,
-      taskId: task.taskId,
-      gateType: 'review_gate',
-      evaluator: 'integration-test',
-    });
-    expect(reviewGate.passed).toBe(true);
 
     await orchestrator.acceptTask(runId, task.taskId);
 

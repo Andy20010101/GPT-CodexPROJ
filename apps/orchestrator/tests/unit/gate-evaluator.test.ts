@@ -132,7 +132,9 @@ describe('GateEvaluator', () => {
     });
 
     expect(result.passed).toBe(false);
-    expect(result.reasons).toContain('No review evidence is attached to the task.');
+    expect(result.reasons).toContain(
+      'No structured review result evidence is attached to the task.',
+    );
   });
 
   it('rejects architecture gate when the freeze is missing', () => {

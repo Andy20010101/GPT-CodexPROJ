@@ -18,6 +18,7 @@ This repository currently provides:
 - Architecture documentation and ADRs for the three-plane system.
 - A working `chatgpt-web-bridge` service with typed Fastify routes, in-memory session/conversation state, artifact export, DOM drift checks, and mockable browser boundaries.
 - A control-plane orchestrator skeleton with requirement freeze, architecture freeze, task graph registration, gate-aware task loop transitions, evidence ledger persistence, a typed bridge client, and execution-plane dispatch through replaceable executors.
+- A first end-to-end single-task loop that can prepare an isolated workspace, execute through a local Codex CLI adapter, route structured review back through the bridge, and translate that review into `review_gate`.
 
 ## Layout
 
@@ -37,11 +38,16 @@ services/
 The repository now has:
 
 - a working Review Plane service
-- a working Control Plane skeleton with file-backed persistence, execution dispatch, and tests
+- a working Control Plane skeleton with file-backed persistence, execution dispatch, review-gate integration, and tests
 - a working Execution Plane skeleton with:
   - `CodexExecutor` for structured prompt/payload generation against a mockable runner
+  - `CodexCliRunner` for local `codex exec` integration when the CLI is available
   - `CommandExecutor` for local command-based smoke execution
   - `NoopExecutor` for dry runs and placeholder flows
+- a task-level review loop with:
+  - `ReviewService` for bridge dispatch
+  - `ReviewGateService` for converting structured review into gate state
+  - `WorkspaceRuntimeService` and `WorktreeService` for isolated execution context
 - shared bridge contracts reused across planes
 
 The orchestrator is intentionally not a full workflow engine yet. It models the control-plane lifecycle, enforces state and gate rules, and writes execution evidence, but it does not pretend that a real Codex cloud runtime is already present.
@@ -94,14 +100,38 @@ Run type checks across the monorepo:
 npm run typecheck
 ```
 
+## Local Codex CLI and Review Loop
+
+The repository can now run a first local execution + review loop, but it depends on local prerequisites:
+
+- the `codex` CLI must be installed if `CODEX_RUNNER_MODE=cli`
+- `chatgpt-web-bridge` must be running if you want real review dispatch
+- the bridge must be able to attach to an already logged-in ChatGPT web session
+
+Useful environment variables:
+
+```bash
+CODEX_RUNNER_MODE=cli
+CODEX_CLI_BIN=codex
+CODEX_CLI_TIMEOUT_MS=600000
+BRIDGE_BASE_URL=http://127.0.0.1:3100
+BRIDGE_BROWSER_URL=https://chatgpt.com/
+BRIDGE_PROJECT_NAME=Default
+REVIEW_MODEL_HINT=gpt-5.4
+WORKSPACE_RUNTIME_BASE_DIR=/path/to/workspaces
+```
+
+This is still a local runtime adapter. The repository does not claim that a production Codex API or cloud sandbox is already connected.
+
 ## Execution Plane Boundary
 
-The execution plane is now wired into the orchestrator through `ExecutionService` and `ExecutorRegistry`, but the `CodexExecutor` is intentionally a local skeleton:
+The execution plane is now wired into the orchestrator through `ExecutionService` and `ExecutorRegistry`, and the `CodexExecutor` can now target a real local CLI runner:
 
 - it converts `TaskEnvelope` data into a reusable Codex execution payload
-- it calls a mockable runner adapter
+- it calls a replaceable runner adapter
 - it returns structured `ExecutionResult` objects that are written into the evidence ledger
-- it does not claim that a real remote Codex runtime is already connected
+- it can use `CodexCliRunner` for local `codex exec`, or `StubCodexRunner` when no real runner is configured
+- it still does not claim that a real remote Codex cloud runtime is already connected
 
 Execution artifacts are persisted under:
 
@@ -115,10 +145,20 @@ apps/orchestrator/artifacts/runs/<runId>/executions/<executionId>/
   ...
 ```
 
+Review artifacts are persisted under:
+
+```text
+apps/orchestrator/artifacts/runs/<runId>/reviews/<reviewId>/
+  request.json
+  result.json
+  review.md
+  structured-review.json
+```
+
 ## Connecting a Real Execution Agent Next
 
 The next major step is to plug an execution agent such as Codex into the orchestrator task loop. The missing pieces are:
 
-1. replace the stubbed Codex runner behind `CodexExecutor` with a real CLI, API, or cloud runtime adapter
-2. feed execution-side review feedback back into the task loop through bridge-driven review evidence and gate re-evaluation
-3. add a higher-level runtime or API surface that sequences multi-task runs instead of calling the service objects directly
+1. harden the local Codex CLI adapter into a production runtime with better retries, richer parsing, and safer patch lifecycle handling
+2. stabilize real bridge review sessions against live ChatGPT web drift and add release-level review flows on top of task review
+3. add a higher-level runtime or API surface that sequences multiple tasks, manages queueing, and coordinates long-running workspaces
