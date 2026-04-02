@@ -7,6 +7,7 @@ export const GateTypeSchema = z.enum([
   'architecture_gate',
   'red_test_gate',
   'review_gate',
+  'release_gate',
   'acceptance_gate',
 ]);
 

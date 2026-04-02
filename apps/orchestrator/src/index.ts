@@ -11,21 +11,34 @@ import { ExecutionEvidenceService } from './services/execution-evidence-service'
 import { ExecutionService } from './services/execution-service';
 import { ExecutorRegistry, NoopExecutor } from './services/executor-registry';
 import { GateEvaluator } from './services/gate-evaluator';
+import { RecoveryService } from './services/recovery-service';
+import { ReleaseGateService } from './services/release-gate-service';
+import { ReleaseReviewService } from './services/release-review-service';
 import { ReviewGateService } from './services/review-gate-service';
 import { ReviewService } from './services/review-service';
+import { RetryService } from './services/retry-service';
+import { RunAcceptanceService } from './services/run-acceptance-service';
+import { RunQueueService } from './services/run-queue-service';
 import { ArchitectureFreezeService } from './services/architecture-freeze-service';
 import { RequirementFreezeService } from './services/requirement-freeze-service';
+import { TaskSchedulerService } from './services/task-scheduler-service';
 import { TaskGraphService } from './services/task-graph-service';
 import { TaskLoopService } from './services/task-loop-service';
+import { WorkerService } from './services/worker-service';
+import { WorkflowRuntimeService } from './services/workflow-runtime-service';
 import { WorkspaceRuntimeService } from './services/workspace-runtime-service';
 import { WorktreeService } from './services/worktree-service';
 import { FileEvidenceRepository } from './storage/file-evidence-repository';
 import { FileExecutionRepository } from './storage/file-execution-repository';
+import { FileJobRepository } from './storage/file-job-repository';
+import { FileQueueRepository } from './storage/file-queue-repository';
+import { FileReleaseRepository } from './storage/file-release-repository';
 import { FileReviewRepository } from './storage/file-review-repository';
 import { FileRunRepository } from './storage/file-run-repository';
 import { FileTaskRepository } from './storage/file-task-repository';
 import { FileWorkspaceRepository } from './storage/file-workspace-repository';
 import { CodexCliCommandBuilder } from './utils/codex-cli-command-builder';
+import type { RetryPolicy } from './contracts';
 
 export type CreateOrchestratorServiceOptions = {
   artifactDir?: string;
@@ -33,11 +46,38 @@ export type CreateOrchestratorServiceOptions = {
   codexRunner?: CodexRunner | undefined;
   commandRunner?: CommandRunner | undefined;
   worktreeService?: WorktreeService | undefined;
+  retryPolicy?: RetryPolicy | undefined;
+};
+
+export type OrchestratorRuntimeBundle = {
+  config: ReturnType<typeof loadOrchestratorConfig>;
+  orchestratorService: OrchestratorService;
+  workflowRuntimeService: WorkflowRuntimeService;
+  workerService: WorkerService;
+  runQueueService: RunQueueService;
+  retryService: RetryService;
+  recoveryService: RecoveryService;
+  releaseReviewService: ReleaseReviewService;
+  releaseGateService: ReleaseGateService;
+  runAcceptanceService: RunAcceptanceService;
+  taskSchedulerService: TaskSchedulerService;
+  runRepository: FileRunRepository;
+  taskRepository: FileTaskRepository;
+  evidenceRepository: FileEvidenceRepository;
+  jobRepository: FileJobRepository;
+  queueRepository: FileQueueRepository;
+  releaseRepository: FileReleaseRepository;
 };
 
 export function createOrchestratorService(
   artifactDirOrOptions?: string | CreateOrchestratorServiceOptions,
 ): OrchestratorService {
+  return createOrchestratorRuntimeBundle(artifactDirOrOptions).orchestratorService;
+}
+
+export function createOrchestratorRuntimeBundle(
+  artifactDirOrOptions?: string | CreateOrchestratorServiceOptions,
+): OrchestratorRuntimeBundle {
   const config = loadOrchestratorConfig();
   const options =
     typeof artifactDirOrOptions === 'string'
@@ -48,6 +88,9 @@ export function createOrchestratorService(
   const taskRepository = new FileTaskRepository(resolvedArtifactDir);
   const evidenceRepository = new FileEvidenceRepository(resolvedArtifactDir);
   const executionRepository = new FileExecutionRepository(resolvedArtifactDir);
+  const jobRepository = new FileJobRepository(resolvedArtifactDir);
+  const queueRepository = new FileQueueRepository(resolvedArtifactDir);
+  const releaseRepository = new FileReleaseRepository(resolvedArtifactDir);
   const reviewRepository = new FileReviewRepository(resolvedArtifactDir);
   const workspaceRepository = new FileWorkspaceRepository(resolvedArtifactDir);
   const evidenceLedgerService = new EvidenceLedgerService(evidenceRepository);
@@ -96,8 +139,8 @@ export function createOrchestratorService(
     evidenceLedgerService,
     taskLoopService,
   );
-
-  return new OrchestratorService(
+  const gateEvaluator = new GateEvaluator();
+  const orchestratorService = new OrchestratorService(
     runRepository,
     taskRepository,
     evidenceRepository,
@@ -106,12 +149,102 @@ export function createOrchestratorService(
     new TaskGraphService(runRepository, taskRepository, evidenceLedgerService),
     taskLoopService,
     evidenceLedgerService,
-    new GateEvaluator(),
+    gateEvaluator,
     new ExecutionService(executorRegistry, executionEvidenceService),
     workspaceRuntimeService,
     reviewService,
     reviewGateService,
   );
+  const runQueueService = new RunQueueService(
+    runRepository,
+    jobRepository,
+    queueRepository,
+    evidenceLedgerService,
+    options.retryPolicy ?? config.defaultRetryPolicy,
+  );
+  const retryService = new RetryService(
+    resolvedArtifactDir,
+    runRepository,
+    runQueueService,
+    evidenceLedgerService,
+    options.retryPolicy ?? config.defaultRetryPolicy,
+  );
+  const releaseReviewService = new ReleaseReviewService(
+    bridgeClient,
+    releaseRepository,
+    taskRepository,
+    executionRepository,
+    evidenceRepository,
+    evidenceLedgerService,
+    {
+      browserUrl: config.bridgeBrowserUrl,
+      projectName: config.bridgeProjectName,
+      modelHint: config.reviewModelHint,
+      maxWaitMs: config.reviewMaxWaitMs,
+    },
+  );
+  const releaseGateService = new ReleaseGateService(evidenceRepository, evidenceLedgerService);
+  const runAcceptanceService = new RunAcceptanceService(
+    runRepository,
+    taskRepository,
+    evidenceRepository,
+    releaseRepository,
+    evidenceLedgerService,
+    gateEvaluator,
+  );
+  const taskSchedulerService = new TaskSchedulerService();
+  const workerService = new WorkerService(
+    orchestratorService,
+    runRepository,
+    taskRepository,
+    runQueueService,
+    retryService,
+    releaseReviewService,
+    releaseGateService,
+    runAcceptanceService,
+    {
+      workspaceSourceRepoPath: config.workspaceSourceRepoPath,
+      retryPolicy: options.retryPolicy ?? config.defaultRetryPolicy,
+    },
+  );
+  const recoveryService = new RecoveryService(
+    runRepository,
+    jobRepository,
+    queueRepository,
+    runQueueService,
+    retryService,
+    evidenceLedgerService,
+  );
+  const workflowRuntimeService = new WorkflowRuntimeService(
+    orchestratorService,
+    runRepository,
+    taskRepository,
+    runQueueService,
+    taskSchedulerService,
+    workerService,
+    recoveryService,
+    options.retryPolicy ?? config.defaultRetryPolicy,
+  );
+
+  return {
+    config,
+    orchestratorService,
+    workflowRuntimeService,
+    workerService,
+    runQueueService,
+    retryService,
+    recoveryService,
+    releaseReviewService,
+    releaseGateService,
+    runAcceptanceService,
+    taskSchedulerService,
+    runRepository,
+    taskRepository,
+    evidenceRepository,
+    jobRepository,
+    queueRepository,
+    releaseRepository,
+  };
 }
 
 export * from './application/orchestrator-service';
@@ -122,7 +255,15 @@ export * from './services/codex-cli-runner';
 export * from './services/codex-executor';
 export * from './services/execution-service';
 export * from './services/executor-registry';
+export * from './services/release-gate-service';
+export * from './services/release-review-service';
 export * from './services/review-gate-service';
 export * from './services/review-service';
+export * from './services/retry-service';
+export * from './services/run-acceptance-service';
+export * from './services/run-queue-service';
+export * from './services/task-scheduler-service';
+export * from './services/worker-service';
+export * from './services/workflow-runtime-service';
 export * from './services/workspace-runtime-service';
 export * from './services/worktree-service';

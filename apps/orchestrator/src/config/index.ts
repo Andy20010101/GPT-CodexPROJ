@@ -1,9 +1,11 @@
 import path from 'node:path';
 
-import type { ExecutorType } from '../contracts';
+import type { ExecutorType, RetryPolicy } from '../contracts';
 
 export type OrchestratorConfig = {
   artifactDir: string;
+  apiHost: string;
+  apiPort: number;
   bridgeBaseUrl: string;
   bridgeBrowserUrl: string;
   bridgeProjectName: string;
@@ -14,7 +16,9 @@ export type OrchestratorConfig = {
   codexCliArgs: string[];
   codexCliTimeoutMs: number;
   workspaceRuntimeBaseDir: string;
+  workspaceSourceRepoPath: string;
   defaultExecutorType: ExecutorType;
+  defaultRetryPolicy: RetryPolicy;
 };
 
 export function loadOrchestratorConfig(): OrchestratorConfig {
@@ -23,6 +27,8 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
 
   return {
     artifactDir,
+    apiHost: process.env.ORCHESTRATOR_API_HOST ?? '127.0.0.1',
+    apiPort: parseInteger(process.env.ORCHESTRATOR_API_PORT, 3200),
     bridgeBaseUrl: process.env.BRIDGE_BASE_URL ?? 'http://127.0.0.1:3100',
     bridgeBrowserUrl: process.env.BRIDGE_BROWSER_URL ?? 'https://chatgpt.com/',
     bridgeProjectName: process.env.BRIDGE_PROJECT_NAME ?? 'Default',
@@ -34,7 +40,15 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
     codexCliTimeoutMs: parseInteger(process.env.CODEX_CLI_TIMEOUT_MS, 600000),
     workspaceRuntimeBaseDir:
       process.env.WORKSPACE_RUNTIME_BASE_DIR ?? path.join(artifactDir, 'workspace-runtime'),
+    workspaceSourceRepoPath:
+      process.env.WORKSPACE_SOURCE_REPO_PATH ?? path.resolve(__dirname, '..', '..', '..', '..'),
     defaultExecutorType: parseExecutorType(process.env.DEFAULT_EXECUTOR_TYPE),
+    defaultRetryPolicy: {
+      maxAttempts: parseInteger(process.env.RUNTIME_MAX_ATTEMPTS, 2),
+      backoffStrategy:
+        process.env.RUNTIME_BACKOFF_STRATEGY === 'exponential' ? 'exponential' : 'fixed',
+      baseDelayMs: parseInteger(process.env.RUNTIME_BASE_DELAY_MS, 0),
+    },
   };
 }
 

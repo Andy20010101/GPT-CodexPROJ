@@ -22,6 +22,15 @@ export const EvidenceKindSchema = z.enum([
   'review_input',
   'review_output',
   'workspace_runtime',
+  'job_record',
+  'queue_state',
+  'retry_decision',
+  'recovery_summary',
+  'release_review_request',
+  'release_review_result',
+  'release_markdown',
+  'release_structured_review',
+  'run_acceptance',
 ]);
 
 export type EvidenceKind = z.infer<typeof EvidenceKindSchema>;

@@ -9,7 +9,7 @@ import {
 import { type RunRecord, RunRecordSchema } from '../domain/run';
 import { OrchestratorError } from '../utils/error';
 import { readJsonFile, writeJsonFile } from '../utils/file-store';
-import { getRunFile, getRunRoot } from '../utils/run-paths';
+import { getRunFile, getRunRoot, getRunsRoot } from '../utils/run-paths';
 
 export class FileRunRepository {
   public constructor(private readonly artifactDir: string) {}
@@ -32,6 +32,32 @@ export class FileRunRepository {
       throw new OrchestratorError('RUN_NOT_FOUND', `Run ${runId} was not found`, { runId });
     }
     return RunRecordSchema.parse(raw);
+  }
+
+  public async listRuns(): Promise<RunRecord[]> {
+    const runsRoot = getRunsRoot(this.artifactDir);
+    const fs = await import('node:fs/promises');
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await fs.readdir(runsRoot, { withFileTypes: true });
+    } catch (error) {
+      const castError = error as NodeJS.ErrnoException;
+      if (castError.code === 'ENOENT') {
+        return [];
+      }
+      throw error;
+    }
+
+    const runs: RunRecord[] = [];
+    for (const entry of entries
+      .filter((item) => item.isDirectory())
+      .sort((a, b) => a.name.localeCompare(b.name))) {
+      const raw = await readJsonFile<RunRecord>(getRunFile(this.artifactDir, entry.name));
+      if (raw) {
+        runs.push(RunRecordSchema.parse(raw));
+      }
+    }
+    return runs;
   }
 
   public async saveRequirementFreeze(freeze: RequirementFreeze): Promise<string> {

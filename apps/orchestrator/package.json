@@ -4,7 +4,8 @@
   "private": true,
   "description": "Control-plane skeleton for requirement freeze, architecture freeze, task loops, evidence, and gates.",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/api/server.ts",
+    "dev:api": "tsx src/api/server.ts",
     "test": "TMPDIR=/tmp vitest run tests/unit tests/integration",
     "test:integration": "TMPDIR=/tmp vitest run tests/integration",
     "test:unit": "TMPDIR=/tmp vitest run tests/unit",
@@ -13,6 +14,7 @@
   },
   "dependencies": {
     "@review-then-codex/shared-contracts": "file:../../packages/shared-contracts",
+    "fastify": "^5.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

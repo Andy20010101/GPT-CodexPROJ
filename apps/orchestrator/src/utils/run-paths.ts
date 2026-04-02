@@ -1,7 +1,11 @@
 import path from 'node:path';
 
+export function getRunsRoot(artifactDir: string): string {
+  return path.join(artifactDir, 'runs');
+}
+
 export function getRunRoot(artifactDir: string, runId: string): string {
-  return path.join(artifactDir, 'runs', runId);
+  return path.join(getRunsRoot(artifactDir), runId);
 }
 
 export function getRunFile(artifactDir: string, runId: string): string {
@@ -46,4 +50,48 @@ export function getWorkspaceRecordFile(
   workspaceId: string,
 ): string {
   return path.join(getRunRoot(artifactDir, runId), 'workspaces', `${workspaceId}.json`);
+}
+
+export function getJobsRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'jobs');
+}
+
+export function getJobFile(artifactDir: string, runId: string, jobId: string): string {
+  return path.join(getJobsRoot(artifactDir, runId), `${jobId}.json`);
+}
+
+export function getQueueRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'queue');
+}
+
+export function getQueueStateFile(artifactDir: string, runId: string): string {
+  return path.join(getQueueRoot(artifactDir, runId), 'queue-state.json');
+}
+
+export function getReleaseRoot(
+  artifactDir: string,
+  runId: string,
+  releaseReviewId: string,
+): string {
+  return path.join(getRunRoot(artifactDir, runId), 'releases', releaseReviewId);
+}
+
+export function getReleaseRequestFile(
+  artifactDir: string,
+  runId: string,
+  releaseReviewId: string,
+): string {
+  return path.join(getReleaseRoot(artifactDir, runId, releaseReviewId), 'request.json');
+}
+
+export function getReleaseResultFile(
+  artifactDir: string,
+  runId: string,
+  releaseReviewId: string,
+): string {
+  return path.join(getReleaseRoot(artifactDir, runId, releaseReviewId), 'result.json');
+}
+
+export function getRunAcceptanceFile(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'run-acceptance.json');
 }

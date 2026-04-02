@@ -58,6 +58,10 @@ export class OrchestratorService {
     return this.runRepository.createRun(run);
   }
 
+  public async getRun(runId: string): Promise<RunRecord> {
+    return this.runRepository.getRun(runId);
+  }
+
   public async saveRequirementFreeze(runId: string, freeze: RequirementFreeze): Promise<RunRecord> {
     return this.requirementFreezeService.freeze(runId, freeze);
   }
@@ -71,6 +75,10 @@ export class OrchestratorService {
 
   public async registerTaskGraph(runId: string, graph: TaskGraph): Promise<RunRecord> {
     return this.taskGraphService.registerTaskGraph(runId, graph);
+  }
+
+  public async getTaskGraph(runId: string): Promise<TaskGraph | null> {
+    return this.taskRepository.getTaskGraph(runId);
   }
 
   public async createTaskEnvelope(task: TaskEnvelope): Promise<TaskEnvelope> {
@@ -230,6 +238,10 @@ export class OrchestratorService {
 
   public async listEvidenceForTask(runId: string, taskId: string): Promise<EvidenceManifest[]> {
     return this.evidenceLedgerService.listEvidenceForTask(runId, taskId);
+  }
+
+  public async listTasks(runId: string): Promise<TaskEnvelope[]> {
+    return this.taskRepository.listTasks(runId);
   }
 
   public async summarizeRunEvidence(runId: string): Promise<{
