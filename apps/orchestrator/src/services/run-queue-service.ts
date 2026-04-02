@@ -110,7 +110,7 @@ export class RunQueueService {
     );
   }
 
-  public async dequeueNextRunnable(runId?: string | undefined): Promise<JobRecord | null> {
+  public async listRunnableJobs(runId?: string | undefined): Promise<JobRecord[]> {
     const queueStates = runId
       ? [await this.getQueueState(runId)]
       : await this.listQueueStatesForRuns();
@@ -124,26 +124,54 @@ export class RunQueueService {
           : left.item.availableAt.localeCompare(right.item.availableAt),
       );
 
+    const jobs: JobRecord[] = [];
+    for (const candidate of candidates) {
+      const job = await this.getJob(candidate.item.jobId);
+      if (job.status === 'queued' || job.status === 'retriable') {
+        jobs.push(job);
+      }
+    }
+
+    return jobs;
+  }
+
+  public async dequeueNextRunnable(runId?: string | undefined): Promise<JobRecord | null> {
+    const candidates = await this.listRunnableJobs(runId);
     const candidate = candidates[0];
     if (!candidate) {
       return null;
     }
 
-    const job = await this.getJob(candidate.item.jobId);
-    const queueState = await this.getQueueState(candidate.runId);
+    return this.startJob(candidate.jobId);
+  }
+
+  public async startJob(jobId: string): Promise<JobRecord> {
+    const job = await this.getJob(jobId);
+    if (job.status !== 'queued' && job.status !== 'retriable') {
+      throw new OrchestratorError(
+        'JOB_NOT_FOUND',
+        `Job ${jobId} is not runnable from status ${job.status}`,
+        {
+          jobId,
+          status: job.status,
+        },
+      );
+    }
+
+    const queueState = await this.getQueueState(job.runId);
     const updatedQueue = QueueStateSchema.parse({
       ...queueState,
       items: queueState.items.filter((entry) => entry.jobId !== job.jobId),
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     });
     const queuePath = await this.queueRepository.saveQueueState(updatedQueue);
 
     const runningJob = JobRecordSchema.parse({
       ...job,
       status: 'running',
-      startedAt: now,
+      startedAt: new Date().toISOString(),
       finishedAt: undefined,
-      availableAt: candidate.item.availableAt,
+      availableAt: job.availableAt,
     });
     const jobPath = await this.jobRepository.saveJob(runningJob);
     await this.appendJobEvidence(runningJob, jobPath, `Dequeued ${job.kind} job ${job.jobId}`);
@@ -155,6 +183,44 @@ export class RunQueueService {
     );
 
     return runningJob;
+  }
+
+  public async annotateJob(input: {
+    jobId: string;
+    metadata: Record<string, unknown>;
+  }): Promise<JobRecord> {
+    const job = await this.getJob(input.jobId);
+    const updatedJob = JobRecordSchema.parse({
+      ...job,
+      metadata: {
+        ...job.metadata,
+        ...input.metadata,
+      },
+    });
+    const jobPath = await this.jobRepository.saveJob(updatedJob);
+    await this.appendJobEvidence(
+      updatedJob,
+      jobPath,
+      `${updatedJob.kind} job ${updatedJob.jobId} metadata updated`,
+    );
+    return updatedJob;
+  }
+
+  public async removeQueueItem(jobId: string): Promise<void> {
+    const job = await this.getJob(jobId);
+    const queueState = await this.getQueueState(job.runId);
+    const updatedState = QueueStateSchema.parse({
+      ...queueState,
+      items: queueState.items.filter((entry) => entry.jobId !== jobId),
+      updatedAt: new Date().toISOString(),
+    });
+    const queuePath = await this.queueRepository.saveQueueState(updatedState);
+    await this.appendQueueEvidence(
+      job.runId,
+      queuePath,
+      `Queue contains ${updatedState.items.length} item(s) after removing ${jobId}`,
+      { jobId },
+    );
   }
 
   public async markSucceeded(input: {
@@ -352,6 +418,22 @@ export class RunQueueService {
         ...(input.metadata ?? {}),
       },
     });
+    const queueState = await this.getQueueState(job.runId);
+    const wasQueued = queueState.items.some((entry) => entry.jobId === job.jobId);
+    if (wasQueued) {
+      const updatedState = QueueStateSchema.parse({
+        ...queueState,
+        items: queueState.items.filter((entry) => entry.jobId !== job.jobId),
+        updatedAt: timestamp,
+      });
+      const queuePath = await this.queueRepository.saveQueueState(updatedState);
+      await this.appendQueueEvidence(
+        job.runId,
+        queuePath,
+        `Queue contains ${updatedState.items.length} item(s) after completing ${job.jobId}`,
+        { jobId: job.jobId },
+      );
+    }
     const jobPath = await this.jobRepository.saveJob(completedJob);
     await this.appendJobEvidence(
       completedJob,

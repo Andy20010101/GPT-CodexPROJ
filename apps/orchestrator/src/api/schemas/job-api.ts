@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { JobRecordSchema, RetryPolicySchema } from '../../contracts';
+import { CancellationResultSchema, JobRecordSchema, RetryPolicySchema } from '../../contracts';
 import { successEnvelope } from './common';
 
 export const JobPathParamsSchema = z.object({
@@ -16,3 +16,15 @@ export const RetryJobRequestSchema = z.object({
 });
 
 export const RetryJobResponseSchema = successEnvelope(JobRecordSchema);
+
+export const CancelJobRequestSchema = z.object({
+  requestedBy: z.string().min(1).default('api'),
+  reason: z.string().min(1).optional(),
+});
+
+export const CancelJobResponseSchema = successEnvelope(
+  z.object({
+    job: JobRecordSchema,
+    result: CancellationResultSchema,
+  }),
+);

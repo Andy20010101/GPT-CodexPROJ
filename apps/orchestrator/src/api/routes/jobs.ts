@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 
 import type { OrchestratorRuntimeBundle } from '../../index';
 import {
+  CancelJobRequestSchema,
+  CancelJobResponseSchema,
   GetJobResponseSchema,
   JobPathParamsSchema,
   RetryJobRequestSchema,
@@ -40,5 +42,22 @@ export function registerJobRoutes(app: FastifyInstance, bundle: OrchestratorRunt
     }
 
     return RetryJobResponseSchema.parse({ ok: true, data });
+  });
+
+  app.post('/api/jobs/:jobId/cancel', async (request) => {
+    const params = JobPathParamsSchema.parse(request.params);
+    const body = CancelJobRequestSchema.parse(request.body ?? {});
+    const cancelled = await bundle.cancellationService.cancelJob({
+      jobId: params.jobId,
+      requestedBy: body.requestedBy,
+      ...(body.reason ? { reason: body.reason } : {}),
+    });
+    return CancelJobResponseSchema.parse({
+      ok: true,
+      data: {
+        job: cancelled.job,
+        result: cancelled.result,
+      },
+    });
   });
 }

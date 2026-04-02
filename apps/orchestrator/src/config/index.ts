@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import type { ExecutorType, RetryPolicy } from '../contracts';
+import type { ConcurrencyPolicy, ExecutorType, RetryPolicy } from '../contracts';
 
 export type OrchestratorConfig = {
   artifactDir: string;
@@ -19,6 +19,12 @@ export type OrchestratorConfig = {
   workspaceSourceRepoPath: string;
   defaultExecutorType: ExecutorType;
   defaultRetryPolicy: RetryPolicy;
+  daemonPollIntervalMs: number;
+  daemonWorkerCount: number;
+  workerHeartbeatIntervalMs: number;
+  workerLeaseTtlMs: number;
+  staleHeartbeatThresholdMs: number;
+  concurrencyPolicy: ConcurrencyPolicy;
 };
 
 export function loadOrchestratorConfig(): OrchestratorConfig {
@@ -48,6 +54,20 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
       backoffStrategy:
         process.env.RUNTIME_BACKOFF_STRATEGY === 'exponential' ? 'exponential' : 'fixed',
       baseDelayMs: parseInteger(process.env.RUNTIME_BASE_DELAY_MS, 0),
+    },
+    daemonPollIntervalMs: parseInteger(process.env.DAEMON_POLL_INTERVAL_MS, 250),
+    daemonWorkerCount: parseInteger(process.env.DAEMON_WORKER_COUNT, 2),
+    workerHeartbeatIntervalMs: parseInteger(process.env.DAEMON_HEARTBEAT_INTERVAL_MS, 500),
+    workerLeaseTtlMs: parseInteger(process.env.DAEMON_LEASE_TTL_MS, 2000),
+    staleHeartbeatThresholdMs: parseInteger(process.env.DAEMON_STALE_THRESHOLD_MS, 3000),
+    concurrencyPolicy: {
+      maxConcurrentJobs: parseInteger(process.env.DAEMON_MAX_CONCURRENT_JOBS, 2),
+      maxConcurrentJobsPerRun: parseInteger(process.env.DAEMON_MAX_CONCURRENT_JOBS_PER_RUN, 1),
+      deferDelayMs: parseInteger(process.env.DAEMON_CONCURRENCY_DEFER_MS, 250),
+      exclusiveKeys: {
+        task: process.env.DAEMON_EXCLUSIVE_TASK !== 'false',
+        workspace: process.env.DAEMON_EXCLUSIVE_WORKSPACE !== 'false',
+      },
     },
   };
 }

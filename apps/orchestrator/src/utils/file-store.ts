@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 export async function ensureDirectory(directoryPath: string): Promise<void> {
   await fs.mkdir(directoryPath, { recursive: true });
@@ -7,12 +8,16 @@ export async function ensureDirectory(directoryPath: string): Promise<void> {
 
 export async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
   await ensureDirectory(path.dirname(filePath));
-  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  const tempPath = `${filePath}.${randomUUID()}.tmp`;
+  await fs.writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  await fs.rename(tempPath, filePath);
 }
 
 export async function writeTextFile(filePath: string, value: string): Promise<void> {
   await ensureDirectory(path.dirname(filePath));
-  await fs.writeFile(filePath, value, 'utf8');
+  const tempPath = `${filePath}.${randomUUID()}.tmp`;
+  await fs.writeFile(tempPath, value, 'utf8');
+  await fs.rename(tempPath, filePath);
 }
 
 export async function readJsonFile<T>(filePath: string): Promise<T | null> {

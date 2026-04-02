@@ -15,6 +15,7 @@ import { RunQueueService } from './run-queue-service';
 import { ReleaseGateService } from './release-gate-service';
 import { ReleaseReviewService } from './release-review-service';
 import { RunAcceptanceService } from './run-acceptance-service';
+import { CancellationService } from './cancellation-service';
 
 export class WorkerService {
   public constructor(
@@ -26,6 +27,7 @@ export class WorkerService {
     private readonly releaseReviewService: ReleaseReviewService,
     private readonly releaseGateService: ReleaseGateService,
     private readonly runAcceptanceService: RunAcceptanceService,
+    private readonly cancellationService: CancellationService | undefined,
     private readonly config: {
       workspaceSourceRepoPath: string;
       retryPolicy: RetryPolicy;
@@ -38,6 +40,10 @@ export class WorkerService {
       return null;
     }
 
+    return this.processJob(job);
+  }
+
+  public async processJob(job: JobRecord): Promise<JobRecord> {
     try {
       switch (job.kind) {
         case 'task_execution':
@@ -53,6 +59,10 @@ export class WorkerService {
   }
 
   private async processTaskExecution(job: JobRecord): Promise<JobRecord> {
+    const cancelledBeforeStart = await this.cancelIfRequested(job);
+    if (cancelledBeforeStart) {
+      return cancelledBeforeStart;
+    }
     if (!job.taskId) {
       return this.runQueueService.markFailed({
         jobId: job.jobId,
@@ -103,6 +113,10 @@ export class WorkerService {
     });
 
     const relatedEvidenceIds = execution.evidence.map((entry) => entry.evidenceId);
+    const cancelledAfterExecution = await this.cancelIfRequested(job);
+    if (cancelledAfterExecution) {
+      return cancelledAfterExecution;
+    }
     if (execution.result.status === 'succeeded' && execution.task.status === 'review_pending') {
       await this.runQueueService.markSucceeded({
         jobId: job.jobId,
@@ -159,6 +173,10 @@ export class WorkerService {
   }
 
   private async processTaskReview(job: JobRecord): Promise<JobRecord> {
+    const cancelledBeforeStart = await this.cancelIfRequested(job);
+    if (cancelledBeforeStart) {
+      return cancelledBeforeStart;
+    }
     if (!job.taskId) {
       return this.runQueueService.markFailed({
         jobId: job.jobId,
@@ -189,6 +207,10 @@ export class WorkerService {
       },
     });
     const relatedEvidenceIds = review.evidence.map((entry) => entry.evidenceId);
+    const cancelledAfterReview = await this.cancelIfRequested(job);
+    if (cancelledAfterReview) {
+      return cancelledAfterReview;
+    }
     if (review.result.status === 'approved') {
       const acceptedTask = await this.orchestratorService.acceptTask(job.runId, job.taskId);
       return this.runQueueService.markSucceeded({
@@ -239,6 +261,10 @@ export class WorkerService {
   }
 
   private async processReleaseReview(job: JobRecord): Promise<JobRecord> {
+    const cancelledBeforeStart = await this.cancelIfRequested(job);
+    if (cancelledBeforeStart) {
+      return cancelledBeforeStart;
+    }
     const run = await this.runRepository.getRun(job.runId);
     const release = await this.releaseReviewService.reviewRun({
       run,
@@ -253,6 +279,10 @@ export class WorkerService {
       evaluator: 'worker-service',
     });
     const relatedEvidenceIds = release.evidence.map((entry) => entry.evidenceId);
+    const cancelledAfterReview = await this.cancelIfRequested(job);
+    if (cancelledAfterReview) {
+      return cancelledAfterReview;
+    }
 
     if (gateResult.passed) {
       const acceptance = await this.runAcceptanceService.acceptRun({
@@ -327,6 +357,23 @@ export class WorkerService {
       jobId: job.jobId,
       error: normalizedError,
     });
+  }
+
+  private async cancelIfRequested(job: JobRecord): Promise<JobRecord | null> {
+    if (!this.cancellationService) {
+      return null;
+    }
+    const request = await this.cancellationService.isCancellationRequested(job.jobId);
+    if (!request) {
+      return null;
+    }
+
+    await this.cancellationService.acknowledgeCancellation(job.jobId, 'worker-service');
+    await this.cancellationService.finalizeRunningCancellation({
+      jobId: job.jobId,
+      cancelledBy: 'worker-service',
+    });
+    return this.runQueueService.getJob(job.jobId);
   }
 }
 

@@ -8,12 +8,15 @@ import {
 } from '..';
 import { loadOrchestratorConfig } from '../config';
 import { OrchestratorError } from '../utils/error';
+import { registerGracefulShutdown } from '../utils/graceful-shutdown';
 import { ApiFailureSchema } from './schemas/common';
+import { registerDaemonRoutes } from './routes/daemon';
 import { registerHealthRoute } from './routes/health';
 import { registerJobRoutes } from './routes/jobs';
 import { registerReleaseRoutes } from './routes/releases';
 import { registerRunRoutes } from './routes/runs';
 import { registerTaskRoutes } from './routes/tasks';
+import { registerWorkerRoutes } from './routes/workers';
 
 export type BuildApiServerOptions = CreateOrchestratorServiceOptions & {
   logger?: FastifyBaseLogger | boolean | undefined;
@@ -45,6 +48,8 @@ export function buildServer(options: BuildApiServerOptions = {}): FastifyInstanc
   registerTaskRoutes(app, bundle);
   registerJobRoutes(app, bundle);
   registerReleaseRoutes(app, bundle);
+  registerDaemonRoutes(app, bundle);
+  registerWorkerRoutes(app, bundle);
 
   return app;
 }
@@ -95,6 +100,8 @@ function mapStatusCode(code: string): number {
     case 'RETRY_LIMIT_EXCEEDED':
     case 'RELEASE_REVIEW_FAILED':
     case 'RUN_ACCEPTANCE_BLOCKED':
+    case 'JOB_LEASE_CONFLICT':
+    case 'DAEMON_WAIT_TIMEOUT':
       return 409;
     case 'VALIDATION_ERROR':
       return 400;
@@ -108,9 +115,20 @@ if (require.main === module) {
   const bundle = createOrchestratorRuntimeBundle();
   void (async () => {
     await bundle.recoveryService.recover();
+    await bundle.daemonRuntimeService.start({
+      autoPolling: true,
+      requestedBy: 'server',
+    });
     const app = buildServer({
       runtimeBundle: bundle,
       logger: true,
+    });
+    const unregister = registerGracefulShutdown({
+      shutdown: async () => {
+        await bundle.daemonRuntimeService.shutdown('signal', 'graceful shutdown');
+        unregister();
+        await app.close();
+      },
     });
     await app.listen({
       host: config.apiHost,
