@@ -272,6 +272,43 @@ export function createCodexRunnerSequence(
   };
 }
 
+export function createControllableCodexRunner(initialResponse: CodexRunnerResponse) {
+  const calls: number[] = [];
+  let pending:
+    | {
+        resolve: (value: CodexRunnerResponse) => void;
+        reject: (reason?: unknown) => void;
+      }
+    | undefined;
+
+  const runner: CodexRunner = {
+    async run() {
+      calls.push(Date.now());
+      return new Promise<CodexRunnerResponse>((resolve, reject) => {
+        pending = {
+          resolve,
+          reject,
+        };
+      });
+    },
+  };
+
+  return {
+    runner,
+    callCount(): number {
+      return calls.length;
+    },
+    resolve(response: CodexRunnerResponse = initialResponse): void {
+      pending?.resolve(response);
+      pending = undefined;
+    },
+    reject(error: Error): void {
+      pending?.reject(error);
+      pending = undefined;
+    },
+  };
+}
+
 export async function createArtifactDir(prefix: string): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
 }

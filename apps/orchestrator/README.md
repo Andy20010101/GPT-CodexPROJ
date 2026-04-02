@@ -15,6 +15,7 @@ Current scope:
 - a workspace runtime shell that prepares isolated execution context records
 - a Fastify API layer for run, task, job, and release operations
 - a workflow runtime layer with queueing, worker processing, retry, recovery, dependency unlock, release review, and run acceptance
+- a daemon runtime layer with worker leases, heartbeats, concurrency control, drain/shutdown control, cancellation requests, and status summaries
 - integration coverage for the control-plane happy path and failure rules
 
 The orchestrator now exposes both service boundaries and a first runtime shell, but it is still intentionally single-process and file-backed. It persists state to files, dispatches typed execution requests through adapters, and does not claim to be a production distributed scheduler.
@@ -52,3 +53,7 @@ Job records are written under `apps/orchestrator/artifacts/runs/<runId>/jobs/<jo
 Queue state is written under `apps/orchestrator/artifacts/runs/<runId>/queue/queue-state.json`.
 
 Release review artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/releases/<releaseReviewId>/`.
+
+Daemon state is written under `apps/orchestrator/artifacts/runtime/daemon-state.json`.
+
+Worker, lease, heartbeat, and cancellation artifacts are written under `apps/orchestrator/artifacts/runtime/` and mirrored into run-level directories where applicable.
