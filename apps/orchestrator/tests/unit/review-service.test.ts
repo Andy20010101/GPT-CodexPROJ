@@ -118,6 +118,69 @@ function createService(artifactDir: string, bridgeClient: BridgeClient): ReviewS
   );
 }
 
+function withRuntimeBridgeMethods(
+  overrides: Omit<
+    BridgeClient,
+    'getBridgeHealth' | 'listDriftIncidents' | 'resumeSession' | 'recoverConversation'
+  >,
+): BridgeClient {
+  return {
+    async getBridgeHealth() {
+      return {
+        status: 'ready',
+        checkedAt: '2026-04-02T10:00:00.000Z',
+        activeSessions: 1,
+        activeConversations: 1,
+        issues: [],
+        metadata: {},
+      };
+    },
+    async listDriftIncidents() {
+      return [];
+    },
+    async resumeSession(sessionId) {
+      return {
+        session: {
+          sessionId,
+          browserUrl: 'https://chatgpt.com/',
+          connectedAt: '2026-04-02T10:00:00.000Z',
+        },
+        health: {
+          status: 'ready',
+          checkedAt: '2026-04-02T10:00:00.000Z',
+          activeSessions: 1,
+          activeConversations: 1,
+          issues: [],
+          metadata: {},
+        },
+      };
+    },
+    async recoverConversation(conversationId) {
+      return {
+        snapshot: {
+          conversationId,
+          sessionId: randomUUID(),
+          projectName: 'Review Project',
+          status: 'completed',
+          source: 'memory',
+          messages: [],
+          startedAt: '2026-04-02T10:00:00.000Z',
+          updatedAt: '2026-04-02T10:01:00.000Z',
+        },
+        health: {
+          status: 'ready',
+          checkedAt: '2026-04-02T10:01:00.000Z',
+          activeSessions: 1,
+          activeConversations: 1,
+          issues: [],
+          metadata: {},
+        },
+      };
+    },
+    ...overrides,
+  };
+}
+
 describe('ReviewService', () => {
   it('writes review artifacts and evidence when bridge review succeeds', async () => {
     const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-service-success-'));
@@ -128,75 +191,78 @@ describe('ReviewService', () => {
     });
     const task = buildTask(run.runId);
     const executionResult = buildExecutionResult(run.runId, task.taskId);
-    const service = createService(artifactDir, {
-      async openSession() {
-        return {
-          sessionId: randomUUID(),
-          browserUrl: 'https://chatgpt.com/',
-          connectedAt: '2026-04-02T10:00:00.000Z',
-        };
-      },
-      async selectProject(input) {
-        return {
-          sessionId: input.sessionId,
-          browserUrl: 'https://chatgpt.com/',
-          projectName: input.projectName,
-          model: input.model,
-          connectedAt: '2026-04-02T10:00:00.000Z',
-        };
-      },
-      async startConversation(input) {
-        return {
-          conversationId: randomUUID(),
-          sessionId: input.sessionId,
-          projectName: input.projectName ?? 'Review Project',
-          model: input.model,
-          status: 'running',
-          source: 'memory',
-          messages: [],
-          startedAt: '2026-04-02T10:00:00.000Z',
-          updatedAt: '2026-04-02T10:00:00.000Z',
-        };
-      },
-      async sendMessage() {
-        throw new Error('sendMessage should not be called on success');
-      },
-      async waitForCompletion(conversationId) {
-        return {
-          conversationId,
-          sessionId: randomUUID(),
-          projectName: 'Review Project',
-          model: 'gpt-5.4',
-          status: 'completed',
-          source: 'memory',
-          messages: [],
-          startedAt: '2026-04-02T10:00:00.000Z',
-          updatedAt: '2026-04-02T10:01:00.000Z',
-          lastAssistantMessage: 'approved',
-        };
-      },
-      async exportMarkdown() {
-        return {
-          artifactPath: '/bridge/review.md',
-          manifestPath: '/bridge/review-manifest.json',
-          markdown: '# review\napproved\n',
-        };
-      },
-      async extractStructuredReview() {
-        return {
-          artifactPath: '/bridge/structured.json',
-          manifestPath: '/bridge/structured-manifest.json',
-          payload: {
-            status: 'approved',
-            summary: 'Review approved the task.',
-            findings: [],
-            missingTests: [],
-            architectureConcerns: [],
-            recommendedActions: [],
-          },
-        };
-      },
-    });
+    const service = createService(
+      artifactDir,
+      withRuntimeBridgeMethods({
+        async openSession() {
+          return {
+            sessionId: randomUUID(),
+            browserUrl: 'https://chatgpt.com/',
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async selectProject(input) {
+          return {
+            sessionId: input.sessionId,
+            browserUrl: 'https://chatgpt.com/',
+            projectName: input.projectName,
+            model: input.model,
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async startConversation(input) {
+          return {
+            conversationId: randomUUID(),
+            sessionId: input.sessionId,
+            projectName: input.projectName ?? 'Review Project',
+            model: input.model,
+            status: 'running',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async sendMessage() {
+          throw new Error('sendMessage should not be called on success');
+        },
+        async waitForCompletion(conversationId) {
+          return {
+            conversationId,
+            sessionId: randomUUID(),
+            projectName: 'Review Project',
+            model: 'gpt-5.4',
+            status: 'completed',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:01:00.000Z',
+            lastAssistantMessage: 'approved',
+          };
+        },
+        async exportMarkdown() {
+          return {
+            artifactPath: '/bridge/review.md',
+            manifestPath: '/bridge/review-manifest.json',
+            markdown: '# review\napproved\n',
+          };
+        },
+        async extractStructuredReview() {
+          return {
+            artifactPath: '/bridge/structured.json',
+            manifestPath: '/bridge/structured-manifest.json',
+            payload: {
+              status: 'approved',
+              summary: 'Review approved the task.',
+              findings: [],
+              missingTests: [],
+              architectureConcerns: [],
+              recommendedActions: [],
+            },
+          };
+        },
+      }),
+    );
 
     const review = await service.reviewExecution({
       run,
@@ -233,75 +299,78 @@ describe('ReviewService', () => {
     const task = buildTask(run.runId);
     const executionResult = buildExecutionResult(run.runId, task.taskId);
     let sendMessageCount = 0;
-    const service = createService(artifactDir, {
-      async openSession() {
-        return {
-          sessionId: randomUUID(),
-          browserUrl: 'https://chatgpt.com/',
-          connectedAt: '2026-04-02T10:00:00.000Z',
-        };
-      },
-      async selectProject(input) {
-        return {
-          sessionId: input.sessionId,
-          browserUrl: 'https://chatgpt.com/',
-          projectName: input.projectName,
-          model: input.model,
-          connectedAt: '2026-04-02T10:00:00.000Z',
-        };
-      },
-      async startConversation(input) {
-        return {
-          conversationId: randomUUID(),
-          sessionId: input.sessionId,
-          projectName: input.projectName ?? 'Review Project',
-          status: 'running',
-          source: 'memory',
-          messages: [],
-          startedAt: '2026-04-02T10:00:00.000Z',
-          updatedAt: '2026-04-02T10:00:00.000Z',
-        };
-      },
-      async sendMessage() {
-        sendMessageCount += 1;
-        return {
-          conversationId: randomUUID(),
-          sessionId: randomUUID(),
-          projectName: 'Review Project',
-          status: 'running',
-          source: 'memory',
-          messages: [],
-          startedAt: '2026-04-02T10:00:00.000Z',
-          updatedAt: '2026-04-02T10:00:01.000Z',
-        };
-      },
-      async waitForCompletion(conversationId) {
-        return {
-          conversationId,
-          sessionId: randomUUID(),
-          projectName: 'Review Project',
-          status: 'completed',
-          source: 'memory',
-          messages: [],
-          startedAt: '2026-04-02T10:00:00.000Z',
-          updatedAt: '2026-04-02T10:01:00.000Z',
-        };
-      },
-      async exportMarkdown() {
-        return {
-          artifactPath: '/bridge/review.md',
-          manifestPath: '/bridge/review-manifest.json',
-          markdown: '# review\nmissing json\n',
-        };
-      },
-      async extractStructuredReview() {
-        throw new BridgeClientError(
-          'STRUCTURED_OUTPUT_NOT_FOUND',
-          'Missing structured output',
-          404,
-        );
-      },
-    });
+    const service = createService(
+      artifactDir,
+      withRuntimeBridgeMethods({
+        async openSession() {
+          return {
+            sessionId: randomUUID(),
+            browserUrl: 'https://chatgpt.com/',
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async selectProject(input) {
+          return {
+            sessionId: input.sessionId,
+            browserUrl: 'https://chatgpt.com/',
+            projectName: input.projectName,
+            model: input.model,
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async startConversation(input) {
+          return {
+            conversationId: randomUUID(),
+            sessionId: input.sessionId,
+            projectName: input.projectName ?? 'Review Project',
+            status: 'running',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async sendMessage() {
+          sendMessageCount += 1;
+          return {
+            conversationId: randomUUID(),
+            sessionId: randomUUID(),
+            projectName: 'Review Project',
+            status: 'running',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:00:01.000Z',
+          };
+        },
+        async waitForCompletion(conversationId) {
+          return {
+            conversationId,
+            sessionId: randomUUID(),
+            projectName: 'Review Project',
+            status: 'completed',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:01:00.000Z',
+          };
+        },
+        async exportMarkdown() {
+          return {
+            artifactPath: '/bridge/review.md',
+            manifestPath: '/bridge/review-manifest.json',
+            markdown: '# review\nmissing json\n',
+          };
+        },
+        async extractStructuredReview() {
+          throw new BridgeClientError(
+            'STRUCTURED_OUTPUT_NOT_FOUND',
+            'Missing structured output',
+            404,
+          );
+        },
+      }),
+    );
 
     const review = await service.reviewExecution({
       run,
@@ -327,29 +396,32 @@ describe('ReviewService', () => {
     });
     const task = buildTask(run.runId);
     const executionResult = buildExecutionResult(run.runId, task.taskId);
-    const service = createService(artifactDir, {
-      async openSession() {
-        throw new BridgeClientError('SESSION_NOT_FOUND', 'No browser session', 404);
-      },
-      async selectProject() {
-        throw new Error('unreachable');
-      },
-      async startConversation() {
-        throw new Error('unreachable');
-      },
-      async sendMessage() {
-        throw new Error('unreachable');
-      },
-      async waitForCompletion() {
-        throw new Error('unreachable');
-      },
-      async exportMarkdown() {
-        throw new Error('unreachable');
-      },
-      async extractStructuredReview() {
-        throw new Error('unreachable');
-      },
-    });
+    const service = createService(
+      artifactDir,
+      withRuntimeBridgeMethods({
+        async openSession() {
+          throw new BridgeClientError('SESSION_NOT_FOUND', 'No browser session', 404);
+        },
+        async selectProject() {
+          throw new Error('unreachable');
+        },
+        async startConversation() {
+          throw new Error('unreachable');
+        },
+        async sendMessage() {
+          throw new Error('unreachable');
+        },
+        async waitForCompletion() {
+          throw new Error('unreachable');
+        },
+        async exportMarkdown() {
+          throw new Error('unreachable');
+        },
+        async extractStructuredReview() {
+          throw new Error('unreachable');
+        },
+      }),
+    );
 
     const review = await service.reviewExecution({
       run,

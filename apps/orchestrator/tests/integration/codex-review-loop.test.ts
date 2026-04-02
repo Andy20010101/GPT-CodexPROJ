@@ -158,11 +158,41 @@ function createBridgeClient(options?: {
   const sessionId = randomUUID();
 
   return {
+    async getBridgeHealth() {
+      return {
+        status: 'ready',
+        checkedAt: '2026-04-02T13:07:00.000Z',
+        activeSessions: 1,
+        activeConversations: 1,
+        issues: [],
+        metadata: {},
+      };
+    },
+    async listDriftIncidents() {
+      return [];
+    },
     async openSession() {
       return {
         sessionId,
         browserUrl: 'https://chatgpt.com/',
         connectedAt: '2026-04-02T13:07:00.000Z',
+      };
+    },
+    async resumeSession(resumeSessionId) {
+      return {
+        session: {
+          sessionId: resumeSessionId,
+          browserUrl: 'https://chatgpt.com/',
+          connectedAt: '2026-04-02T13:07:00.000Z',
+        },
+        health: {
+          status: 'ready',
+          checkedAt: '2026-04-02T13:07:00.000Z',
+          activeSessions: 1,
+          activeConversations: 1,
+          issues: [],
+          metadata: {},
+        },
       };
     },
     async selectProject(input) {
@@ -197,6 +227,29 @@ function createBridgeClient(options?: {
         messages: [],
         startedAt: '2026-04-02T13:07:10.000Z',
         updatedAt: '2026-04-02T13:07:10.000Z',
+      };
+    },
+    async recoverConversation(recoverConversationId) {
+      return {
+        snapshot: {
+          conversationId: recoverConversationId,
+          sessionId,
+          projectName: 'Review Project',
+          model: 'gpt-5.4',
+          status: 'completed',
+          source: 'memory',
+          messages: [],
+          startedAt: '2026-04-02T13:07:00.000Z',
+          updatedAt: '2026-04-02T13:07:30.000Z',
+        },
+        health: {
+          status: 'ready',
+          checkedAt: '2026-04-02T13:07:30.000Z',
+          activeSessions: 1,
+          activeConversations: 1,
+          issues: [],
+          metadata: {},
+        },
       };
     },
     async waitForCompletion() {

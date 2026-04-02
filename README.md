@@ -22,6 +22,11 @@ This repository currently provides:
 - A first multi-task runtime shell with a Fastify API, file-backed job queue, worker loop, retry/recovery handling, dependency-based task unlocking, release review, and run acceptance.
 - A first daemon-grade runtime shell with worker leases, heartbeats, stale-job reclaim, concurrency control, pause/resume/drain/shutdown controls, cancellation requests, and daemon status APIs.
 - A first runtime-hardening layer with subprocess lifecycle control, workspace retention and GC, priority-aware scheduling, quota-aware dequeue rules, failure taxonomy, and machine-readable job disposition.
+- A first real validation and stability-governance layer with:
+  - mock-assisted and opt-in real end-to-end validation runs
+  - bridge health, drift incident, session resume, and conversation recovery boundaries
+  - rollback planning, retained workspace reuse, and debug snapshot capture
+  - remediation playbooks, failure-to-task proposals, and self-repair policy decisions
 
 ## Layout
 
@@ -68,6 +73,11 @@ The repository now has:
   - `WorkspaceCleanupService` and `WorkspaceGcService` for cleanup, retain, TTL, and garbage collection policies
   - `PriorityQueueService`, `QuotaControlService`, and `SchedulingPolicyService` for non-preemptive priority and quota-aware scheduling
   - `FailureClassificationService` and `JobDispositionService` for machine-readable error taxonomy and retry/manual-attention routing
+- a stability and controlled-remediation layer with:
+  - `E2eValidationService` for bounded end-to-end validation runs
+  - `RollbackService`, `DebugSnapshotService`, and `RetainedWorkspaceService` for failure capture and controlled rollback planning
+  - `StabilityGovernanceService` for recurring-incident summaries
+  - `RemediationPlaybookService`, `FailureToTaskService`, `SelfRepairPolicyService`, and `RemediationService` for low-risk remediation prerequisites
 - shared bridge contracts reused across planes
 
 The orchestrator is intentionally not a production workflow engine yet. It models the control-plane lifecycle, enforces state and gate rules, persists runtime/job/release evidence, and now exposes an API plus a daemon shell, but it does not pretend to be a distributed scheduler or that a remote Codex cloud runtime is already present.
@@ -77,14 +87,18 @@ The orchestrator is intentionally not a production workflow engine yet. It model
 The bridge service currently exposes these routes:
 
 - `GET /health`
+- `GET /api/health/bridge`
 - `POST /api/sessions/open`
+- `POST /api/sessions/:sessionId/resume`
 - `POST /api/projects/select`
 - `POST /api/conversations/start`
 - `POST /api/conversations/:id/message`
 - `POST /api/conversations/:id/wait`
 - `GET /api/conversations/:id/snapshot`
+- `POST /api/conversations/:id/recover`
 - `POST /api/conversations/:id/export/markdown`
 - `POST /api/conversations/:id/extract/structured-review`
+- `GET /api/drift/incidents`
 
 ## Development
 
@@ -118,6 +132,12 @@ Start the orchestrator API:
 
 ```bash
 npm run dev --workspace @review-then-codex/orchestrator
+```
+
+Run the real validation harness only when the local bridge and Codex CLI are intentionally configured:
+
+```bash
+ENABLE_REAL_E2E_VALIDATION=true npx tsx scripts/run-real-e2e-validation.ts
 ```
 
 Run type checks across the monorepo:
@@ -236,7 +256,33 @@ apps/orchestrator/artifacts/runtime/
   workers/
   leases/
   heartbeats/
+  remediation/
+  rollbacks/
+  snapshots/
+  stability/
+  resume/
 ```
+
+## Phase 8 Reliability Boundary
+
+The repository now has a first real collaboration-validation and self-repair prerequisite layer, but it is still deliberately bounded.
+
+Low-risk automatic remediation is currently limited to:
+
+- bridge selector and preflight hardening
+- prompt and structured-output template repair
+- evidence-gap repair
+- workspace and runtime cleanup repair
+
+High-risk automatic modification is still intentionally blocked for:
+
+- orchestrator state-machine rules
+- gate semantics
+- acceptance rules
+- task graph dependency semantics
+- primary ledger schema structure
+
+The current next step is not “more autonomy by default”. The next step is stronger production-grade reliability around process trees, retained workspace hygiene, bridge drift handling, and human-reviewed remediation loops.
 
 ## API And Runtime
 

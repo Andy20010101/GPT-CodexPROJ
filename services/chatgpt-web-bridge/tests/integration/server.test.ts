@@ -6,8 +6,12 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  BridgeHealthResponseSchema,
+  DriftIncidentsResponseSchema,
   MarkdownExportResponseSchema,
   OpenSessionResponseSchema,
+  RecoverConversationResponseSchema,
+  ResumeSessionResponseSchema,
   SelectProjectResponseSchema,
   StartConversationResponseSchema,
   StructuredReviewExtractResponseSchema,
@@ -19,7 +23,9 @@ import { SessionLease } from '../../src/browser/session-lease';
 import { MarkdownExporter } from '../../src/exporters/markdown-exporter';
 import { StructuredOutputExtractor } from '../../src/exporters/structured-output-extractor';
 import { ArtifactManifestWriter } from '../../src/guards/artifact-manifest';
+import { SessionResumeGuard } from '../../src/guards/session-resume-guard';
 import { buildServer } from '../../src/server';
+import { BridgeHealthService } from '../../src/services/bridge-health-service';
 import { ConversationService } from '../../src/services/conversation-service';
 import { ExportService } from '../../src/services/export-service';
 import type {
@@ -169,11 +175,14 @@ describe('chatgpt-web-bridge routes', () => {
       new StructuredOutputExtractor(),
       new ArtifactManifestWriter(artifactDir),
     );
+    const bridgeHealthService = new BridgeHealthService(artifactDir);
     const conversationService = new ConversationService(
       adapter,
       new SessionLease(),
       exportService,
       { info: () => undefined },
+      bridgeHealthService,
+      new SessionResumeGuard(adapter, bridgeHealthService),
     );
     app = buildServer({ conversationService });
   });
@@ -188,6 +197,13 @@ describe('chatgpt-web-bridge routes', () => {
       url: '/health',
     });
     expect(health.statusCode).toBe(200);
+
+    const bridgeHealth = await app.inject({
+      method: 'GET',
+      url: '/api/health/bridge',
+    });
+    expect(bridgeHealth.statusCode).toBe(200);
+    BridgeHealthResponseSchema.parse(bridgeHealth.json());
 
     const openSession = await app.inject({
       method: 'POST',
@@ -211,6 +227,14 @@ describe('chatgpt-web-bridge routes', () => {
     });
     expect(selectProject.statusCode).toBe(200);
     SelectProjectResponseSchema.parse(selectProject.json());
+
+    const resumed = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/resume`,
+      payload: {},
+    });
+    expect(resumed.statusCode).toBe(200);
+    ResumeSessionResponseSchema.parse(resumed.json());
 
     const startConversation = await app.inject({
       method: 'POST',
@@ -238,6 +262,14 @@ describe('chatgpt-web-bridge routes', () => {
     });
     expect(snapshotResponse.statusCode).toBe(200);
 
+    const recoverResponse = await app.inject({
+      method: 'POST',
+      url: `/api/conversations/${conversationId}/recover`,
+      payload: {},
+    });
+    expect(recoverResponse.statusCode).toBe(200);
+    RecoverConversationResponseSchema.parse(recoverResponse.json());
+
     const exportResponse = await app.inject({
       method: 'POST',
       url: `/api/conversations/${conversationId}/export/markdown`,
@@ -262,6 +294,14 @@ describe('chatgpt-web-bridge routes', () => {
       decision: 'approve',
       issues: [],
     });
+
+    const incidents = await app.inject({
+      method: 'GET',
+      url: '/api/drift/incidents',
+    });
+    expect(incidents.statusCode).toBe(200);
+    const incidentsBody = DriftIncidentsResponseSchema.parse(incidents.json());
+    expect(incidentsBody.data.incidents).toEqual([]);
   });
 
   it('returns a clear structured output error when the assistant reply has no json block', async () => {

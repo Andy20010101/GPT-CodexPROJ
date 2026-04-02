@@ -17,6 +17,11 @@ Current scope:
 - a workflow runtime layer with queueing, worker processing, retry, recovery, dependency unlock, release review, and run acceptance
 - a daemon runtime layer with worker leases, heartbeats, concurrency control, drain/shutdown control, cancellation requests, and status summaries
 - a runtime-hardening layer with subprocess lifecycle management, workspace cleanup/retention/GC, priority-aware scheduling, quota control, failure taxonomy, and job disposition
+- a phase-8 stability layer with:
+  - end-to-end validation reports
+  - rollback planning and debug snapshots
+  - retained workspace reuse and runner resume decisions
+  - remediation playbooks and self-repair policy decisions
 - integration coverage for the control-plane happy path and failure rules
 
 The orchestrator now exposes both service boundaries and a first runtime shell, but it is still intentionally single-process and file-backed. It persists state to files, dispatches typed execution requests through adapters, and does not claim to be a production distributed scheduler.
@@ -74,6 +79,21 @@ Runtime-hardening artifacts are also written under:
 - `apps/orchestrator/artifacts/runtime/cleanup/<cleanupId>.json`
 - `apps/orchestrator/artifacts/runtime/gc/<gcRunId>.json`
 - `apps/orchestrator/artifacts/runtime/processes/<processHandleId>.json`
+- `apps/orchestrator/artifacts/runtime/remediation/<remediationId>.json`
+- `apps/orchestrator/artifacts/runtime/rollbacks/<rollbackId>.json`
+- `apps/orchestrator/artifacts/runtime/snapshots/<snapshotId>.json`
+- `apps/orchestrator/artifacts/runtime/stability/stability-report.json`
+- `apps/orchestrator/artifacts/runtime/resume/<resumeStateId>.json`
+
+Validation artifacts are written under:
+
+- `apps/orchestrator/artifacts/runs/<runId>/validation/validation-report.json`
+
+Run the opt-in real validation harness only when the bridge and Codex CLI are configured intentionally:
+
+```bash
+ENABLE_REAL_E2E_VALIDATION=true npx tsx scripts/run-real-e2e-validation.ts
+```
 
 The current runtime is still intentionally:
 

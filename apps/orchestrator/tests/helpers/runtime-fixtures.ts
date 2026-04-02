@@ -7,6 +7,8 @@ import { randomUUID } from 'node:crypto';
 import { createOrchestratorRuntimeBundle, type OrchestratorRuntimeBundle } from '../../src';
 import type {
   ArchitectureFreeze,
+  BridgeDriftIncident,
+  BridgeHealthSummary,
   CleanupPolicy,
   RequirementFreeze,
   SchedulingPolicy,
@@ -146,9 +148,19 @@ export function createBridgeClient(options?: {
   releaseReviewPayload?: Record<string, unknown>;
   taskExtractError?: Error;
   releaseExtractError?: Error;
+  bridgeHealth?: BridgeHealthSummary;
+  driftIncidents?: BridgeDriftIncident[];
 }): BridgeClient {
   const conversationKinds = new Map<string, 'task' | 'release'>();
   const sessionId = randomUUID();
+  const bridgeHealth = options?.bridgeHealth ?? {
+    status: 'ready' as const,
+    checkedAt: '2026-04-02T15:03:00.000Z',
+    activeSessions: 1,
+    activeConversations: conversationKinds.size,
+    issues: [],
+    metadata: {},
+  };
 
   return {
     async openSession() {
@@ -158,6 +170,15 @@ export function createBridgeClient(options?: {
         connectedAt: '2026-04-02T15:03:00.000Z',
       };
     },
+    async getBridgeHealth() {
+      return {
+        ...bridgeHealth,
+        activeConversations: conversationKinds.size,
+      };
+    },
+    async listDriftIncidents() {
+      return options?.driftIncidents ?? [];
+    },
     async selectProject(input) {
       return {
         sessionId: input.sessionId,
@@ -165,6 +186,21 @@ export function createBridgeClient(options?: {
         projectName: input.projectName,
         model: input.model,
         connectedAt: '2026-04-02T15:03:00.000Z',
+      };
+    },
+    async resumeSession(sessionId) {
+      return {
+        session: {
+          sessionId,
+          browserUrl: 'https://chatgpt.com/',
+          projectName: 'Review Project',
+          model: 'gpt-5.4',
+          connectedAt: '2026-04-02T15:03:00.000Z',
+        },
+        health: {
+          ...bridgeHealth,
+          activeConversations: conversationKinds.size,
+        },
       };
     },
     async startConversation(input) {
@@ -183,6 +219,25 @@ export function createBridgeClient(options?: {
         messages: [],
         startedAt: '2026-04-02T15:03:00.000Z',
         updatedAt: '2026-04-02T15:03:00.000Z',
+      };
+    },
+    async recoverConversation(conversationId) {
+      return {
+        snapshot: {
+          conversationId,
+          sessionId,
+          projectName: 'Review Project',
+          model: 'gpt-5.4',
+          status: 'completed',
+          source: 'memory',
+          messages: [],
+          startedAt: '2026-04-02T15:03:00.000Z',
+          updatedAt: '2026-04-02T15:03:10.000Z',
+        },
+        health: {
+          ...bridgeHealth,
+          activeConversations: conversationKinds.size,
+        },
       };
     },
     async sendMessage(conversationId) {

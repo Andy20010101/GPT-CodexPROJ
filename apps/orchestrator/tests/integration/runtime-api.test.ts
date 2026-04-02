@@ -86,4 +86,75 @@ describe('runtime api integration', () => {
 
     await app.close();
   });
+
+  it('exposes runtime stability and remediation query endpoints', async () => {
+    const artifactDir = await createArtifactDir('runtime-api-hardening-');
+    const app = buildServer({
+      artifactDir,
+    });
+
+    const createRunResponse = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: {
+        title: 'Runtime hardening run',
+        createdBy: 'tester',
+      },
+    });
+    const createRunBody: {
+      ok: true;
+      data: { runId: string };
+    } = createRunResponse.json();
+    const runId = createRunBody.data.runId;
+
+    const proposeResponse = await app.inject({
+      method: 'POST',
+      url: '/api/runtime/remediation/propose',
+      payload: {
+        runId,
+        metadata: {
+          source: 'runtime-api-test',
+        },
+      },
+    });
+    expect(proposeResponse.statusCode).toBe(200);
+
+    const remediationListResponse = await app.inject({
+      method: 'GET',
+      url: '/api/runtime/remediation',
+    });
+    const remediationListBody: {
+      ok: true;
+      data: { results: Array<{ runId: string }> };
+    } = remediationListResponse.json();
+    expect(remediationListBody.data.results.some((entry) => entry.runId === runId)).toBe(true);
+
+    const stabilityResponse = await app.inject({
+      method: 'GET',
+      url: '/api/runtime/stability',
+    });
+    expect(stabilityResponse.statusCode).toBe(200);
+
+    const rollbackResponse = await app.inject({
+      method: 'GET',
+      url: '/api/runtime/rollbacks',
+    });
+    const rollbackBody: {
+      ok: true;
+      data: { rollbacks: unknown[] };
+    } = rollbackResponse.json();
+    expect(rollbackBody.data.rollbacks).toEqual([]);
+
+    const snapshotResponse = await app.inject({
+      method: 'GET',
+      url: '/api/runtime/debug-snapshots',
+    });
+    const snapshotBody: {
+      ok: true;
+      data: { snapshots: unknown[] };
+    } = snapshotResponse.json();
+    expect(snapshotBody.data.snapshots).toEqual([]);
+
+    await app.close();
+  });
 });

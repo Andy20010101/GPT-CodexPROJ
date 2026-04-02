@@ -155,11 +155,41 @@ function createApprovedBridgeClient(): BridgeClient {
   const sessionId = randomUUID();
 
   return {
+    async getBridgeHealth() {
+      return {
+        status: 'ready',
+        checkedAt: '2026-04-02T12:07:30.000Z',
+        activeSessions: 1,
+        activeConversations: 1,
+        issues: [],
+        metadata: {},
+      };
+    },
+    async listDriftIncidents() {
+      return [];
+    },
     async openSession() {
       return {
         sessionId,
         browserUrl: 'https://chatgpt.com/',
         connectedAt: '2026-04-02T12:07:30.000Z',
+      };
+    },
+    async resumeSession(resumeSessionId) {
+      return {
+        session: {
+          sessionId: resumeSessionId,
+          browserUrl: 'https://chatgpt.com/',
+          connectedAt: '2026-04-02T12:07:30.000Z',
+        },
+        health: {
+          status: 'ready',
+          checkedAt: '2026-04-02T12:07:30.000Z',
+          activeSessions: 1,
+          activeConversations: 1,
+          issues: [],
+          metadata: {},
+        },
       };
     },
     async selectProject(input) {
@@ -186,6 +216,29 @@ function createApprovedBridgeClient(): BridgeClient {
     },
     async sendMessage() {
       throw new Error('sendMessage should not be called when structured review is present');
+    },
+    async recoverConversation(recoverConversationId) {
+      return {
+        snapshot: {
+          conversationId: recoverConversationId,
+          sessionId,
+          projectName: 'Execution Review Project',
+          model: 'gpt-5.4',
+          status: 'completed',
+          source: 'memory',
+          messages: [],
+          startedAt: '2026-04-02T12:08:00.000Z',
+          updatedAt: '2026-04-02T12:08:30.000Z',
+        },
+        health: {
+          status: 'ready',
+          checkedAt: '2026-04-02T12:08:30.000Z',
+          activeSessions: 1,
+          activeConversations: 1,
+          issues: [],
+          metadata: {},
+        },
+      };
     },
     async waitForCompletion() {
       return {
