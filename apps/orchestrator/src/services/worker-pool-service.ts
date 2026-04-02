@@ -6,6 +6,7 @@ import { OrchestratorError } from '../utils/error';
 import { ConcurrencyControlService } from './concurrency-control-service';
 import { HeartbeatService } from './heartbeat-service';
 import { RunQueueService } from './run-queue-service';
+import { SchedulingPolicyService } from './scheduling-policy-service';
 import { WorkerLeaseService } from './worker-lease-service';
 import { WorkerService } from './worker-service';
 import { EvidenceLedgerService } from './evidence-ledger-service';
@@ -25,6 +26,7 @@ export class WorkerPoolService {
     private readonly workerLeaseService: WorkerLeaseService,
     private readonly heartbeatService: HeartbeatService,
     private readonly concurrencyControlService: ConcurrencyControlService,
+    private readonly schedulingPolicyService: SchedulingPolicyService,
     private readonly workerService: WorkerService,
     private readonly evidenceLedgerService: EvidenceLedgerService,
     private readonly config: {
@@ -98,6 +100,12 @@ export class WorkerPoolService {
     const runnableJobs = await this.runQueueService.listRunnableJobs();
     const activeJobs = await this.listActiveJobs();
     const claimedJobIds = new Set<string>();
+    const blockedJobs: JobRecord[] = [];
+    const selectedJobs: JobRecord[] = [];
+    const orderedJobs = this.schedulingPolicyService.orderRunnableJobs({
+      jobs: runnableJobs,
+      activeJobs,
+    });
 
     for (const worker of workers) {
       if (this.hasRunningHandle(worker.workerId)) {
@@ -109,7 +117,12 @@ export class WorkerPoolService {
         status: 'polling',
         currentJobId: undefined,
       });
-      const candidate = await this.findCandidate(runnableJobs, activeJobs, claimedJobIds);
+      const candidate = await this.findCandidate(
+        orderedJobs,
+        activeJobs,
+        claimedJobIds,
+        blockedJobs,
+      );
       if (!candidate) {
         await this.persistWorker({
           ...idleWorker,
@@ -119,6 +132,7 @@ export class WorkerPoolService {
       }
 
       claimedJobIds.add(candidate.jobId);
+      selectedJobs.push(candidate);
       const startedJob = await this.runQueueService.startJob(candidate.jobId);
       const lease = await this.workerLeaseService.acquireJobLease({
         workerId: worker.workerId,
@@ -146,6 +160,13 @@ export class WorkerPoolService {
       this.startWorkerHandle(input.daemonId, runningWorker, startedJob, lease);
       activeJobs.push(startedJob);
     }
+
+    await this.schedulingPolicyService.recordState({
+      runnableJobs: orderedJobs,
+      blockedJobs,
+      selectedJobs,
+      activeJobs,
+    });
   }
 
   public async waitForIdle(timeoutMs: number = 5000): Promise<void> {
@@ -165,9 +186,28 @@ export class WorkerPoolService {
     runnableJobs: readonly JobRecord[],
     activeJobs: JobRecord[],
     claimedJobIds: Set<string>,
+    blockedJobs: JobRecord[],
   ): Promise<JobRecord | null> {
     for (const job of runnableJobs) {
       if (claimedJobIds.has(job.jobId)) {
+        continue;
+      }
+      const quotaDecision = await this.schedulingPolicyService.evaluateQuota({
+        job,
+        activeJobs,
+        producer: 'worker-pool-service',
+      });
+      if (!quotaDecision.allowed) {
+        await this.runQueueService.rescheduleJob({
+          jobId: job.jobId,
+          availableAt: quotaDecision.availableAt,
+          metadata: {
+            quotaDeferredAt: new Date().toISOString(),
+            quotaReason: quotaDecision.reason,
+          },
+        });
+        blockedJobs.push(job);
+        claimedJobIds.add(job.jobId);
         continue;
       }
       const decision = this.concurrencyControlService.evaluate({
@@ -190,6 +230,7 @@ export class WorkerPoolService {
           concurrencyReason: decision.reason,
         },
       });
+      blockedJobs.push(job);
       claimedJobIds.add(job.jobId);
     }
 

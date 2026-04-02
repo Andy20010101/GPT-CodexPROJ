@@ -6,6 +6,7 @@ import { FileRunRepository } from '../storage/file-run-repository';
 import { FileCancellationRepository } from '../storage/file-cancellation-repository';
 import { RunQueueService } from './run-queue-service';
 import { EvidenceLedgerService } from './evidence-ledger-service';
+import { RunnerLifecycleService } from './runner-lifecycle-service';
 
 export class CancellationService {
   public constructor(
@@ -13,6 +14,7 @@ export class CancellationService {
     private readonly runQueueService: RunQueueService,
     private readonly cancellationRepository: FileCancellationRepository,
     private readonly evidenceLedgerService: EvidenceLedgerService,
+    private readonly runnerLifecycleService?: RunnerLifecycleService,
   ) {}
 
   public async cancelJob(input: {
@@ -73,12 +75,20 @@ export class CancellationService {
         metadata: {},
       });
     } else if (job.status === 'running') {
+      const runnerCancellation = this.runnerLifecycleService
+        ? await this.runnerLifecycleService.requestCancellation({
+            jobId: job.jobId,
+            reason: input.reason ?? 'api cancellation',
+            requestedBy: input.requestedBy,
+          })
+        : null;
       updatedJob = await this.runQueueService.annotateJob({
         jobId: job.jobId,
         metadata: {
           cancellationRequestedAt: timestamp,
           cancellationId: request.cancellationId,
           cancellationRequestedBy: input.requestedBy,
+          ...(runnerCancellation ? { runnerCancellation } : {}),
         },
       });
       result = CancellationResultSchema.parse({
@@ -89,7 +99,9 @@ export class CancellationService {
         outcome: 'cancellation_requested',
         message: `Cancellation requested for running job ${job.jobId}.`,
         timestamp,
-        metadata: {},
+        metadata: {
+          ...(runnerCancellation ? { runnerCancellation } : {}),
+        },
       });
     } else {
       result = CancellationResultSchema.parse({
@@ -126,6 +138,10 @@ export class CancellationService {
     return latest.request.state === 'requested' || latest.request.state === 'acknowledged'
       ? latest.request
       : null;
+  }
+
+  public async getLatestForJob(jobId: string) {
+    return this.cancellationRepository.findLatestForJob(jobId);
   }
 
   public async acknowledgeCancellation(

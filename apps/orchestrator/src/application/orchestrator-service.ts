@@ -439,7 +439,13 @@ export class OrchestratorService {
     reviewType?: 'task_review' | 'release_review' | undefined;
     relatedEvidenceIds?: readonly string[] | undefined;
     metadata?: Record<string, unknown> | undefined;
-  }): Promise<ReviewDispatch & { gateResult: GateResult; task: TaskEnvelope }> {
+  }): Promise<
+    ReviewDispatch & {
+      gateResult: GateResult;
+      task: TaskEnvelope;
+      executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
+    }
+  > {
     const run = await this.runRepository.getRun(input.runId);
     let task = await this.taskRepository.getTask(input.runId, input.taskId);
     if (task.status === 'tests_green') {
@@ -495,6 +501,7 @@ export class OrchestratorService {
       ...review,
       gateResult: gate.gateResult,
       task: gate.task,
+      executionResult,
     };
   }
 

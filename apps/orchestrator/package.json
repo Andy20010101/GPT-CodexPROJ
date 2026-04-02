@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx src/api/server.ts",
     "dev:api": "tsx src/api/server.ts",
+    "daemon": "TMPDIR=/tmp tsx ../../scripts/run-orchestrator-daemon.ts",
     "test": "TMPDIR=/tmp vitest run tests/unit tests/integration",
     "test:integration": "TMPDIR=/tmp vitest run tests/integration",
     "test:unit": "TMPDIR=/tmp vitest run tests/unit",

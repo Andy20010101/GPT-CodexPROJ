@@ -128,7 +128,10 @@ export class CodexExecutor implements ExecutionExecutor {
         stdout: response.stdout ?? '',
         stderr: response.stderr ?? '',
         exitCode: response.exitCode ?? null,
-        metadata: response.metadata ?? {},
+        metadata: {
+          ...request.metadata,
+          ...(response.metadata ?? {}),
+        },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Codex runner failure';
@@ -150,6 +153,7 @@ export class CodexExecutor implements ExecutionExecutor {
         stderr: message,
         exitCode: 1,
         metadata: {
+          ...request.metadata,
           runnerError: true,
           ...(error instanceof Error && 'code' in error
             ? {

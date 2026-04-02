@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { PriorityLevelSchema } from './priority-level';
+
 export const JobKindSchema = z.enum(['task_execution', 'task_review', 'release_review']);
 export type JobKind = z.infer<typeof JobKindSchema>;
 
@@ -30,6 +32,7 @@ export const JobRecordSchema = z.object({
   status: JobStatusSchema,
   attempt: z.number().int().min(1),
   maxAttempts: z.number().int().min(1),
+  priority: PriorityLevelSchema.default('normal'),
   createdAt: z.string().datetime(),
   startedAt: z.string().datetime().optional(),
   finishedAt: z.string().datetime().optional(),

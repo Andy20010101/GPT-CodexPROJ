@@ -22,6 +22,7 @@ export function registerTaskRoutes(app: FastifyInstance, bundle: OrchestratorRun
       taskId: params.taskId,
       ...(body.command ? { command: body.command } : {}),
       ...(body.retryPolicy ? { retryPolicy: body.retryPolicy } : {}),
+      ...(body.priority ? { priority: body.priority } : {}),
       metadata: body.metadata,
       runWorker: body.runWorker,
     });

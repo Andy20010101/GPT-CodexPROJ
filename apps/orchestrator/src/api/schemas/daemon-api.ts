@@ -15,6 +15,12 @@ export const DaemonStatusResponseSchema = successEnvelope(
   }),
 );
 
+export const DaemonMetricsResponseSchema = successEnvelope(
+  z.object({
+    metrics: RuntimeMetricsSchema.nullable(),
+  }),
+);
+
 export const DaemonControlResponseSchema = successEnvelope(
   z.object({
     daemonState: DaemonStateSchema,

@@ -17,15 +17,22 @@ import { DaemonRuntimeService } from './services/daemon-runtime-service';
 import { DaemonStatusService } from './services/daemon-status-service';
 import { DrainService } from './services/drain-service';
 import { HeartbeatService } from './services/heartbeat-service';
+import { FailureClassificationService } from './services/failure-classification-service';
+import { JobDispositionService } from './services/job-disposition-service';
+import { PriorityQueueService } from './services/priority-queue-service';
+import { ProcessControlService } from './services/process-control-service';
+import { QuotaControlService } from './services/quota-control-service';
 import { RecoveryService } from './services/recovery-service';
 import { ReleaseGateService } from './services/release-gate-service';
 import { ReleaseReviewService } from './services/release-review-service';
 import { ReviewGateService } from './services/review-gate-service';
 import { ReviewService } from './services/review-service';
 import { RetryService } from './services/retry-service';
+import { RunnerLifecycleService } from './services/runner-lifecycle-service';
 import { RunAcceptanceService } from './services/run-acceptance-service';
 import { RunQueueService } from './services/run-queue-service';
 import { ArchitectureFreezeService } from './services/architecture-freeze-service';
+import { SchedulingPolicyService } from './services/scheduling-policy-service';
 import { RequirementFreezeService } from './services/requirement-freeze-service';
 import { StaleJobReclaimService } from './services/stale-job-reclaim-service';
 import { TaskSchedulerService } from './services/task-scheduler-service';
@@ -35,23 +42,29 @@ import { WorkerLeaseService } from './services/worker-lease-service';
 import { WorkerPoolService } from './services/worker-pool-service';
 import { WorkerService } from './services/worker-service';
 import { WorkflowRuntimeService } from './services/workflow-runtime-service';
+import { WorkspaceCleanupService } from './services/workspace-cleanup-service';
+import { WorkspaceGcService } from './services/workspace-gc-service';
 import { WorkspaceRuntimeService } from './services/workspace-runtime-service';
 import { WorktreeService } from './services/worktree-service';
 import { FileCancellationRepository } from './storage/file-cancellation-repository';
 import { FileDaemonRepository } from './storage/file-daemon-repository';
 import { FileEvidenceRepository } from './storage/file-evidence-repository';
 import { FileExecutionRepository } from './storage/file-execution-repository';
+import { FileFailureRepository } from './storage/file-failure-repository';
 import { FileHeartbeatRepository } from './storage/file-heartbeat-repository';
 import { FileJobRepository } from './storage/file-job-repository';
+import { FileProcessRepository } from './storage/file-process-repository';
 import { FileQueueRepository } from './storage/file-queue-repository';
 import { FileReleaseRepository } from './storage/file-release-repository';
 import { FileReviewRepository } from './storage/file-review-repository';
 import { FileRunRepository } from './storage/file-run-repository';
+import { FileSchedulingRepository } from './storage/file-scheduling-repository';
 import { FileTaskRepository } from './storage/file-task-repository';
 import { FileWorkerRepository } from './storage/file-worker-repository';
+import { FileWorkspaceLifecycleRepository } from './storage/file-workspace-lifecycle-repository';
 import { FileWorkspaceRepository } from './storage/file-workspace-repository';
 import { CodexCliCommandBuilder } from './utils/codex-cli-command-builder';
-import type { ConcurrencyPolicy, RetryPolicy } from './contracts';
+import type { CleanupPolicy, ConcurrencyPolicy, RetryPolicy, SchedulingPolicy } from './contracts';
 
 export type CreateOrchestratorServiceOptions = {
   artifactDir?: string;
@@ -61,6 +74,8 @@ export type CreateOrchestratorServiceOptions = {
   worktreeService?: WorktreeService | undefined;
   retryPolicy?: RetryPolicy | undefined;
   concurrencyPolicy?: ConcurrencyPolicy | undefined;
+  schedulingPolicy?: SchedulingPolicy | undefined;
+  workspaceCleanupPolicy?: CleanupPolicy | undefined;
   daemonWorkerCount?: number | undefined;
   daemonPollIntervalMs?: number | undefined;
   workerHeartbeatIntervalMs?: number | undefined;
@@ -78,6 +93,12 @@ export type OrchestratorRuntimeBundle = {
   recoveryService: RecoveryService;
   cancellationService: CancellationService;
   concurrencyControlService: ConcurrencyControlService;
+  failureClassificationService: FailureClassificationService;
+  jobDispositionService: JobDispositionService;
+  processControlService: ProcessControlService;
+  quotaControlService: QuotaControlService;
+  runnerLifecycleService: RunnerLifecycleService;
+  schedulingPolicyService: SchedulingPolicyService;
   daemonRuntimeService: DaemonRuntimeService;
   daemonStatusService: DaemonStatusService;
   drainService: DrainService;
@@ -89,6 +110,8 @@ export type OrchestratorRuntimeBundle = {
   taskSchedulerService: TaskSchedulerService;
   workerLeaseService: WorkerLeaseService;
   workerPoolService: WorkerPoolService;
+  workspaceCleanupService: WorkspaceCleanupService;
+  workspaceGcService: WorkspaceGcService;
   runRepository: FileRunRepository;
   taskRepository: FileTaskRepository;
   evidenceRepository: FileEvidenceRepository;
@@ -96,9 +119,13 @@ export type OrchestratorRuntimeBundle = {
   workerRepository: FileWorkerRepository;
   heartbeatRepository: FileHeartbeatRepository;
   cancellationRepository: FileCancellationRepository;
+  failureRepository: FileFailureRepository;
   jobRepository: FileJobRepository;
+  processRepository: FileProcessRepository;
   queueRepository: FileQueueRepository;
   releaseRepository: FileReleaseRepository;
+  schedulingRepository: FileSchedulingRepository;
+  workspaceLifecycleRepository: FileWorkspaceLifecycleRepository;
 };
 
 export function createOrchestratorService(
@@ -117,6 +144,8 @@ export function createOrchestratorRuntimeBundle(
       : (artifactDirOrOptions ?? {});
   const retryPolicy = options.retryPolicy ?? config.defaultRetryPolicy;
   const concurrencyPolicy = options.concurrencyPolicy ?? config.concurrencyPolicy;
+  const schedulingPolicy = options.schedulingPolicy ?? config.schedulingPolicy;
+  const workspaceCleanupPolicy = options.workspaceCleanupPolicy ?? config.workspaceCleanupPolicy;
   const daemonWorkerCount = options.daemonWorkerCount ?? config.daemonWorkerCount;
   const daemonPollIntervalMs = options.daemonPollIntervalMs ?? config.daemonPollIntervalMs;
   const workerHeartbeatIntervalMs =
@@ -130,13 +159,17 @@ export function createOrchestratorRuntimeBundle(
   const evidenceRepository = new FileEvidenceRepository(resolvedArtifactDir);
   const daemonRepository = new FileDaemonRepository(resolvedArtifactDir);
   const executionRepository = new FileExecutionRepository(resolvedArtifactDir);
+  const failureRepository = new FileFailureRepository(resolvedArtifactDir);
   const heartbeatRepository = new FileHeartbeatRepository(resolvedArtifactDir);
   const jobRepository = new FileJobRepository(resolvedArtifactDir);
+  const processRepository = new FileProcessRepository(resolvedArtifactDir);
   const cancellationRepository = new FileCancellationRepository(resolvedArtifactDir);
   const queueRepository = new FileQueueRepository(resolvedArtifactDir);
   const releaseRepository = new FileReleaseRepository(resolvedArtifactDir);
   const reviewRepository = new FileReviewRepository(resolvedArtifactDir);
+  const schedulingRepository = new FileSchedulingRepository(resolvedArtifactDir);
   const workerRepository = new FileWorkerRepository(resolvedArtifactDir);
+  const workspaceLifecycleRepository = new FileWorkspaceLifecycleRepository(resolvedArtifactDir);
   const workspaceRepository = new FileWorkspaceRepository(resolvedArtifactDir);
   const evidenceLedgerService = new EvidenceLedgerService(evidenceRepository);
   const executionEvidenceService = new ExecutionEvidenceService(
@@ -151,20 +184,56 @@ export function createOrchestratorRuntimeBundle(
     evidenceLedgerService,
     worktreeService,
   );
+  const workspaceCleanupService = new WorkspaceCleanupService(
+    runRepository,
+    workspaceLifecycleRepository,
+    evidenceLedgerService,
+    worktreeService,
+    workspaceCleanupPolicy,
+  );
+  const workspaceGcService = new WorkspaceGcService(
+    runRepository,
+    workspaceRepository,
+    workspaceLifecycleRepository,
+    workspaceCleanupService,
+    evidenceLedgerService,
+  );
+  const processControlService = new ProcessControlService(
+    processRepository,
+    runRepository,
+    evidenceLedgerService,
+    {
+      gracefulSignal: 'SIGTERM',
+      graceMs: config.runnerTerminateGraceMs,
+      forcedSignal: config.runnerKillSignal,
+      forceKillAfterMs: config.runnerForceKillAfterMs,
+    },
+  );
+  const runnerLifecycleService = new RunnerLifecycleService(
+    runRepository,
+    evidenceLedgerService,
+    processControlService,
+  );
   const bridgeClient = options.bridgeClient ?? new HttpBridgeClient(config.bridgeBaseUrl);
   const codexRunner =
     options.codexRunner ??
     (config.codexRunnerMode === 'cli'
-      ? new CodexCliRunner(new CodexCliCommandBuilder(), {
-          cliBin: config.codexCliBin,
-          cliArgs: config.codexCliArgs,
-          modelHint: config.reviewModelHint,
-          timeoutMs: config.codexCliTimeoutMs,
-        })
+      ? new CodexCliRunner(
+          new CodexCliCommandBuilder(),
+          {
+            cliBin: config.codexCliBin,
+            cliArgs: config.codexCliArgs,
+            modelHint: config.reviewModelHint,
+            timeoutMs: config.codexCliTimeoutMs,
+          },
+          undefined,
+          undefined,
+          runnerLifecycleService,
+        )
       : undefined);
   const executorRegistry = new ExecutorRegistry([
     new CodexExecutor(codexRunner),
-    new CommandExecutor(options.commandRunner),
+    new CommandExecutor(options.commandRunner, runnerLifecycleService, config.codexCliTimeoutMs),
     new NoopExecutor(),
   ]);
   const reviewService = new ReviewService(
@@ -214,11 +283,23 @@ export function createOrchestratorRuntimeBundle(
     evidenceLedgerService,
     retryPolicy,
   );
+  const failureClassificationService = new FailureClassificationService(
+    runRepository,
+    failureRepository,
+    evidenceLedgerService,
+  );
+  const jobDispositionService = new JobDispositionService(
+    resolvedArtifactDir,
+    runRepository,
+    failureClassificationService,
+    evidenceLedgerService,
+  );
   const cancellationService = new CancellationService(
     runRepository,
     runQueueService,
     cancellationRepository,
     evidenceLedgerService,
+    runnerLifecycleService,
   );
   const workerLeaseService = new WorkerLeaseService(
     runRepository,
@@ -241,6 +322,21 @@ export function createOrchestratorRuntimeBundle(
     runRepository,
     evidenceLedgerService,
     concurrencyPolicy,
+  );
+  const quotaControlService = new QuotaControlService(
+    resolvedArtifactDir,
+    runRepository,
+    evidenceLedgerService,
+    schedulingPolicy.quotaPolicy,
+    concurrencyPolicy.deferDelayMs,
+  );
+  const schedulingPolicyService = new SchedulingPolicyService(
+    schedulingRepository,
+    runRepository,
+    evidenceLedgerService,
+    new PriorityQueueService(),
+    quotaControlService,
+    schedulingPolicy,
   );
   const releaseReviewService = new ReleaseReviewService(
     bridgeClient,
@@ -276,6 +372,8 @@ export function createOrchestratorRuntimeBundle(
     releaseGateService,
     runAcceptanceService,
     cancellationService,
+    workspaceCleanupService,
+    jobDispositionService,
     {
       workspaceSourceRepoPath: config.workspaceSourceRepoPath,
       retryPolicy,
@@ -315,6 +413,7 @@ export function createOrchestratorRuntimeBundle(
     workerLeaseService,
     heartbeatService,
     concurrencyControlService,
+    schedulingPolicyService,
     workerService,
     evidenceLedgerService,
     {
@@ -348,9 +447,11 @@ export function createOrchestratorRuntimeBundle(
     drainService,
     daemonStatusService,
     staleJobReclaimService,
+    workspaceGcService,
     evidenceLedgerService,
     {
       pollIntervalMs: daemonPollIntervalMs,
+      gcIntervalMs: config.daemonGcIntervalMs,
       autoQueueRunnableTasks: true,
     },
   );
@@ -365,6 +466,12 @@ export function createOrchestratorRuntimeBundle(
     recoveryService,
     cancellationService,
     concurrencyControlService,
+    failureClassificationService,
+    jobDispositionService,
+    processControlService,
+    quotaControlService,
+    runnerLifecycleService,
+    schedulingPolicyService,
     daemonRuntimeService,
     daemonStatusService,
     drainService,
@@ -376,6 +483,8 @@ export function createOrchestratorRuntimeBundle(
     taskSchedulerService,
     workerLeaseService,
     workerPoolService,
+    workspaceCleanupService,
+    workspaceGcService,
     runRepository,
     taskRepository,
     evidenceRepository,
@@ -383,9 +492,13 @@ export function createOrchestratorRuntimeBundle(
     workerRepository,
     heartbeatRepository,
     cancellationRepository,
+    failureRepository,
     jobRepository,
+    processRepository,
     queueRepository,
     releaseRepository,
+    schedulingRepository,
+    workspaceLifecycleRepository,
   };
 }
 
@@ -402,19 +515,27 @@ export * from './services/daemon-status-service';
 export * from './services/drain-service';
 export * from './services/execution-service';
 export * from './services/executor-registry';
+export * from './services/failure-classification-service';
 export * from './services/heartbeat-service';
+export * from './services/job-disposition-service';
+export * from './services/process-control-service';
+export * from './services/quota-control-service';
 export * from './services/release-gate-service';
 export * from './services/release-review-service';
 export * from './services/review-gate-service';
 export * from './services/review-service';
 export * from './services/retry-service';
+export * from './services/runner-lifecycle-service';
 export * from './services/run-acceptance-service';
 export * from './services/run-queue-service';
+export * from './services/scheduling-policy-service';
 export * from './services/stale-job-reclaim-service';
 export * from './services/task-scheduler-service';
 export * from './services/worker-lease-service';
 export * from './services/worker-pool-service';
 export * from './services/worker-service';
 export * from './services/workflow-runtime-service';
+export * from './services/workspace-cleanup-service';
+export * from './services/workspace-gc-service';
 export * from './services/workspace-runtime-service';
 export * from './services/worktree-service';

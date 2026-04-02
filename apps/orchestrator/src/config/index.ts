@@ -1,6 +1,12 @@
 import path from 'node:path';
 
-import type { ConcurrencyPolicy, ExecutorType, RetryPolicy } from '../contracts';
+import type {
+  CleanupPolicy,
+  ConcurrencyPolicy,
+  ExecutorType,
+  RetryPolicy,
+  SchedulingPolicy,
+} from '../contracts';
 
 export type OrchestratorConfig = {
   artifactDir: string;
@@ -25,6 +31,12 @@ export type OrchestratorConfig = {
   workerLeaseTtlMs: number;
   staleHeartbeatThresholdMs: number;
   concurrencyPolicy: ConcurrencyPolicy;
+  schedulingPolicy: SchedulingPolicy;
+  workspaceCleanupPolicy: CleanupPolicy;
+  daemonGcIntervalMs: number;
+  runnerTerminateGraceMs: number;
+  runnerKillSignal: NodeJS.Signals;
+  runnerForceKillAfterMs: number;
 };
 
 export function loadOrchestratorConfig(): OrchestratorConfig {
@@ -69,6 +81,33 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
         workspace: process.env.DAEMON_EXCLUSIVE_WORKSPACE !== 'false',
       },
     },
+    schedulingPolicy: {
+      quotaPolicy: {
+        maxConcurrentJobsGlobal: parseInteger(process.env.DAEMON_MAX_CONCURRENT_JOBS, 2),
+        maxConcurrentJobsPerRun: parseInteger(process.env.DAEMON_MAX_CONCURRENT_JOBS_PER_RUN, 1),
+        maxConcurrentJobsPerKind: {
+          task_execution: parseInteger(process.env.SCHEDULER_MAX_TASK_EXECUTION, 2),
+          task_review: parseInteger(process.env.SCHEDULER_MAX_TASK_REVIEW, 1),
+          release_review: parseInteger(process.env.SCHEDULER_MAX_RELEASE_REVIEW, 1),
+        },
+        reservedSlots: [],
+      },
+      fairnessWindowMs: parseInteger(process.env.SCHEDULER_FAIRNESS_WINDOW_MS, 1000),
+      priorityOrder: ['urgent', 'high', 'normal', 'low'],
+      releaseReviewBoostMs: parseInteger(process.env.SCHEDULER_RELEASE_BOOST_MS, 5000),
+    },
+    workspaceCleanupPolicy: {
+      ttlMs: parseInteger(process.env.WORKSPACE_TTL_MS, 3_600_000),
+      retainOnFailure: process.env.WORKSPACE_RETAIN_ON_FAILURE !== 'false',
+      retainOnRejectedReview: process.env.WORKSPACE_RETAIN_ON_REJECTED_REVIEW !== 'false',
+      retainOnDebug: process.env.WORKSPACE_RETAIN_ON_DEBUG !== 'false',
+      maxRetainedPerRun: parseInteger(process.env.WORKSPACE_MAX_RETAINED_PER_RUN, 3),
+      cleanupMode: parseCleanupMode(process.env.WORKSPACE_CLEANUP_MODE),
+    },
+    daemonGcIntervalMs: parseInteger(process.env.DAEMON_GC_INTERVAL_MS, 1000),
+    runnerTerminateGraceMs: parseInteger(process.env.RUNNER_TERMINATE_GRACE_MS, 250),
+    runnerKillSignal: parseSignal(process.env.RUNNER_KILL_SIGNAL),
+    runnerForceKillAfterMs: parseInteger(process.env.RUNNER_FORCE_KILL_AFTER_MS, 750),
   };
 }
 
@@ -98,4 +137,19 @@ function parseExecutorType(value: string | undefined): ExecutorType {
   }
 
   return 'codex';
+}
+
+function parseCleanupMode(value: string | undefined): CleanupPolicy['cleanupMode'] {
+  return value === 'immediate' || value === 'manual' ? value : 'delayed';
+}
+
+function parseSignal(value: string | undefined): NodeJS.Signals {
+  switch (value) {
+    case 'SIGINT':
+    case 'SIGKILL':
+    case 'SIGTERM':
+      return value;
+    default:
+      return 'SIGKILL';
+  }
 }

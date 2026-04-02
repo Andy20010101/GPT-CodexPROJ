@@ -4,6 +4,7 @@ import type { OrchestratorRuntimeBundle } from '../../index';
 import {
   DaemonControlRequestSchema,
   DaemonControlResponseSchema,
+  DaemonMetricsResponseSchema,
   DaemonStatusResponseSchema,
 } from '../schemas/daemon-api';
 
@@ -16,6 +17,16 @@ export function registerDaemonRoutes(
     return DaemonStatusResponseSchema.parse({
       ok: true,
       data,
+    });
+  });
+
+  app.get('/api/daemon/metrics', async () => {
+    const data = await bundle.daemonRuntimeService.getStatus();
+    return DaemonMetricsResponseSchema.parse({
+      ok: true,
+      data: {
+        metrics: data.metrics,
+      },
     });
   });
 

@@ -1,6 +1,7 @@
 import type {
   ExecutionCommand,
   JobRecord,
+  PriorityLevel,
   RetryPolicy,
   RunRuntimeState,
   TaskEnvelope,
@@ -31,6 +32,7 @@ export class WorkflowRuntimeService {
     taskId: string;
     command?: ExecutionCommand | undefined;
     retryPolicy?: RetryPolicy | undefined;
+    priority?: PriorityLevel | undefined;
     metadata?: Record<string, unknown> | undefined;
     runWorker?: boolean | undefined;
   }): Promise<{
@@ -63,6 +65,7 @@ export class WorkflowRuntimeService {
       taskId: primedTask.taskId,
       kind: 'task_execution',
       maxAttempts: policy.maxAttempts,
+      ...(input.priority ? { priority: input.priority } : {}),
       metadata: {
         ...(input.command ? { command: input.command } : {}),
         retryPolicy: policy,
@@ -95,6 +98,7 @@ export class WorkflowRuntimeService {
         taskId: primedTask.taskId,
         kind: 'task_execution',
         maxAttempts: retryPolicy.maxAttempts,
+        priority: readPriority(primedTask.metadata.priority),
         metadata: {
           retryPolicy,
         },
@@ -114,6 +118,7 @@ export class WorkflowRuntimeService {
           runId,
           kind: 'release_review',
           maxAttempts: this.defaultRetryPolicy.maxAttempts,
+          priority: 'high',
           metadata: {
             retryPolicy: this.defaultRetryPolicy,
           },
@@ -171,6 +176,7 @@ export class WorkflowRuntimeService {
       runId: input.runId,
       kind: 'release_review',
       maxAttempts: this.defaultRetryPolicy.maxAttempts,
+      priority: 'high',
       metadata: {
         retryPolicy: this.defaultRetryPolicy,
       },
@@ -282,6 +288,12 @@ export class WorkflowRuntimeService {
 
     return this.taskRepository.getTask(currentTask.runId, currentTask.taskId);
   }
+}
+
+function readPriority(value: unknown): PriorityLevel | undefined {
+  return value === 'low' || value === 'normal' || value === 'high' || value === 'urgent'
+    ? value
+    : undefined;
 }
 
 function readRetryPolicy(value: unknown, fallback: RetryPolicy): RetryPolicy {

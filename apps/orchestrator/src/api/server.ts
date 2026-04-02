@@ -15,6 +15,7 @@ import { registerHealthRoute } from './routes/health';
 import { registerJobRoutes } from './routes/jobs';
 import { registerReleaseRoutes } from './routes/releases';
 import { registerRunRoutes } from './routes/runs';
+import { registerRuntimeRoutes } from './routes/runtime';
 import { registerTaskRoutes } from './routes/tasks';
 import { registerWorkerRoutes } from './routes/workers';
 
@@ -50,6 +51,7 @@ export function buildServer(options: BuildApiServerOptions = {}): FastifyInstanc
   registerReleaseRoutes(app, bundle);
   registerDaemonRoutes(app, bundle);
   registerWorkerRoutes(app, bundle);
+  registerRuntimeRoutes(app, bundle);
 
   return app;
 }
@@ -102,6 +104,7 @@ function mapStatusCode(code: string): number {
     case 'RUN_ACCEPTANCE_BLOCKED':
     case 'JOB_LEASE_CONFLICT':
     case 'DAEMON_WAIT_TIMEOUT':
+    case 'PROCESS_START_FAILED':
       return 409;
     case 'VALIDATION_ERROR':
       return 400;

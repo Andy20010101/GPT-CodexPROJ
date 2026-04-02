@@ -4,6 +4,9 @@ import type { OrchestratorRuntimeBundle } from '../../index';
 import {
   CancelJobRequestSchema,
   CancelJobResponseSchema,
+  GetJobCancellationResponseSchema,
+  GetJobFailureResponseSchema,
+  GetJobProcessResponseSchema,
   GetJobResponseSchema,
   JobPathParamsSchema,
   RetryJobRequestSchema,
@@ -57,6 +60,36 @@ export function registerJobRoutes(app: FastifyInstance, bundle: OrchestratorRunt
       data: {
         job: cancelled.job,
         result: cancelled.result,
+      },
+    });
+  });
+
+  app.get('/api/jobs/:jobId/failure', async (request) => {
+    const params = JobPathParamsSchema.parse(request.params);
+    return GetJobFailureResponseSchema.parse({
+      ok: true,
+      data: {
+        failure: await bundle.failureClassificationService.getLatestFailureForJob(params.jobId),
+      },
+    });
+  });
+
+  app.get('/api/jobs/:jobId/process', async (request) => {
+    const params = JobPathParamsSchema.parse(request.params);
+    return GetJobProcessResponseSchema.parse({
+      ok: true,
+      data: {
+        process: await bundle.runnerLifecycleService.getLatestProcessForJob(params.jobId),
+      },
+    });
+  });
+
+  app.get('/api/jobs/:jobId/cancellation', async (request) => {
+    const params = JobPathParamsSchema.parse(request.params);
+    return GetJobCancellationResponseSchema.parse({
+      ok: true,
+      data: {
+        cancellation: await bundle.cancellationService.getLatestForJob(params.jobId),
       },
     });
   });

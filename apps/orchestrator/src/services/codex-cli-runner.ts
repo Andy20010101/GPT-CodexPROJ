@@ -6,6 +6,7 @@ import { OrchestratorError } from '../utils/error';
 import { CodexCliCommandBuilder } from '../utils/codex-cli-command-builder';
 import type { CodexRunner, CodexRunnerResponse } from './codex-executor';
 import type { CodexExecutionPayload } from './codex-execution-payload-builder';
+import { RunnerLifecycleService } from './runner-lifecycle-service';
 import { ExecFileGitProcessRunner, type GitProcessRunner } from './worktree-service';
 
 type CliProcessResult = {
@@ -120,6 +121,7 @@ export class CodexCliRunner implements CodexRunner {
     },
     private readonly processRunner: CliProcessRunner = new SpawnCliProcessRunner(),
     private readonly gitRunner: GitProcessRunner = new ExecFileGitProcessRunner(),
+    private readonly runnerLifecycleService?: RunnerLifecycleService,
   ) {}
 
   public async run(payload: CodexExecutionPayload): Promise<CodexRunnerResponse> {
@@ -132,26 +134,55 @@ export class CodexCliRunner implements CodexRunner {
     });
 
     try {
-      const processResult = await this.processRunner.run(command);
+      const processResult = this.runnerLifecycleService
+        ? await this.runnerLifecycleService.runCommand({
+            runId: payload.runId,
+            taskId: payload.taskId,
+            jobId: readJobId(payload),
+            workspacePath: command.cwd,
+            command: command.command,
+            args: command.args,
+            stdin: command.stdin,
+            timeoutMs: command.timeoutMs,
+            producer: 'codex-cli-runner',
+            metadata: {
+              executionId: payload.executionId,
+            },
+          })
+        : await this.processRunner.run(command);
       const structuredOutput = await this.readStructuredOutput(command.outputPath);
       const patch = await this.collectPatch(command.cwd);
+      const errorCode = 'errorCode' in processResult ? processResult.errorCode : undefined;
+      const elapsedMs =
+        'durationMs' in processResult ? processResult.durationMs : processResult.elapsedMs;
 
       return {
-        status: structuredOutput?.status ?? (processResult.exitCode === 0 ? 'partial' : 'failed'),
+        status:
+          structuredOutput?.status ??
+          (errorCode === 'RUNNER_CANCELLED'
+            ? 'failed'
+            : processResult.exitCode === 0
+              ? 'partial'
+              : 'failed'),
         summary:
           structuredOutput?.summary ??
-          (processResult.exitCode === 0
-            ? 'Codex CLI completed without a structured summary.'
-            : `Codex CLI exited with code ${processResult.exitCode ?? 'unknown'}.`),
+          (errorCode === 'RUNNER_CANCELLED'
+            ? 'Codex CLI was cancelled before completion.'
+            : errorCode === 'RUNNER_TIMEOUT'
+              ? 'Codex CLI timed out before completion.'
+              : processResult.exitCode === 0
+                ? 'Codex CLI completed without a structured summary.'
+                : `Codex CLI exited with code ${processResult.exitCode ?? 'unknown'}.`),
         stdout: processResult.stdout,
         stderr: processResult.stderr,
         exitCode: processResult.exitCode,
         patch,
         testResults: structuredOutput?.testResults ?? [],
         metadata: {
-          elapsedMs: processResult.elapsedMs,
+          elapsedMs,
           cliBin: this.config.cliBin,
           outputPath: command.outputPath,
+          ...(errorCode ? { errorCode } : {}),
         },
       };
     } finally {
@@ -191,4 +222,9 @@ export class CodexCliRunner implements CodexRunner {
       return undefined;
     }
   }
+}
+
+function readJobId(payload: CodexExecutionPayload): string {
+  const value = payload.metadata.jobId;
+  return typeof value === 'string' ? value : payload.executionId;
 }

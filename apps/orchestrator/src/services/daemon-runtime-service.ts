@@ -11,9 +11,11 @@ import { WorkerPoolService } from './worker-pool-service';
 import { DaemonStatusService } from './daemon-status-service';
 import { RunQueueService } from './run-queue-service';
 import { StaleJobReclaimService, type StaleJobReclaimSummary } from './stale-job-reclaim-service';
+import { WorkspaceGcService } from './workspace-gc-service';
 
 export class DaemonRuntimeService {
   private pollTimer?: NodeJS.Timeout | undefined;
+  private gcTimer?: NodeJS.Timeout | undefined;
 
   public constructor(
     private readonly daemonRepository: FileDaemonRepository,
@@ -24,9 +26,11 @@ export class DaemonRuntimeService {
     private readonly drainService: DrainService,
     private readonly daemonStatusService: DaemonStatusService,
     private readonly staleJobReclaimService: StaleJobReclaimService,
+    private readonly workspaceGcService: WorkspaceGcService,
     private readonly evidenceLedgerService: EvidenceLedgerService,
     private readonly config: {
       pollIntervalMs: number;
+      gcIntervalMs: number;
       autoQueueRunnableTasks: boolean;
     },
   ) {}
@@ -53,8 +57,10 @@ export class DaemonRuntimeService {
       state: 'running',
       updatedAt: new Date().toISOString(),
     });
+    await this.appendLifecycleEvidence(running, 'runtime_daemon_startup');
     if (options?.autoPolling !== false) {
       this.startPollingLoop();
+      this.startGcLoop();
     }
     const metrics = await this.tick();
     return {
@@ -195,10 +201,23 @@ export class DaemonRuntimeService {
     }, this.config.pollIntervalMs);
   }
 
+  private startGcLoop(): void {
+    if (this.gcTimer) {
+      return;
+    }
+    this.gcTimer = setInterval(() => {
+      void this.workspaceGcService.runGc();
+    }, this.config.gcIntervalMs);
+  }
+
   private stopPollingLoop(): void {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = undefined;
+    }
+    if (this.gcTimer) {
+      clearInterval(this.gcTimer);
+      this.gcTimer = undefined;
     }
   }
 
@@ -230,6 +249,7 @@ export class DaemonRuntimeService {
       });
       await this.workerPoolService.setIdleWorkersStatus(stopped.daemonId, 'stopped');
       this.stopPollingLoop();
+      await this.appendLifecycleEvidence(stopped, 'runtime_daemon_shutdown');
     }
   }
 
@@ -295,6 +315,32 @@ export class DaemonRuntimeService {
         metadata: {
           daemonId: metrics.daemonId,
           daemonState: metrics.daemonState,
+        },
+      });
+    }
+  }
+
+  private async appendLifecycleEvidence(
+    state: DaemonState,
+    kind: 'runtime_daemon_startup' | 'runtime_daemon_shutdown',
+  ): Promise<void> {
+    const runs = await this.runRepository.listRuns();
+    const artifact = await this.daemonRepository.saveDaemonState(state);
+    for (const run of runs.filter((entry) => entry.stage !== 'accepted')) {
+      await this.evidenceLedgerService.appendEvidence({
+        runId: run.runId,
+        stage: run.stage,
+        kind,
+        timestamp: state.updatedAt,
+        producer: 'daemon-runtime-service',
+        artifactPaths: [artifact.globalPath, ...(artifact.runPath ? [artifact.runPath] : [])],
+        summary:
+          kind === 'runtime_daemon_startup'
+            ? `Daemon ${state.daemonId} started`
+            : `Daemon ${state.daemonId} shutdown`,
+        metadata: {
+          daemonId: state.daemonId,
+          state: state.state,
         },
       });
     }

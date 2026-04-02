@@ -27,7 +27,7 @@ export class FileWorkspaceRepository {
   }
 
   public async listWorkspaces(runId: string): Promise<WorkspaceRuntime[]> {
-    const directoryPath = path.join(getRunRoot(this.artifactDir, runId), 'workspaces');
+    const directoryPath = path.join(getRunRoot(this.artifactDir, runId), 'workspace-runtime');
     const raw = await readJsonFilesInDirectory<WorkspaceRuntime>(directoryPath);
     return raw.map((value) => WorkspaceRuntimeSchema.parse(value));
   }

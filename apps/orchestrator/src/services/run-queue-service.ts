@@ -3,11 +3,13 @@ import { randomUUID } from 'node:crypto';
 import {
   JobErrorSchema,
   JobRecordSchema,
+  PriorityLevelSchema,
   QueueItemSchema,
   QueueStateSchema,
   type JobError,
   type JobKind,
   type JobRecord,
+  type PriorityLevel,
   type QueueState,
   type RetryPolicy,
 } from '../contracts';
@@ -22,6 +24,7 @@ type EnqueueJobInput = {
   taskId?: string | undefined;
   kind: JobKind;
   maxAttempts: number;
+  priority?: PriorityLevel | undefined;
   availableAt?: string | undefined;
   metadata?: Record<string, unknown> | undefined;
 };
@@ -50,6 +53,7 @@ export class RunQueueService {
       status: 'queued',
       attempt: 1,
       maxAttempts: input.maxAttempts,
+      priority: input.priority ?? defaultPriorityForKind(input.kind),
       createdAt: timestamp,
       availableAt: input.availableAt ?? timestamp,
       metadata: input.metadata ?? {},
@@ -61,6 +65,7 @@ export class RunQueueService {
       runId: job.runId,
       ...(job.taskId ? { taskId: job.taskId } : {}),
       kind: job.kind,
+      priority: job.priority,
       queuedAt: timestamp,
       availableAt: job.availableAt ?? timestamp,
       metadata: {},
@@ -279,6 +284,21 @@ export class RunQueueService {
     });
   }
 
+  public async markManualAttentionRequired(input: {
+    jobId: string;
+    error: JobError;
+    relatedEvidenceIds?: readonly string[] | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }): Promise<JobRecord> {
+    return this.completeJob({
+      jobId: input.jobId,
+      status: 'manual_attention_required',
+      error: input.error,
+      ...(input.relatedEvidenceIds ? { relatedEvidenceIds: input.relatedEvidenceIds } : {}),
+      metadata: input.metadata,
+    });
+  }
+
   public async markRetriable(input: {
     jobId: string;
     error: JobError;
@@ -305,6 +325,7 @@ export class RunQueueService {
       runId: retriableJob.runId,
       ...(retriableJob.taskId ? { taskId: retriableJob.taskId } : {}),
       kind: retriableJob.kind,
+      priority: retriableJob.priority,
       queuedAt: timestamp,
       availableAt: input.availableAt,
       metadata: {},
@@ -333,6 +354,7 @@ export class RunQueueService {
       runId: job.runId,
       ...(job.taskId ? { taskId: job.taskId } : {}),
       kind: job.kind,
+      priority: job.priority,
       queuedAt: new Date().toISOString(),
       availableAt: job.availableAt ?? new Date().toISOString(),
       metadata: {},
@@ -377,6 +399,7 @@ export class RunQueueService {
       runId: rescheduledJob.runId,
       ...(rescheduledJob.taskId ? { taskId: rescheduledJob.taskId } : {}),
       kind: rescheduledJob.kind,
+      priority: rescheduledJob.priority,
       queuedAt: new Date().toISOString(),
       availableAt: input.availableAt,
       metadata: {},
@@ -397,7 +420,7 @@ export class RunQueueService {
 
   private async completeJob(input: {
     jobId: string;
-    status: 'succeeded' | 'failed' | 'blocked' | 'cancelled';
+    status: 'succeeded' | 'failed' | 'blocked' | 'cancelled' | 'manual_attention_required';
     error?: JobError | undefined;
     relatedEvidenceIds?: readonly string[] | undefined;
     metadata?: Record<string, unknown> | undefined;
@@ -459,6 +482,7 @@ export class RunQueueService {
       runId: string;
       taskId?: string | undefined;
       kind: JobKind;
+      priority?: PriorityLevel | undefined;
       queuedAt: string;
       availableAt: string;
       metadata?: Record<string, unknown> | undefined;
@@ -467,6 +491,7 @@ export class RunQueueService {
     const queueState = await this.getQueueState(runId);
     const queueItem = QueueItemSchema.parse({
       ...item,
+      priority: PriorityLevelSchema.parse(item.priority ?? 'normal'),
       metadata: item.metadata ?? {},
     });
     const nextItems = [
@@ -526,6 +551,18 @@ export class RunQueueService {
       summary,
       metadata,
     });
+  }
+}
+
+function defaultPriorityForKind(kind: JobKind): PriorityLevel {
+  switch (kind) {
+    case 'release_review':
+      return 'high';
+    case 'task_review':
+      return 'normal';
+    case 'task_execution':
+    default:
+      return 'normal';
   }
 }
 

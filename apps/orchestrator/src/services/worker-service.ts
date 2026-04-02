@@ -1,10 +1,7 @@
+import { randomUUID } from 'node:crypto';
+
 import type { ExecutionCommand, JobError, JobRecord, RetryPolicy } from '../contracts';
 import { ExecutionCommandSchema } from '../contracts';
-import {
-  getExecutionJobFailureDisposition,
-  getReleaseJobFailureDisposition,
-  getReviewJobFailureDisposition,
-} from '../utils/job-disposition';
 import { areTaskDependenciesSatisfied } from '../utils/dependency-resolver';
 import { OrchestratorError } from '../utils/error';
 import { OrchestratorService } from '../application/orchestrator-service';
@@ -16,6 +13,8 @@ import { ReleaseGateService } from './release-gate-service';
 import { ReleaseReviewService } from './release-review-service';
 import { RunAcceptanceService } from './run-acceptance-service';
 import { CancellationService } from './cancellation-service';
+import { JobDispositionService } from './job-disposition-service';
+import { WorkspaceCleanupService } from './workspace-cleanup-service';
 
 export class WorkerService {
   public constructor(
@@ -28,6 +27,8 @@ export class WorkerService {
     private readonly releaseGateService: ReleaseGateService,
     private readonly runAcceptanceService: RunAcceptanceService,
     private readonly cancellationService: CancellationService | undefined,
+    private readonly workspaceCleanupService: WorkspaceCleanupService,
+    private readonly jobDispositionService: JobDispositionService,
     private readonly config: {
       workspaceSourceRepoPath: string;
       retryPolicy: RetryPolicy;
@@ -98,6 +99,10 @@ export class WorkerService {
         jobId: job.jobId,
       },
     });
+    await this.workspaceCleanupService.registerWorkspace({
+      workspace,
+    });
+    await this.workspaceCleanupService.markActive(run.runId, workspace.workspaceId);
     const command = readExecutionCommand(job.metadata.command ?? task.metadata.command);
     const execution = await this.orchestratorService.executeTask({
       runId: run.runId,
@@ -115,14 +120,23 @@ export class WorkerService {
     const relatedEvidenceIds = execution.evidence.map((entry) => entry.evidenceId);
     const cancelledAfterExecution = await this.cancelIfRequested(job);
     if (cancelledAfterExecution) {
+      await this.workspaceCleanupService.finalizeAfterExecution({
+        workspace,
+        outcome: 'cancelled',
+      });
       return cancelledAfterExecution;
     }
     if (execution.result.status === 'succeeded' && execution.task.status === 'review_pending') {
+      await this.workspaceCleanupService.finalizeAfterExecution({
+        workspace,
+        outcome: 'succeeded',
+      });
       await this.runQueueService.markSucceeded({
         jobId: job.jobId,
         relatedEvidenceIds,
         metadata: {
           executionId: execution.result.executionId,
+          workspaceId: workspace.workspaceId,
         },
       });
       return this.runQueueService.enqueueJob({
@@ -130,19 +144,32 @@ export class WorkerService {
         taskId: task.taskId,
         kind: 'task_review',
         maxAttempts: job.maxAttempts,
+        priority: 'high',
         metadata: {
           executionId: execution.result.executionId,
+          workspaceId: workspace.workspaceId,
         },
       });
     }
 
+    await this.workspaceCleanupService.finalizeAfterExecution({
+      workspace,
+      outcome:
+        readString(execution.result.metadata.errorCode) === 'RUNNER_CANCELLED'
+          ? 'cancelled'
+          : 'failed',
+    });
+    const { disposition } = await this.jobDispositionService.forExecutionFailure({
+      job,
+      result: execution.result,
+      source: 'worker-service',
+    });
     const error = buildJobError(
       execution.result.metadata.errorCode,
-      execution.result.summary,
+      disposition.reason,
       execution.result.metadata,
     );
-    const disposition = getExecutionJobFailureDisposition(job, execution.result);
-    if (disposition === 'retry') {
+    if (disposition.disposition === 'retriable') {
       return this.retryService.retryJob({
         jobId: job.jobId,
         policy: this.config.retryPolicy,
@@ -152,8 +179,27 @@ export class WorkerService {
         },
       });
     }
-    if (disposition === 'block') {
+    if (disposition.disposition === 'blocked') {
       return this.runQueueService.markBlocked({
+        jobId: job.jobId,
+        error,
+        relatedEvidenceIds,
+        metadata: {
+          executionId: execution.result.executionId,
+        },
+      });
+    }
+    if (disposition.disposition === 'cancelled') {
+      return this.runQueueService.markCancelled({
+        jobId: job.jobId,
+        error,
+        metadata: {
+          executionId: execution.result.executionId,
+        },
+      });
+    }
+    if (disposition.disposition === 'manual_attention_required') {
+      return this.runQueueService.markManualAttentionRequired({
         jobId: job.jobId,
         error,
         relatedEvidenceIds,
@@ -207,11 +253,22 @@ export class WorkerService {
       },
     });
     const relatedEvidenceIds = review.evidence.map((entry) => entry.evidenceId);
+    const workspaceId = readString(review.executionResult.metadata.workspaceId);
     const cancelledAfterReview = await this.cancelIfRequested(job);
     if (cancelledAfterReview) {
       return cancelledAfterReview;
     }
     if (review.result.status === 'approved') {
+      if (workspaceId) {
+        const workspace = await this.orchestratorService.describeWorkspaceRuntime(
+          job.runId,
+          workspaceId,
+        );
+        await this.workspaceCleanupService.finalizeAfterReview({
+          workspace,
+          reviewStatus: 'approved',
+        });
+      }
       const acceptedTask = await this.orchestratorService.acceptTask(job.runId, job.taskId);
       return this.runQueueService.markSucceeded({
         jobId: job.jobId,
@@ -224,13 +281,27 @@ export class WorkerService {
       });
     }
 
+    if (workspaceId) {
+      const workspace = await this.orchestratorService.describeWorkspaceRuntime(
+        job.runId,
+        workspaceId,
+      );
+      await this.workspaceCleanupService.finalizeAfterReview({
+        workspace,
+        reviewStatus: review.result.status,
+      });
+    }
+    const { disposition } = await this.jobDispositionService.forReviewFailure({
+      job,
+      result: review.result,
+      source: 'worker-service',
+    });
     const error = buildJobError(
       readString(review.result.metadata.errorCode),
-      review.result.summary,
+      disposition.reason,
       review.result.metadata,
     );
-    const disposition = getReviewJobFailureDisposition(job, review.result);
-    if (disposition === 'retry') {
+    if (disposition.disposition === 'retriable') {
       return this.retryService.retryJob({
         jobId: job.jobId,
         policy: this.config.retryPolicy,
@@ -240,8 +311,18 @@ export class WorkerService {
         },
       });
     }
-    if (disposition === 'block') {
+    if (disposition.disposition === 'blocked') {
       return this.runQueueService.markBlocked({
+        jobId: job.jobId,
+        error,
+        relatedEvidenceIds,
+        metadata: {
+          reviewId: review.result.reviewId,
+        },
+      });
+    }
+    if (disposition.disposition === 'manual_attention_required') {
+      return this.runQueueService.markManualAttentionRequired({
         jobId: job.jobId,
         error,
         relatedEvidenceIds,
@@ -300,13 +381,17 @@ export class WorkerService {
       });
     }
 
+    const { disposition } = await this.jobDispositionService.forReleaseFailure({
+      job,
+      result: release.result,
+      source: 'worker-service',
+    });
     const error = buildJobError(
       readString(release.result.metadata.errorCode),
-      release.result.summary,
+      disposition.reason,
       release.result.metadata,
     );
-    const disposition = getReleaseJobFailureDisposition(job, release.result);
-    if (disposition === 'retry') {
+    if (disposition.disposition === 'retriable') {
       return this.retryService.retryJob({
         jobId: job.jobId,
         policy: this.config.retryPolicy,
@@ -316,8 +401,18 @@ export class WorkerService {
         },
       });
     }
-    if (disposition === 'block') {
+    if (disposition.disposition === 'blocked') {
       return this.runQueueService.markBlocked({
+        jobId: job.jobId,
+        error,
+        relatedEvidenceIds,
+        metadata: {
+          releaseReviewId: release.result.releaseReviewId,
+        },
+      });
+    }
+    if (disposition.disposition === 'manual_attention_required') {
+      return this.runQueueService.markManualAttentionRequired({
         jobId: job.jobId,
         error,
         relatedEvidenceIds,
@@ -338,7 +433,35 @@ export class WorkerService {
 
   private async handleUnexpectedFailure(job: JobRecord, error: unknown): Promise<JobRecord> {
     const normalizedError = normalizeJobError(error);
-    if (this.retryService.canRetry(job)) {
+    const { disposition } = await this.jobDispositionService.forExecutionFailure({
+      job,
+      result: {
+        executionId: randomUUID(),
+        runId: job.runId,
+        taskId: job.taskId ?? randomUUID(),
+        executorType: 'noop',
+        status: 'failed',
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        summary: normalizedError.message,
+        patchSummary: {
+          changedFiles: [],
+          addedLines: 0,
+          removedLines: 0,
+          notes: ['Worker failure fallback.'],
+        },
+        testResults: [],
+        artifacts: [],
+        stdout: '',
+        stderr: normalizedError.message,
+        exitCode: 1,
+        metadata: {
+          errorCode: normalizedError.code,
+        },
+      },
+      source: 'worker-service',
+    });
+    if (disposition.disposition === 'retriable' && this.retryService.canRetry(job)) {
       try {
         return await this.retryService.retryJob({
           jobId: job.jobId,
@@ -351,6 +474,20 @@ export class WorkerService {
           error: normalizedError,
         });
       }
+    }
+
+    if (disposition.disposition === 'manual_attention_required') {
+      return this.runQueueService.markManualAttentionRequired({
+        jobId: job.jobId,
+        error: normalizedError,
+      });
+    }
+
+    if (disposition.disposition === 'cancelled') {
+      return this.runQueueService.markCancelled({
+        jobId: job.jobId,
+        error: normalizedError,
+      });
     }
 
     return this.runQueueService.markFailed({

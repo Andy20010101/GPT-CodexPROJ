@@ -42,29 +42,6 @@ export class ConcurrencyControlService {
     const activeRunningJobs = input.activeJobs.filter((job) => job.status === 'running');
     const candidateKeys = buildConcurrencyKeys(input.job);
 
-    if (activeRunningJobs.length >= policy.maxConcurrentJobs) {
-      return {
-        allowed: false,
-        action: 'defer',
-        reason: 'Global concurrency limit is saturated.',
-        keys: candidateKeys,
-        availableAt: new Date(now.getTime() + policy.deferDelayMs).toISOString(),
-      };
-    }
-
-    if (
-      activeRunningJobs.filter((job) => job.runId === input.job.runId).length >=
-      policy.maxConcurrentJobsPerRun
-    ) {
-      return {
-        allowed: false,
-        action: 'defer',
-        reason: `Per-run concurrency limit is saturated for run ${input.job.runId}.`,
-        keys: candidateKeys,
-        availableAt: new Date(now.getTime() + policy.deferDelayMs).toISOString(),
-      };
-    }
-
     if (candidateKeys.length > 0) {
       const activeKeys = new Set(activeRunningJobs.flatMap((job) => buildConcurrencyKeys(job)));
       const conflictingKey = candidateKeys.find((key) => activeKeys.has(key));

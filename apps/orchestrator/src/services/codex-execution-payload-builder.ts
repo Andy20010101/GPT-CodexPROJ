@@ -94,6 +94,7 @@ export class CodexExecutionPayloadBuilder {
         workspacePath: request.workspacePath,
         relatedEvidenceIds: request.relatedEvidenceIds,
         executorType: request.executorType,
+        ...request.metadata,
       },
     };
   }

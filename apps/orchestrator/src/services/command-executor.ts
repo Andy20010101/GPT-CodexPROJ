@@ -10,6 +10,7 @@ import {
 import { createEmptyPatchSummary } from '../utils/patch-parser';
 import { normalizeCommandResult, type RawCommandResult } from '../utils/command-result-normalizer';
 import type { ExecutionExecutor } from './executor-registry';
+import { RunnerLifecycleService } from './runner-lifecycle-service';
 
 export type CommandRunnerInput = {
   command: string;
@@ -61,7 +62,11 @@ export class SpawnCommandRunner implements CommandRunner {
 export class CommandExecutor implements ExecutionExecutor {
   public readonly type = 'command' as const;
 
-  public constructor(private readonly runner: CommandRunner = new SpawnCommandRunner()) {}
+  public constructor(
+    private readonly runner: CommandRunner = new SpawnCommandRunner(),
+    private readonly runnerLifecycleService?: RunnerLifecycleService,
+    private readonly timeoutMs: number = 600000,
+  ) {}
 
   public getCapability(): ExecutorCapability {
     return ExecutorCapabilitySchema.parse({
@@ -100,13 +105,18 @@ export class CommandExecutor implements ExecutionExecutor {
     }
 
     try {
-      const raw = await this.runner.run({
-        command: request.command.command,
-        args: request.command.args,
-        cwd: request.workspacePath,
-        env: request.command.env,
-        shell: request.command.shell,
-      });
+      const lifecycleResult = this.runnerLifecycleService
+        ? await this.runWithLifecycle(request)
+        : null;
+      const raw =
+        lifecycleResult?.raw ??
+        (await this.runner.run({
+          command: request.command.command,
+          args: request.command.args,
+          cwd: request.workspacePath,
+          env: request.command.env,
+          shell: request.command.shell,
+        }));
       const normalized = normalizeCommandResult({
         command: request.command,
         raw,
@@ -121,9 +131,11 @@ export class CommandExecutor implements ExecutionExecutor {
         finishedAt: new Date().toISOString(),
         ...normalized,
         metadata: {
+          ...request.metadata,
           command: request.command.command,
           args: request.command.args,
           purpose: request.command.purpose,
+          ...(lifecycleResult?.errorCode ? { errorCode: lifecycleResult.errorCode } : {}),
         },
       });
     } catch (error) {
@@ -144,9 +156,49 @@ export class CommandExecutor implements ExecutionExecutor {
         stderr: message,
         exitCode: 1,
         metadata: {
+          ...request.metadata,
           runnerError: true,
         },
       });
     }
   }
+
+  private async runWithLifecycle(request: ExecutionRequest): Promise<{
+    raw: RawCommandResult;
+    errorCode?: string | undefined;
+  }> {
+    const result = await this.runnerLifecycleService!.runCommand({
+      runId: request.runId,
+      taskId: request.taskId,
+      jobId: readJobId(request),
+      workspacePath: request.workspacePath,
+      command: request.command!.command,
+      args: request.command!.args,
+      env: request.command!.env,
+      shell: request.command!.shell,
+      timeoutMs: this.timeoutMs,
+      producer: 'command-executor',
+      metadata: {
+        executionId: request.executionId,
+      },
+    });
+    return {
+      raw: {
+        stdout: result.stdout,
+        stderr:
+          result.errorCode === 'RUNNER_TIMEOUT'
+            ? `${result.stderr}\nRunner timed out.`.trim()
+            : result.errorCode === 'RUNNER_CANCELLED'
+              ? `${result.stderr}\nRunner cancelled.`.trim()
+              : result.stderr,
+        exitCode: result.exitCode ?? (result.errorCode ? 1 : 0),
+      },
+      ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+    };
+  }
+}
+
+function readJobId(request: ExecutionRequest): string {
+  const value = request.metadata.jobId;
+  return typeof value === 'string' ? value : request.executionId;
 }

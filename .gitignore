@@ -11,4 +11,5 @@ services/chatgpt-web-bridge/artifacts/*.tmp
 
 apps/orchestrator/artifacts/runs/
 apps/orchestrator/artifacts/workspace-runtime/
+apps/orchestrator/artifacts/runtime/
 !apps/orchestrator/artifacts/.gitkeep

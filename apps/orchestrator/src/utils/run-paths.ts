@@ -53,7 +53,19 @@ export function getWorkspaceRecordFile(
   runId: string,
   workspaceId: string,
 ): string {
-  return path.join(getRunRoot(artifactDir, runId), 'workspaces', `${workspaceId}.json`);
+  return path.join(getRunRoot(artifactDir, runId), 'workspace-runtime', `${workspaceId}.json`);
+}
+
+export function getRunWorkspacesRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'workspaces');
+}
+
+export function getWorkspaceLifecycleFile(
+  artifactDir: string,
+  runId: string,
+  workspaceId: string,
+): string {
+  return path.join(getRunWorkspacesRoot(artifactDir, runId), `${workspaceId}.json`);
 }
 
 export function getJobsRoot(artifactDir: string, runId: string): string {
@@ -174,4 +186,52 @@ export function getRuntimeMetricsFile(artifactDir: string): string {
 
 export function getRuntimeDrainSummaryFile(artifactDir: string): string {
   return path.join(getRuntimeRoot(artifactDir), 'drain-summary.json');
+}
+
+export function getRuntimeSchedulingRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'scheduling');
+}
+
+export function getRuntimeSchedulingStateFile(artifactDir: string): string {
+  return path.join(getRuntimeSchedulingRoot(artifactDir), 'scheduling-state.json');
+}
+
+export function getRuntimeFailuresRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'failures');
+}
+
+export function getRuntimeFailureFile(artifactDir: string, failureId: string): string {
+  return path.join(getRuntimeFailuresRoot(artifactDir), `${failureId}.json`);
+}
+
+export function getRunFailuresRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'failures');
+}
+
+export function getRunFailureFile(artifactDir: string, runId: string, failureId: string): string {
+  return path.join(getRunFailuresRoot(artifactDir, runId), `${failureId}.json`);
+}
+
+export function getRuntimeCleanupRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'cleanup');
+}
+
+export function getRuntimeCleanupFile(artifactDir: string, cleanupId: string): string {
+  return path.join(getRuntimeCleanupRoot(artifactDir), `${cleanupId}.json`);
+}
+
+export function getRuntimeGcRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'gc');
+}
+
+export function getRuntimeGcFile(artifactDir: string, gcRunId: string): string {
+  return path.join(getRuntimeGcRoot(artifactDir), `${gcRunId}.json`);
+}
+
+export function getRuntimeProcessesRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'processes');
+}
+
+export function getRuntimeProcessFile(artifactDir: string, processHandleId: string): string {
+  return path.join(getRuntimeProcessesRoot(artifactDir), `${processHandleId}.json`);
 }
