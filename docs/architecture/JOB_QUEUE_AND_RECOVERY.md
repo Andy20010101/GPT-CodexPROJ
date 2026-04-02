@@ -1,0 +1,104 @@
+# Job Queue And Recovery
+
+The orchestrator runtime uses persisted job records plus a file-backed queue view so work can be resumed after process interruption.
+
+## Job Record Model
+
+Each runtime job is stored as a `JobRecord`. The current model includes:
+
+- `jobId`
+- `runId`
+- optional `taskId`
+- `kind`: `task_execution`, `task_review`, or `release_review`
+- `status`: `queued`, `running`, `succeeded`, `failed`, `retriable`, `blocked`, or `cancelled`
+- `attempt`
+- `maxAttempts`
+- `createdAt`
+- `startedAt`
+- `finishedAt`
+- `availableAt`
+- `lastError`
+- `relatedEvidenceIds`
+- `metadata`
+
+The durable job file lives at:
+
+```text
+apps/orchestrator/artifacts/runs/<runId>/jobs/<jobId>.json
+```
+
+## Queue State
+
+The queue is not just in memory. The runtime also persists queue membership so it can rebuild the runnable view after restart.
+
+Queue state lives at:
+
+```text
+apps/orchestrator/artifacts/runs/<runId>/queue/queue-state.json
+```
+
+Each queue item records:
+
+- `jobId`
+- `runId`
+- optional `taskId`
+- `kind`
+- `queuedAt`
+- `availableAt`
+- queue metadata
+
+This split keeps the queue light while preserving richer job history in the job record.
+
+## Retry Policy
+
+`RetryPolicy` currently supports:
+
+- `maxAttempts`
+- `backoffStrategy`: `fixed` or `exponential`
+- `baseDelayMs`
+
+`RetryService` owns retry eligibility and backoff math. It prevents infinite retry loops by comparing the current attempt count against `maxAttempts`.
+
+The service distinguishes between:
+
+- jobs that can be requeued immediately
+- jobs that need a delayed retry window
+- jobs that have exhausted retry budget and must become `failed`
+
+Retry decisions are themselves written to the evidence ledger as `retry_decision`.
+
+## Recovery
+
+`RecoveryService` runs at startup and scans persisted runs plus their jobs.
+
+The current recovery rules are:
+
+- `running` jobs without `finishedAt` are treated as interrupted work
+- interrupted jobs are requeued if retry policy allows
+- interrupted jobs become `failed` if retry budget is exhausted
+- `queued` and `retriable` jobs are restored into queue state if the process-local queue was lost
+
+Each recovery pass writes a per-run recovery summary artifact and corresponding ledger evidence.
+
+## Resumability Model
+
+The current resumability guarantee is pragmatic:
+
+- run contracts stay on disk
+- job state stays on disk
+- queue view can be rebuilt
+- workers can continue from the last durable job state
+
+It does not yet provide exactly-once delivery. A recovered job may be retried after partial external side effects. That is acceptable for the current single-process phase because the runtime is explicit about retries and keeps execution/review evidence for audit.
+
+## Current Limitations
+
+The queue and recovery layer still needs:
+
+- stronger idempotency around external executors
+- cancellation semantics
+- lease ownership for multiple workers
+- richer retry policies by job kind or error class
+- dead-letter handling beyond simple `failed`
+
+Those are next-step runtime concerns, but the current structure already gives the project a durable and testable queue/recovery foundation.

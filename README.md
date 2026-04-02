@@ -19,6 +19,7 @@ This repository currently provides:
 - A working `chatgpt-web-bridge` service with typed Fastify routes, in-memory session/conversation state, artifact export, DOM drift checks, and mockable browser boundaries.
 - A control-plane orchestrator skeleton with requirement freeze, architecture freeze, task graph registration, gate-aware task loop transitions, evidence ledger persistence, a typed bridge client, and execution-plane dispatch through replaceable executors.
 - A first end-to-end single-task loop that can prepare an isolated workspace, execute through a local Codex CLI adapter, route structured review back through the bridge, and translate that review into `review_gate`.
+- A first multi-task runtime shell with a Fastify API, file-backed job queue, worker loop, retry/recovery handling, dependency-based task unlocking, release review, and run acceptance.
 
 ## Layout
 
@@ -48,9 +49,15 @@ The repository now has:
   - `ReviewService` for bridge dispatch
   - `ReviewGateService` for converting structured review into gate state
   - `WorkspaceRuntimeService` and `WorktreeService` for isolated execution context
+- a workflow runtime layer with:
+  - `TaskSchedulerService` for runnable-task calculation
+  - `RunQueueService` for persisted job and queue state
+  - `WorkerService` for task execution, task review, and release review jobs
+  - `WorkflowRuntimeService` for queueing, draining, recovery, and runtime summaries
+  - `ReleaseReviewService`, `ReleaseGateService`, and `RunAcceptanceService` for run-level closure
 - shared bridge contracts reused across planes
 
-The orchestrator is intentionally not a full workflow engine yet. It models the control-plane lifecycle, enforces state and gate rules, and writes execution evidence, but it does not pretend that a real Codex cloud runtime is already present.
+The orchestrator is intentionally not a production workflow engine yet. It models the control-plane lifecycle, enforces state and gate rules, persists runtime/job/release evidence, and exposes an API plus worker shell, but it does not pretend to be a distributed scheduler or that a remote Codex cloud runtime is already present.
 
 ## Implemented Bridge API
 
@@ -94,6 +101,12 @@ Run orchestrator tests only:
 npm test --workspace @review-then-codex/orchestrator
 ```
 
+Start the orchestrator API:
+
+```bash
+npm run dev --workspace @review-then-codex/orchestrator
+```
+
 Run type checks across the monorepo:
 
 ```bash
@@ -119,6 +132,11 @@ BRIDGE_BROWSER_URL=https://chatgpt.com/
 BRIDGE_PROJECT_NAME=Default
 REVIEW_MODEL_HINT=gpt-5.4
 WORKSPACE_RUNTIME_BASE_DIR=/path/to/workspaces
+ORCHESTRATOR_API_HOST=127.0.0.1
+ORCHESTRATOR_API_PORT=3200
+RUNTIME_MAX_ATTEMPTS=3
+RUNTIME_BACKOFF_STRATEGY=exponential
+RUNTIME_BASE_DELAY_MS=1000
 ```
 
 This is still a local runtime adapter. The repository does not claim that a production Codex API or cloud sandbox is already connected.
@@ -155,10 +173,43 @@ apps/orchestrator/artifacts/runs/<runId>/reviews/<reviewId>/
   structured-review.json
 ```
 
+Runtime artifacts are persisted under:
+
+```text
+apps/orchestrator/artifacts/runs/<runId>/jobs/<jobId>.json
+apps/orchestrator/artifacts/runs/<runId>/queue/queue-state.json
+apps/orchestrator/artifacts/runs/<runId>/releases/<releaseReviewId>/
+  request.json
+  result.json
+  review.md
+  structured-review.json
+apps/orchestrator/artifacts/runs/<runId>/run-acceptance.json
+```
+
+## API And Runtime
+
+The orchestrator now exposes a typed Fastify API for the current runtime boundary:
+
+- `GET /health`
+- `POST /api/runs`
+- `GET /api/runs/:runId`
+- `POST /api/runs/:runId/requirement-freeze`
+- `POST /api/runs/:runId/architecture-freeze`
+- `POST /api/runs/:runId/task-graph`
+- `GET /api/runs/:runId/tasks`
+- `POST /api/tasks/:taskId/queue`
+- `GET /api/jobs/:jobId`
+- `POST /api/jobs/:jobId/retry`
+- `POST /api/runs/:runId/release-review`
+- `POST /api/runs/:runId/accept`
+- `GET /api/runs/:runId/summary`
+
+The worker/runtime layer is still single-process and file-backed. That is deliberate. It gives the project resumability and auditable queue state without adding a database, Redis, or a distributed queue too early.
+
 ## Connecting a Real Execution Agent Next
 
-The next major step is to plug an execution agent such as Codex into the orchestrator task loop. The missing pieces are:
+The most useful next steps from here are:
 
-1. harden the local Codex CLI adapter into a production runtime with better retries, richer parsing, and safer patch lifecycle handling
-2. stabilize real bridge review sessions against live ChatGPT web drift and add release-level review flows on top of task review
-3. add a higher-level runtime or API surface that sequences multiple tasks, manages queueing, and coordinates long-running workspaces
+1. harden the local Codex CLI adapter into a safer execution runtime with better parsing, patch lifecycle control, and stronger idempotency under retry
+2. stabilize real bridge sessions for longer review chains, including better drift handling and richer release-level review prompts
+3. extend the single-process runtime into a more capable worker model with cancellation, concurrency control, and stronger recovery semantics across many runs

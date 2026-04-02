@@ -13,9 +13,11 @@ Current scope:
 - execution request/result persistence under per-run execution directories
 - a review loop that turns bridge structured output into `review_result` evidence and `review_gate`
 - a workspace runtime shell that prepares isolated execution context records
+- a Fastify API layer for run, task, job, and release operations
+- a workflow runtime layer with queueing, worker processing, retry, recovery, dependency unlock, release review, and run acceptance
 - integration coverage for the control-plane happy path and failure rules
 
-The orchestrator does not drive a full agent runtime yet. It persists run state to files, dispatches typed execution requests through adapters, and exposes service boundaries that can later back an API or a workflow runtime.
+The orchestrator now exposes both service boundaries and a first runtime shell, but it is still intentionally single-process and file-backed. It persists state to files, dispatches typed execution requests through adapters, and does not claim to be a production distributed scheduler.
 
 ## Local Usage
 
@@ -31,6 +33,12 @@ Run type checks:
 npm run typecheck --workspace @review-then-codex/orchestrator
 ```
 
+Start the API:
+
+```bash
+npm run dev --workspace @review-then-codex/orchestrator
+```
+
 Artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/`.
 
 Execution attempt artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/executions/<executionId>/`.
@@ -38,3 +46,9 @@ Execution attempt artifacts are written under `apps/orchestrator/artifacts/runs/
 Review artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/reviews/<reviewId>/`.
 
 Workspace runtime records are written under `apps/orchestrator/artifacts/runs/<runId>/workspaces/<workspaceId>.json`.
+
+Job records are written under `apps/orchestrator/artifacts/runs/<runId>/jobs/<jobId>.json`.
+
+Queue state is written under `apps/orchestrator/artifacts/runs/<runId>/queue/queue-state.json`.
+
+Release review artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/releases/<releaseReviewId>/`.
