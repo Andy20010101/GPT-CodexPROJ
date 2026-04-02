@@ -15,6 +15,13 @@ apps/orchestrator/artifacts/runs/<runId>/
   tasks/
   evidence/
   gate-results/
+  executions/
+    <executionId>/
+      request.json
+      result.json
+      stdout.log
+      stderr.log
+      test-results.json
 ```
 
 ## Evidence Manifest
@@ -31,6 +38,17 @@ Each evidence entry records:
 - `artifactPaths`
 - `summary`
 - `metadata`
+
+Execution-related evidence kinds include:
+
+- `execution_request`
+- `execution_result`
+- `patch`
+- `command_log`
+- `build_log`
+- `review_input`
+- `review_output`
+- `test_report`
 
 ## Artifact Reference Strategy
 
@@ -49,3 +67,5 @@ By storing references instead:
 - the orchestrator can keep a compact index
 - downstream tools can fetch the full artifact only when needed
 - evidence remains auditable without bloating state files
+
+The same rule now applies to execution artifacts. Command output, test logs, and payloads are stored once under the execution directory and referenced from evidence manifests.

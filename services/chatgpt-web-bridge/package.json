@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "test": "vitest run",
+    "test": "TMPDIR=/tmp vitest run",
     "test:real": "tsx tests/real/bridge-smoke.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

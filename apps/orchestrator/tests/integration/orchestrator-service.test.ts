@@ -116,6 +116,7 @@ function buildTask(runId: string): TaskEnvelope {
     testPlan: [],
     implementationNotes: [],
     evidenceIds: [],
+    metadata: {},
     status: 'drafted',
     createdAt: '2026-04-02T10:06:00.000Z',
     updatedAt: '2026-04-02T10:06:00.000Z',

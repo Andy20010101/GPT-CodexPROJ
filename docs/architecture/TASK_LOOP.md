@@ -40,6 +40,16 @@ The `acceptance_gate` answers:
 - if acceptance fails, should the task roll back out of `accepted`?
 - for a full run, are all tasks accepted so the run can move from `release_review` to `accepted`?
 
+## Execution Hook
+
+Execution is now attached to the task loop, but it does not bypass the loop:
+
+- a task may only create an execution request after it reaches `tests_red`
+- a task may only execute after the `red_test_gate` passes
+- `executeTask(...)` moves a task into `implementation_in_progress` through the existing loop rules
+- execution success with passing test results may move the task to `tests_green`, and optionally to `review_pending`
+- execution failure still writes evidence and leaves the task in `implementation_in_progress` by default, or may reject it if the caller chooses that disposition
+
 ## Current Enforced Rules
 
 The code currently enforces:
@@ -48,5 +58,7 @@ The code currently enforces:
 - no architecture gate, no task execution
 - no `tests_red`, no implementation
 - no passing `red_test_gate`, no implementation
+- no passing `red_test_gate`, no execution request
 - no passing `review_gate`, no task acceptance
 - failing `acceptance_gate` rolls a task back to `rejected`
+- successful execution without passing test evidence does not auto-green the task
