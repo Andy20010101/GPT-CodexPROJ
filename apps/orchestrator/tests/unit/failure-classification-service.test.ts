@@ -4,7 +4,7 @@ import { createOrchestratorRuntimeBundle } from '../../src';
 import { createArtifactDir } from '../helpers/runtime-fixtures';
 
 describe('FailureClassificationService', () => {
-  it('classifies timeout, drift, and environment failures', async () => {
+  it('classifies timeout, materialization, planning, drift, and environment failures', async () => {
     const artifactDir = await createArtifactDir('failure-classify-');
     const bundle = createOrchestratorRuntimeBundle({
       artifactDir,
@@ -30,6 +30,14 @@ describe('FailureClassificationService', () => {
         message: 'selector missing',
       },
     });
+    const materialization = bundle.failureClassificationService.classify({
+      runId: run.runId,
+      source: 'test',
+      error: {
+        code: 'REVIEW_MATERIALIZATION_PENDING',
+        message: 'export failed after conversation completion',
+      },
+    });
     const environment = bundle.failureClassificationService.classify({
       runId: run.runId,
       source: 'test',
@@ -38,8 +46,18 @@ describe('FailureClassificationService', () => {
         message: 'worktree failed',
       },
     });
+    const planningInvalid = bundle.failureClassificationService.classify({
+      runId: run.runId,
+      source: 'test',
+      error: {
+        code: 'PLANNING_INVALID',
+        message: 'task graph did not match the schema',
+      },
+    });
 
     expect(timeout.taxonomy).toBe('timeout');
+    expect(materialization.taxonomy).toBe('materialization');
+    expect(planningInvalid.taxonomy).toBe('planning');
     expect(drift.taxonomy).toBe('drift');
     expect(environment.taxonomy).toBe('environment');
   });

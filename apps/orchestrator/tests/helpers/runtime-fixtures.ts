@@ -146,12 +146,21 @@ export class FakeWorktreeService extends WorktreeService {
 export function createBridgeClient(options?: {
   taskReviewPayload?: Record<string, unknown>;
   releaseReviewPayload?: Record<string, unknown>;
+  requirementPlanningPayload?: Record<string, unknown>;
+  architecturePlanningPayload?: Record<string, unknown>;
+  taskGraphPlanningPayload?: Record<string, unknown>;
   taskExtractError?: Error;
   releaseExtractError?: Error;
+  requirementExtractError?: Error;
+  architectureExtractError?: Error;
+  taskGraphExtractError?: Error;
   bridgeHealth?: BridgeHealthSummary;
   driftIncidents?: BridgeDriftIncident[];
 }): BridgeClient {
-  const conversationKinds = new Map<string, 'task' | 'release'>();
+  const conversationKinds = new Map<
+    string,
+    'task' | 'release' | 'requirement' | 'architecture' | 'task_graph'
+  >();
   const sessionId = randomUUID();
   const bridgeHealth = options?.bridgeHealth ?? {
     status: 'ready' as const,
@@ -205,10 +214,7 @@ export function createBridgeClient(options?: {
     },
     async startConversation(input) {
       const conversationId = randomUUID();
-      conversationKinds.set(
-        conversationId,
-        input.prompt.includes('# Release Review Request') ? 'release' : 'task',
-      );
+      conversationKinds.set(conversationId, classifyConversationKind(input.prompt));
       return {
         conversationId,
         sessionId: input.sessionId,
@@ -240,6 +246,19 @@ export function createBridgeClient(options?: {
         },
       };
     },
+    async getSnapshot(conversationId) {
+      return {
+        conversationId,
+        sessionId,
+        projectName: 'Review Project',
+        model: 'gpt-5.4',
+        status: 'completed',
+        source: 'memory',
+        messages: [],
+        startedAt: '2026-04-02T15:03:00.000Z',
+        updatedAt: '2026-04-02T15:03:10.000Z',
+      };
+    },
     async sendMessage(conversationId) {
       return {
         conversationId,
@@ -268,9 +287,9 @@ export function createBridgeClient(options?: {
     async exportMarkdown(conversationId) {
       const kind = conversationKinds.get(conversationId) ?? 'task';
       return {
-        artifactPath: `/bridge/${kind}-review.md`,
-        manifestPath: `/bridge/${kind}-review-manifest.json`,
-        markdown: `# ${kind} review\nstructured output follows\n`,
+        artifactPath: `/bridge/${kind}.md`,
+        manifestPath: `/bridge/${kind}-manifest.json`,
+        markdown: `# ${kind}\nstructured output follows\n`,
       };
     },
     async extractStructuredReview(conversationId) {
@@ -280,6 +299,15 @@ export function createBridgeClient(options?: {
       }
       if (kind === 'release' && options?.releaseExtractError) {
         throw options.releaseExtractError;
+      }
+      if (kind === 'requirement' && options?.requirementExtractError) {
+        throw options.requirementExtractError;
+      }
+      if (kind === 'architecture' && options?.architectureExtractError) {
+        throw options.architectureExtractError;
+      }
+      if (kind === 'task_graph' && options?.taskGraphExtractError) {
+        throw options.taskGraphExtractError;
       }
 
       const payload =
@@ -291,6 +319,137 @@ export function createBridgeClient(options?: {
               outstandingLimitations: [],
               recommendedActions: [],
             })
+          : kind === 'requirement'
+            ? (options?.requirementPlanningPayload ?? {
+                title: 'Planning requirement freeze',
+                summary: 'Freeze the fresh planning proof requirements.',
+                objectives: ['Generate live planning before execution.'],
+                nonGoals: ['Do not redesign the orchestrator.'],
+                constraints: [
+                  {
+                    id: 'constraint-1',
+                    title: 'Proof only',
+                    description: 'Use the disposable validation target.',
+                    severity: 'hard',
+                  },
+                ],
+                risks: [],
+                acceptanceCriteria: [
+                  {
+                    id: 'ac-1',
+                    description: 'The run reaches an accepted first task.',
+                    verificationMethod: 'automated_test',
+                    requiredEvidenceKinds: ['execution_result', 'review_result'],
+                  },
+                ],
+              })
+            : kind === 'architecture'
+              ? (options?.architecturePlanningPayload ?? {
+                  summary: 'Architecture freeze for the disposable validation target.',
+                  moduleDefinitions: [
+                    {
+                      moduleId: 'validation-target',
+                      name: 'validation-target',
+                      responsibility: 'Own the disposable user-api validation project.',
+                      ownedPaths: ['tmp/e2e-targets/user-api-validation-1/**'],
+                      publicInterfaces: ['src/app.ts'],
+                      allowedDependencies: ['tests'],
+                    },
+                  ],
+                  dependencyRules: [
+                    {
+                      fromModuleId: 'tests',
+                      toModuleId: 'validation-target',
+                      rule: 'allow',
+                      rationale: 'Tests execute the disposable target.',
+                    },
+                  ],
+                  invariants: ['Planning proof stays inside the disposable target.'],
+                })
+              : kind === 'task_graph'
+                ? (options?.taskGraphPlanningPayload ?? {
+                    tasks: [
+                      {
+                        title: 'Foundation repository and service',
+                        objective: 'Create the repository and service foundation.',
+                        allowedFiles: ['tmp/e2e-targets/user-api-validation-1/**'],
+                        disallowedFiles: ['apps/**', 'services/**', 'packages/**'],
+                        scope: {
+                          inScope: ['tmp/e2e-targets/user-api-validation-1/**'],
+                          outOfScope: ['apps/**', 'services/**', 'packages/**'],
+                        },
+                        dependencies: [],
+                        acceptanceCriteria: [
+                          {
+                            description: 'Foundation code is present with test coverage.',
+                            verificationMethod: 'automated_test',
+                            requiredEvidenceKinds: ['execution_result', 'review_result'],
+                          },
+                        ],
+                        testPlan: [
+                          {
+                            description: 'Run the stage 1 validation command.',
+                            expectedRedSignal: 'red',
+                            expectedGreenSignal: 'green',
+                          },
+                        ],
+                        implementationNotes: ['Create the baseline files first.'],
+                      },
+                      {
+                        title: 'TTL cache layer',
+                        objective: 'Add TTL cache behavior.',
+                        allowedFiles: ['tmp/e2e-targets/user-api-validation-1/**'],
+                        disallowedFiles: ['apps/**', 'services/**', 'packages/**'],
+                        scope: {
+                          inScope: ['tmp/e2e-targets/user-api-validation-1/**'],
+                          outOfScope: ['apps/**', 'services/**', 'packages/**'],
+                        },
+                        dependencies: ['Foundation repository and service'],
+                        acceptanceCriteria: [
+                          {
+                            description: 'TTL cache behavior is implemented with tests.',
+                            verificationMethod: 'automated_test',
+                            requiredEvidenceKinds: ['execution_result', 'review_result'],
+                          },
+                        ],
+                        testPlan: [
+                          {
+                            description: 'Run the stage 2 validation command.',
+                            expectedRedSignal: 'red',
+                            expectedGreenSignal: 'green',
+                          },
+                        ],
+                        implementationNotes: ['Layer caching after the repository exists.'],
+                      },
+                      {
+                        title: 'HTTP handler and structured errors',
+                        objective: 'Add request handling and structured error paths.',
+                        allowedFiles: ['tmp/e2e-targets/user-api-validation-1/**'],
+                        disallowedFiles: ['apps/**', 'services/**', 'packages/**'],
+                        scope: {
+                          inScope: ['tmp/e2e-targets/user-api-validation-1/**'],
+                          outOfScope: ['apps/**', 'services/**', 'packages/**'],
+                        },
+                        dependencies: ['TTL cache layer'],
+                        acceptanceCriteria: [
+                          {
+                            description: 'HTTP and error behavior is covered by tests.',
+                            verificationMethod: 'automated_test',
+                            requiredEvidenceKinds: ['execution_result', 'review_result'],
+                          },
+                        ],
+                        testPlan: [
+                          {
+                            description: 'Run the stage 3 validation command.',
+                            expectedRedSignal: 'red',
+                            expectedGreenSignal: 'green',
+                          },
+                        ],
+                        implementationNotes: ['Wire the route after service and cache exist.'],
+                      },
+                    ],
+                    edges: [],
+                  })
           : (options?.taskReviewPayload ?? {
               status: 'approved',
               summary: 'Task review approved the change.',
@@ -301,12 +460,30 @@ export function createBridgeClient(options?: {
             });
 
       return {
-        artifactPath: `/bridge/${kind}-structured-review.json`,
-        manifestPath: `/bridge/${kind}-structured-review-manifest.json`,
+        artifactPath: `/bridge/${kind}.json`,
+        manifestPath: `/bridge/${kind}-structured-manifest.json`,
         payload,
       };
     },
   };
+}
+
+function classifyConversationKind(
+  prompt: string,
+): 'task' | 'release' | 'requirement' | 'architecture' | 'task_graph' {
+  if (prompt.includes('# Release Review Request')) {
+    return 'release';
+  }
+  if (prompt.includes('system requirement freeze agent')) {
+    return 'requirement';
+  }
+  if (prompt.includes('system architecture freeze agent')) {
+    return 'architecture';
+  }
+  if (prompt.includes('system task graph generation agent')) {
+    return 'task_graph';
+  }
+  return 'task';
 }
 
 export function createCodexRunnerSequence(
