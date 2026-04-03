@@ -84,7 +84,7 @@ describe('BrowserAttachPreflightGuard', () => {
         browserUrl: 'https://chatgpt.com/',
       }),
     ).resolves.toEqual({
-      browserUrl: 'http://172.22.224.1:9223',
+      browserEndpoint: 'http://172.22.224.1:9223',
       startupUrl: 'https://chatgpt.com/',
     });
   });

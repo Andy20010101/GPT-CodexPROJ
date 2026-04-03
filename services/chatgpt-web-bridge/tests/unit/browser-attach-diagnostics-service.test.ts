@@ -16,7 +16,8 @@ import { BridgeHealthService } from '../../src/services/bridge-health-service';
 function createCandidate(input: {
   candidateId: string;
   endpoint: string;
-  source?: 'localhost' | 'default_route_gateway';
+  source?: 'localhost' | 'default_route_gateway' | 'windows_portproxy_rule';
+  metadata?: Record<string, unknown>;
 }) {
   const parsed = new URL(input.endpoint);
   return BrowserEndpointCandidateSchema.parse({
@@ -32,6 +33,7 @@ function createCandidate(input: {
     discoveredAt: '2026-04-03T08:00:00.000Z',
     metadata: {
       evidenceKind: 'browser_endpoint_candidate',
+      ...input.metadata,
     },
   });
 }
@@ -208,5 +210,85 @@ describe('BrowserAttachDiagnosticsService', () => {
       diagnosticId: '77777777-7777-4777-8777-777777777777',
       failureCategory: 'BROWSER_ENDPOINT_MISCONFIGURED',
     });
+  });
+
+  it('distinguishes a healthy Windows local source from a broken WSL-visible portproxy path', async () => {
+    const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bridge-diagnostics-topology-'));
+    const portProxyCandidate = createCandidate({
+      candidateId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      endpoint: 'http://172.22.224.1:9225',
+      source: 'windows_portproxy_rule',
+      metadata: {
+        connectAddress: '127.0.0.1',
+        connectPort: 9224,
+      },
+    });
+    const discovery = BrowserEndpointDiscoverySchema.parse({
+      discoveryId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      candidates: [portProxyCandidate],
+      discoveredAt: '2026-04-03T08:00:00.000Z',
+      metadata: {
+        evidenceKind: 'browser_attach_readiness',
+        windowsPortProxyRules: [
+          {
+            listenAddress: '172.22.224.1',
+            listenPort: 9225,
+            connectAddress: '127.0.0.1',
+            connectPort: 9224,
+          },
+        ],
+        windowsRemoteDebuggingPorts: [9224],
+      },
+    });
+
+    const service = new BrowserAttachDiagnosticsService(
+      artifactDir,
+      {
+        discover: async () => discovery,
+      } as never,
+      {
+        probeCandidate: async () =>
+          createProbe({
+            probeId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            candidate: portProxyCandidate,
+            attachReady: false,
+            failureCategory: 'DEVTOOLS_VERSION_UNREACHABLE',
+          }),
+      } as never,
+      undefined,
+      () => '2026-04-03T08:00:00.000Z',
+      async () => ({
+        endpoint: 'http://127.0.0.1:9224',
+        available: true,
+        versionReachable: true,
+        listReachable: true,
+        metadata: {},
+      }),
+    );
+
+    const diagnostic = await service.runBrowserAttachDiagnostic({
+      browserUrl: 'https://chatgpt.com/',
+    });
+
+    expect(diagnostic.attachReady).toBe(false);
+    expect(diagnostic.probes[0]?.recommendations).toContain(
+      'enable mirrored networking or adjust firewall',
+    );
+    expect(diagnostic.probes[0]?.metadata).toMatchObject({
+      topology: {
+        rootCause: 'browser_local_source_healthy_wsl_visible_proxy_broken',
+        windowsLocalSource: {
+          endpoint: 'http://127.0.0.1:9224',
+          versionReachable: true,
+          listReachable: true,
+        },
+      },
+    });
+    await expect(
+      fs.readFile(
+        path.join(artifactDir, 'diagnostics', 'browser-attach-topology-latest.json'),
+        'utf8',
+      ),
+    ).resolves.toContain('browser_local_source_healthy_wsl_visible_proxy_broken');
   });
 });

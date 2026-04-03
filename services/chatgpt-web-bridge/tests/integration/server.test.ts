@@ -45,7 +45,7 @@ class FakeAdapter implements ChatGPTAdapter {
   public openSession(input: AdapterSessionOpenInput): Promise<SessionSummary> {
     const session: SessionSummary = {
       sessionId: input.sessionId,
-      browserUrl: input.browserUrl,
+      browserUrl: input.browserEndpoint,
       pageUrl: input.startupUrl ?? 'https://chatgpt.com/',
       connectedAt: '2026-04-01T12:00:00.000Z',
     };
