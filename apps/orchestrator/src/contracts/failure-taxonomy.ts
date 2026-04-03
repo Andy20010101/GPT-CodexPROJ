@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const FailureTaxonomySchema = z.enum([
   'transient',
   'timeout',
+  'materialization',
+  'planning',
   'cancellation',
   'drift',
   'policy',

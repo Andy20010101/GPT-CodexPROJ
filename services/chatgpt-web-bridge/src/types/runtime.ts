@@ -36,6 +36,7 @@ export type AdapterWaitInput = {
   readonly conversationId: string;
   readonly maxWaitMs?: number | undefined;
   readonly pollIntervalMs?: number | undefined;
+  readonly stablePolls?: number | undefined;
 };
 
 export type AdapterSnapshotInput = {

@@ -153,7 +153,7 @@ export class ConversationService {
 
     const snapshot = await this.sessionLease.withLease(session.sessionId, ownerId, async () => {
       const conversation = new Conversation(session, conversationId, this.adapter);
-      return conversation.wait(input.maxWaitMs, input.pollIntervalMs);
+      return conversation.wait(input.maxWaitMs, input.pollIntervalMs, input.stablePolls);
     });
 
     this.conversations.set(conversationId, {

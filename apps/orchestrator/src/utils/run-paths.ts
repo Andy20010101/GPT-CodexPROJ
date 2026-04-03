@@ -1,5 +1,7 @@
 import path from 'node:path';
 
+import { planningPhaseToDirectory, type PlanningPhase } from '../contracts/planning-phase';
+
 export function getRunsRoot(artifactDir: string): string {
   return path.join(artifactDir, 'runs');
 }
@@ -14,6 +16,73 @@ export function getRunRoot(artifactDir: string, runId: string): string {
 
 export function getRunFile(artifactDir: string, runId: string): string {
   return path.join(getRunRoot(artifactDir, runId), 'run.json');
+}
+
+export function getPlanningRoot(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getRunRoot(artifactDir, runId), planningPhaseToDirectory(phase));
+}
+
+export function getPlanningRequestFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'request.json');
+}
+
+export function getPlanningConversationLinkFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'conversation-link.json');
+}
+
+export function getPlanningRequestRuntimeStateFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'request-runtime-state.json');
+}
+
+export function getPlanningFinalizeRuntimeStateFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'finalize-runtime-state.json');
+}
+
+export function getPlanningMaterializedResultFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'materialized-result.json');
+}
+
+export function getPlanningModelRoutingDecisionFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'model-routing-decision.json');
+}
+
+export function getPlanningSufficiencyDecisionFile(artifactDir: string, runId: string): string {
+  return path.join(
+    getPlanningRoot(artifactDir, runId, 'task_graph_generation'),
+    'planning-sufficiency-decision.json',
+  );
+}
+
+export function getPlanningRecoverySummaryFile(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'planning-recovery-summary.json');
 }
 
 export function getExecutionRoot(artifactDir: string, runId: string, executionId: string): string {
@@ -46,6 +115,14 @@ export function getReviewRequestFile(artifactDir: string, runId: string, reviewI
 
 export function getReviewResultFile(artifactDir: string, runId: string, reviewId: string): string {
   return path.join(getReviewRoot(artifactDir, runId, reviewId), 'result.json');
+}
+
+export function getReviewRuntimeStateFile(
+  artifactDir: string,
+  runId: string,
+  reviewId: string,
+): string {
+  return path.join(getReviewRoot(artifactDir, runId, reviewId), 'runtime-state.json');
 }
 
 export function getWorkspaceRecordFile(
@@ -310,6 +387,10 @@ export function getRunValidationRoot(artifactDir: string, runId: string): string
 
 export function getRunValidationReportFile(artifactDir: string, runId: string): string {
   return path.join(getRunValidationRoot(artifactDir, runId), 'validation-report.json');
+}
+
+export function getRunPlanningProofReportFile(artifactDir: string, runId: string): string {
+  return path.join(getRunValidationRoot(artifactDir, runId), 'planning-proof-report.json');
 }
 
 export function getRuntimeResumeRoot(artifactDir: string): string {

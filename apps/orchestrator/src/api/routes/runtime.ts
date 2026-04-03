@@ -4,6 +4,7 @@ import type { OrchestratorRuntimeBundle } from '../../index';
 import {
   ExecuteRemediationRequestSchema,
   ExecuteRemediationResponseSchema,
+  GetPlanningFinalizePendingResponseSchema,
   GetRuntimeDebugSnapshotsResponseSchema,
   GetRuntimeRemediationResponseSchema,
   GetRuntimeRollbacksResponseSchema,
@@ -12,6 +13,8 @@ import {
   ProposeRemediationRequestSchema,
   ProposeRemediationResponseSchema,
   GetSchedulingResponseSchema,
+  RunPlanningFinalizeSweeperRequestSchema,
+  RunPlanningFinalizeSweeperResponseSchema,
   TriggerWorkspaceGcRequestSchema,
   TriggerWorkspaceGcResponseSchema,
 } from '../schemas/runtime-api';
@@ -117,6 +120,29 @@ export function registerRuntimeRoutes(
       ok: true,
       data: {
         snapshots: await bundle.debugSnapshotService.listSnapshots(),
+      },
+    });
+  });
+
+  app.get('/api/runtime/planning-finalize-pending', async () => {
+    return GetPlanningFinalizePendingResponseSchema.parse({
+      ok: true,
+      data: {
+        entries: await bundle.planningFinalizeSweeperService.listPending(),
+      },
+    });
+  });
+
+  app.post('/api/runtime/planning-finalize-sweeper/run', async (request) => {
+    const body = RunPlanningFinalizeSweeperRequestSchema.parse(request.body ?? {});
+    const summary = await bundle.planningFinalizeSweeperService.run({
+      runId: body.runId,
+      requestedBy: body.requestedBy,
+    });
+    return RunPlanningFinalizeSweeperResponseSchema.parse({
+      ok: true,
+      data: {
+        summary,
       },
     });
   });

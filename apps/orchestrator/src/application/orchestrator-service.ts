@@ -6,6 +6,9 @@ import type {
   ExecutionRequest,
   GateResult,
   GateType,
+  PlanningPhase,
+  PlanningRuntimeState,
+  PlanningSufficiencyDecision,
   RequirementFreeze,
   TaskEnvelope,
   TaskGraph,
@@ -17,10 +20,13 @@ import { assertRunStageTransition } from '../domain/stage';
 import { FileEvidenceRepository } from '../storage/file-evidence-repository';
 import { FileRunRepository } from '../storage/file-run-repository';
 import { FileTaskRepository } from '../storage/file-task-repository';
+import { writeJsonFile } from '../utils/file-store';
 import { OrchestratorError } from '../utils/error';
 import { ArchitectureFreezeService } from '../services/architecture-freeze-service';
 import { EvidenceLedgerService } from '../services/evidence-ledger-service';
 import { GateEvaluator } from '../services/gate-evaluator';
+import { PlanningService } from '../services/planning-service';
+import { PlanningSufficiencyGateService } from '../services/planning-sufficiency-gate-service';
 import { RequirementFreezeService } from '../services/requirement-freeze-service';
 import { type RunStatusSummary } from '../services/orchestrator-summary';
 import { TaskGraphService } from '../services/task-graph-service';
@@ -29,8 +35,16 @@ import { ExecutionService, type ExecutionDispatch } from '../services/execution-
 import type { ExecutionFailureDisposition } from '../domain/execution';
 import type { ExecutorType } from '../contracts';
 import { WorkspaceRuntimeService } from '../services/workspace-runtime-service';
-import { ReviewService, type ReviewDispatch } from '../services/review-service';
+import {
+  ReviewService,
+  type ReviewDispatch,
+  type ReviewFinalizeCompleted,
+  type ReviewFinalizeDispatch,
+  type ReviewFinalizePending,
+  type ReviewRequestDispatch,
+} from '../services/review-service';
 import { ReviewGateService } from '../services/review-gate-service';
+import { getPlanningSufficiencyDecisionFile } from '../utils/run-paths';
 
 export class OrchestratorService {
   public constructor(
@@ -43,6 +57,8 @@ export class OrchestratorService {
     private readonly taskLoopService: TaskLoopService,
     private readonly evidenceLedgerService: EvidenceLedgerService,
     private readonly gateEvaluator: GateEvaluator,
+    private readonly planningService: PlanningService,
+    private readonly planningSufficiencyGateService: PlanningSufficiencyGateService,
     private readonly executionService: ExecutionService,
     private readonly workspaceRuntimeService: WorkspaceRuntimeService,
     private readonly reviewService: ReviewService,
@@ -71,6 +87,278 @@ export class OrchestratorService {
     freeze: ArchitectureFreeze,
   ): Promise<RunRecord> {
     return this.architectureFreezeService.freeze(runId, freeze);
+  }
+
+  public async requestRequirementFreeze(input: {
+    runId: string;
+    prompt: string;
+    requestedBy: string;
+    producer: string;
+    metadata?: Record<string, unknown> | undefined;
+    modelOverride?: string | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    return this.planningService.requestPhase({
+      run,
+      phase: 'requirement_freeze',
+      prompt: input.prompt,
+      sourcePrompt: input.prompt,
+      requestedBy: input.requestedBy,
+      producer: input.producer,
+      metadata: input.metadata,
+      modelOverride: input.modelOverride,
+    });
+  }
+
+  public async finalizeRequirementFreeze(input: {
+    runId: string;
+    producer: string;
+    metadata?: Record<string, unknown> | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    return this.planningService.finalizePhase({
+      run,
+      phase: 'requirement_freeze',
+      producer: input.producer,
+      metadata: input.metadata,
+    });
+  }
+
+  public async applyRequirementFreeze(input: {
+    runId: string;
+    appliedBy: string;
+    metadata?: Record<string, unknown> | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    const applied = await this.planningService.applyPhase({
+      run,
+      phase: 'requirement_freeze',
+      appliedBy: input.appliedBy,
+      metadata: input.metadata,
+    });
+    const updatedRun = await this.requirementFreezeService.freeze(input.runId, applied.normalizedResult);
+    const finalizeRuntimeState = await this.planningService.markPlanningApplied({
+      request: applied.request,
+      previous: applied.finalizeRuntimeState,
+      metadata: {
+        ...(input.metadata ?? {}),
+        requirementFreezePath: updatedRun.requirementFreezePath,
+      },
+    });
+    return {
+      ...applied,
+      finalizeRuntimeState,
+      run: updatedRun,
+    };
+  }
+
+  public async requestArchitectureFreeze(input: {
+    runId: string;
+    requestedBy: string;
+    producer: string;
+    prompt?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+    modelOverride?: string | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    const requirementFreeze = await this.runRepository.getRequirementFreeze(input.runId);
+    if (!requirementFreeze) {
+      throw new OrchestratorError(
+        'REQUIREMENT_FREEZE_REQUIRED',
+        'Requirement freeze must exist before architecture request.',
+        { runId: input.runId },
+      );
+    }
+    const sourcePrompt = await this.resolvePlanningSourcePrompt(input.runId, input.prompt);
+    return this.planningService.requestPhase({
+      run,
+      phase: 'architecture_freeze',
+      prompt: sourcePrompt,
+      sourcePrompt,
+      requestedBy: input.requestedBy,
+      producer: input.producer,
+      requirementFreeze,
+      metadata: input.metadata,
+      modelOverride: input.modelOverride,
+    });
+  }
+
+  public async finalizeArchitectureFreeze(input: {
+    runId: string;
+    producer: string;
+    metadata?: Record<string, unknown> | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    const requirementFreeze = await this.runRepository.getRequirementFreeze(input.runId);
+    return this.planningService.finalizePhase({
+      run,
+      phase: 'architecture_freeze',
+      producer: input.producer,
+      metadata: input.metadata,
+      requirementFreeze,
+    });
+  }
+
+  public async applyArchitectureFreeze(input: {
+    runId: string;
+    appliedBy: string;
+    metadata?: Record<string, unknown> | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    const applied = await this.planningService.applyPhase({
+      run,
+      phase: 'architecture_freeze',
+      appliedBy: input.appliedBy,
+      metadata: input.metadata,
+    });
+    const updatedRun = await this.architectureFreezeService.freeze(input.runId, applied.normalizedResult);
+    const finalizeRuntimeState = await this.planningService.markPlanningApplied({
+      request: applied.request,
+      previous: applied.finalizeRuntimeState,
+      metadata: {
+        ...(input.metadata ?? {}),
+        architectureFreezePath: updatedRun.architectureFreezePath,
+      },
+    });
+    return {
+      ...applied,
+      finalizeRuntimeState,
+      run: updatedRun,
+    };
+  }
+
+  public async requestTaskGraphGeneration(input: {
+    runId: string;
+    requestedBy: string;
+    producer: string;
+    prompt?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+    modelOverride?: string | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    const requirementFreeze = await this.runRepository.getRequirementFreeze(input.runId);
+    const architectureFreeze = await this.runRepository.getArchitectureFreeze(input.runId);
+    if (!requirementFreeze || !architectureFreeze) {
+      throw new OrchestratorError(
+        'ARCHITECTURE_FREEZE_REQUIRED',
+        'Requirement and architecture freezes must exist before task graph request.',
+        { runId: input.runId },
+      );
+    }
+    const sourcePrompt = await this.resolvePlanningSourcePrompt(input.runId, input.prompt);
+    return this.planningService.requestPhase({
+      run,
+      phase: 'task_graph_generation',
+      prompt: sourcePrompt,
+      sourcePrompt,
+      requestedBy: input.requestedBy,
+      producer: input.producer,
+      requirementFreeze,
+      architectureFreeze,
+      metadata: input.metadata,
+      modelOverride: input.modelOverride,
+    });
+  }
+
+  public async finalizeTaskGraphGeneration(input: {
+    runId: string;
+    producer: string;
+    metadata?: Record<string, unknown> | undefined;
+  }) {
+    const run = await this.runRepository.getRun(input.runId);
+    const requirementFreeze = await this.runRepository.getRequirementFreeze(input.runId);
+    const architectureFreeze = await this.runRepository.getArchitectureFreeze(input.runId);
+    return this.planningService.finalizePhase({
+      run,
+      phase: 'task_graph_generation',
+      producer: input.producer,
+      metadata: input.metadata,
+      requirementFreeze,
+      architectureFreeze,
+    });
+  }
+
+  public async applyTaskGraphGeneration(input: {
+    runId: string;
+    appliedBy: string;
+    metadata?: Record<string, unknown> | undefined;
+    normalization?: Record<string, unknown> | undefined;
+  }): Promise<{
+    applied: boolean;
+    run: RunRecord;
+    decision: PlanningSufficiencyDecision;
+    finalizeRuntimeState: PlanningRuntimeState;
+  }> {
+    const run = await this.runRepository.getRun(input.runId);
+    const applied = await this.planningService.applyPhase({
+      run,
+      phase: 'task_graph_generation',
+      appliedBy: input.appliedBy,
+      metadata: input.metadata,
+      normalization: input.normalization,
+    });
+    const decision = await this.checkPlanningSufficiency({
+      runId: input.runId,
+      evaluator: input.appliedBy,
+      taskGraph: applied.normalizedResult,
+      metadata: input.metadata,
+    });
+    if (!decision.passed) {
+      return {
+        applied: false,
+        run,
+        decision,
+        finalizeRuntimeState: applied.finalizeRuntimeState,
+      };
+    }
+    const updatedRun = await this.taskGraphService.registerTaskGraph(input.runId, applied.normalizedResult);
+    const finalizeRuntimeState = await this.planningService.markPlanningApplied({
+      request: applied.request,
+      previous: applied.finalizeRuntimeState,
+      metadata: {
+        ...(input.metadata ?? {}),
+        taskGraphPath: updatedRun.taskGraphPath,
+      },
+    });
+    return {
+      applied: true,
+      run: updatedRun,
+      decision,
+      finalizeRuntimeState,
+    };
+  }
+
+  public async checkPlanningSufficiency(input: {
+    runId: string;
+    evaluator: string;
+    taskGraph?: TaskGraph | null | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }): Promise<PlanningSufficiencyDecision> {
+    const run = await this.runRepository.getRun(input.runId);
+    const decision = this.planningSufficiencyGateService.evaluate({
+      runId: input.runId,
+      evaluator: input.evaluator,
+      requirementFreeze: await this.runRepository.getRequirementFreeze(input.runId),
+      architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
+      taskGraph: input.taskGraph ?? (await this.taskRepository.getTaskGraph(input.runId)),
+      metadata: input.metadata,
+    });
+    const outputPath = getPlanningSufficiencyDecisionFile(this.evidenceRepository.getArtifactDir(), input.runId);
+    await writeJsonFile(outputPath, decision);
+    await this.evidenceLedgerService.appendEvidence({
+      runId: input.runId,
+      stage: run.stage,
+      kind: 'planning_sufficiency_decision',
+      timestamp: decision.timestamp,
+      producer: input.evaluator,
+      artifactPaths: [outputPath],
+      summary: `Planning sufficiency ${decision.status} for run ${input.runId}`,
+      metadata: {
+        decisionId: decision.decisionId,
+        status: decision.status,
+      },
+    });
+    return decision;
   }
 
   public async registerTaskGraph(runId: string, graph: TaskGraph): Promise<RunRecord> {
@@ -446,16 +734,155 @@ export class OrchestratorService {
       executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
     }
   > {
+    const requested = await this.requestTaskExecutionReview(input);
+    const finalized = await this.finalizeTaskExecutionReview({
+      ...input,
+      reviewId: requested.request.reviewId,
+    });
+    if (finalized.status === 'pending') {
+      throw new OrchestratorError(finalized.error.code, finalized.error.message, {
+        runId: input.runId,
+        taskId: input.taskId,
+        executionId: input.executionId,
+        reviewId: requested.request.reviewId,
+        runtimeState: finalized.runtimeState,
+        details: finalized.error.details,
+      });
+    }
+
+    return {
+      ...finalized,
+      gateResult: finalized.gateResult,
+      evidence: [...requested.evidence, ...finalized.evidence],
+      reviewEvidence: {
+        ...finalized.reviewEvidence,
+        evidenceIds: [...requested.evidence, ...finalized.evidence].map((entry) => entry.evidenceId),
+      },
+    };
+  }
+
+  public async requestTaskExecutionReview(input: {
+    runId: string;
+    taskId: string;
+    executionId: string;
+    producer: string;
+    reviewType?: 'task_review' | 'release_review' | undefined;
+    relatedEvidenceIds?: readonly string[] | undefined;
+    metadata?: Record<string, unknown> | undefined;
+    attempt?: number | undefined;
+    requestJobId?: string | undefined;
+  }): Promise<
+    ReviewRequestDispatch & {
+      task: TaskEnvelope;
+      executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
+    }
+  > {
+    const { run, task, executionResult } = await this.prepareTaskReviewContext({
+      runId: input.runId,
+      taskId: input.taskId,
+      executionId: input.executionId,
+      submitIfTestsGreen: true,
+    });
+    const requested = await this.reviewService.requestExecutionReview({
+      run,
+      task,
+      executionResult,
+      reviewType: input.reviewType,
+      producer: input.producer,
+      architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
+      relatedEvidenceIds: input.relatedEvidenceIds,
+      metadata: input.metadata,
+      attempt: input.attempt,
+      requestJobId: input.requestJobId,
+    });
+
+    return {
+      ...requested,
+      task,
+      executionResult,
+    };
+  }
+
+  public async finalizeTaskExecutionReview(input: {
+    runId: string;
+    taskId: string;
+    executionId: string;
+    reviewId: string;
+    producer: string;
+    metadata?: Record<string, unknown> | undefined;
+    attempt?: number | undefined;
+    finalizeJobId?: string | undefined;
+  }): Promise<
+    | (ReviewFinalizePending & {
+        task: TaskEnvelope;
+        executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
+      })
+    | (ReviewFinalizeCompleted & {
+        gateResult: GateResult;
+        task: TaskEnvelope;
+        executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
+      })
+  > {
+    const { run, task, executionResult } = await this.prepareTaskReviewContext({
+      runId: input.runId,
+      taskId: input.taskId,
+      executionId: input.executionId,
+      submitIfTestsGreen: false,
+      allowStatuses: ['review_pending', 'implementation_in_progress', 'rejected', 'accepted'],
+    });
+    const finalized = await this.reviewService.finalizeExecutionReview({
+      run,
+      task,
+      executionResult,
+      reviewId: input.reviewId,
+      producer: input.producer,
+      metadata: input.metadata,
+      attempt: input.attempt,
+      finalizeJobId: input.finalizeJobId,
+    });
+    if (finalized.status === 'pending') {
+      return {
+        ...finalized,
+        task,
+        executionResult,
+      };
+    }
+
+    return this.applyCompletedTaskReview({
+      run,
+      task,
+      executionResult,
+      review: finalized,
+      evaluator: input.producer,
+      finalizeJobId: input.finalizeJobId,
+      metadata: input.metadata,
+    });
+  }
+
+  private async prepareTaskReviewContext(input: {
+    runId: string;
+    taskId: string;
+    executionId: string;
+    submitIfTestsGreen: boolean;
+    allowStatuses?: readonly TaskEnvelope['status'][] | undefined;
+  }): Promise<{
+    run: RunRecord;
+    task: TaskEnvelope;
+    executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
+  }> {
     const run = await this.runRepository.getRun(input.runId);
     let task = await this.taskRepository.getTask(input.runId, input.taskId);
-    if (task.status === 'tests_green') {
+    if (task.status === 'tests_green' && input.submitIfTestsGreen) {
       task = await this.taskLoopService.submitForReview(input.runId, input.taskId, [
         `Review requested for execution ${input.executionId}.`,
       ]);
-    } else if (task.status !== 'review_pending') {
+    } else if (
+      task.status !== 'review_pending' &&
+      !(input.allowStatuses ?? []).includes(task.status)
+    ) {
       throw new OrchestratorError(
         'TASK_NOT_READY_FOR_REVIEW',
-        'Task review requires the task to be in tests_green or review_pending.',
+        'Task review requires the task to be review_pending or an explicitly allowed recovery state.',
         {
           runId: input.runId,
           taskId: input.taskId,
@@ -480,29 +907,100 @@ export class OrchestratorService {
       );
     }
 
-    const review = await this.reviewService.reviewExecution({
-      run,
-      task,
-      executionResult,
-      reviewType: input.reviewType,
-      producer: input.producer,
-      architectureFreeze: await this.runRepository.getArchitectureFreeze(input.runId),
-      relatedEvidenceIds: input.relatedEvidenceIds,
-      metadata: input.metadata,
-    });
-    const gate = await this.reviewGateService.recordTaskReviewGate({
-      run,
-      task,
-      reviewResult: review.result,
-      evaluator: input.producer,
-    });
-
     return {
-      ...review,
-      gateResult: gate.gateResult,
-      task: gate.task,
+      run,
+      task,
       executionResult,
     };
+  }
+
+  private async applyCompletedTaskReview(input: {
+    run: RunRecord;
+    task: TaskEnvelope;
+    executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
+    review: ReviewFinalizeCompleted;
+    evaluator: string;
+    finalizeJobId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }): Promise<
+    ReviewFinalizeCompleted & {
+      gateResult: GateResult;
+      task: TaskEnvelope;
+      executionResult: NonNullable<Awaited<ReturnType<ExecutionService['getExecutionResult']>>>;
+    }
+  > {
+    const existingGate = await this.findTaskReviewGate(
+      input.run.runId,
+      input.task.taskId,
+      input.review.result.reviewId,
+    );
+    let gateResult: GateResult;
+    let task: TaskEnvelope;
+
+    if (existingGate) {
+      gateResult = existingGate;
+      task = await this.taskRepository.getTask(input.run.runId, input.task.taskId);
+    } else {
+      const gate = await this.reviewGateService.recordTaskReviewGate({
+        run: input.run,
+        task: input.task,
+        reviewResult: input.review.result,
+        evaluator: input.evaluator,
+      });
+      gateResult = gate.gateResult;
+      task = gate.task;
+    }
+
+    if (input.review.result.status === 'approved' && task.status !== 'accepted') {
+      task = await this.acceptTask(input.run.runId, input.task.taskId);
+    }
+
+    const runtimeState =
+      input.review.runtimeState.status === 'review_applied'
+        ? input.review.runtimeState
+        : await this.reviewService.markReviewApplied({
+            request: input.review.request,
+            previous: input.review.runtimeState,
+            finalizeJobId: input.finalizeJobId,
+            metadata: {
+              ...input.metadata,
+              gateId: gateResult.gateId,
+              taskStatus: task.status,
+            },
+          });
+
+    return {
+      ...input.review,
+      gateResult,
+      task,
+      executionResult: input.executionResult,
+      runtimeState,
+    };
+  }
+
+  private async findTaskReviewGate(
+    runId: string,
+    taskId: string,
+    reviewId: string,
+  ): Promise<GateResult | null> {
+    const gates = await this.evidenceRepository.listGateResultsForTask(runId, taskId);
+    return (
+      gates
+        .filter((gate) => gate.metadata.reviewId === reviewId)
+        .sort((left, right) => left.timestamp.localeCompare(right.timestamp))
+        .at(-1) ?? null
+    );
+  }
+
+  private async resolvePlanningSourcePrompt(
+    runId: string,
+    prompt?: string | undefined,
+  ): Promise<string> {
+    if (prompt && prompt.trim().length > 0) {
+      return prompt;
+    }
+    const run = await this.runRepository.getRun(runId);
+    return run.summary ?? run.title;
   }
 
   private async assertExecutionReady(

@@ -8,6 +8,8 @@ export const TaskGraphEdgeSchema = z.object({
   kind: z.enum(['blocks', 'informs']),
 });
 
+export type TaskGraphEdge = z.infer<typeof TaskGraphEdgeSchema>;
+
 export const TaskGraphSchema = z.object({
   runId: z.string().uuid(),
   tasks: z.array(TaskEnvelopeSchema).min(1),

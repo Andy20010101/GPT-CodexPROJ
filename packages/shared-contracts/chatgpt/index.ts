@@ -162,8 +162,9 @@ export const MessageConversationResponseSchema = successEnvelope(ConversationSna
 export type MessageConversationRequest = z.infer<typeof MessageConversationRequestSchema>;
 
 export const WaitConversationRequestSchema = z.object({
-  maxWaitMs: z.number().int().positive().max(900000).optional(),
+  maxWaitMs: z.number().int().positive().max(3600000).optional(),
   pollIntervalMs: z.number().int().positive().max(30000).optional(),
+  stablePolls: z.number().int().positive().max(20).optional(),
 });
 
 export const WaitConversationResponseSchema = successEnvelope(ConversationSnapshotSchema);

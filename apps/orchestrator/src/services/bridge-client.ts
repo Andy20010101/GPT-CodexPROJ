@@ -1,3 +1,5 @@
+import http from 'node:http';
+import https from 'node:https';
 import {
   ApiFailureSchema,
   BridgeHealthResponseSchema,
@@ -11,6 +13,7 @@ import {
   StartConversationResponseSchema,
   StructuredReviewExtractResponseSchema,
   WaitConversationResponseSchema,
+  GetSnapshotResponseSchema,
   type BridgeDriftIncident,
   type BridgeHealthSummary,
   type MarkdownExportRequest,
@@ -30,6 +33,11 @@ import type {
 import { type ZodTypeAny, z } from 'zod';
 
 type BridgeFetch = typeof fetch;
+type BridgeHttpResponse = {
+  ok: boolean;
+  status: number;
+  payload: unknown;
+};
 
 export class BridgeClientError extends Error {
   public readonly code: string;
@@ -62,6 +70,7 @@ export interface BridgeClient {
     conversationId: string,
     input: RecoverConversationRequest,
   ): Promise<{ snapshot: ConversationSnapshot; health: BridgeHealthSummary }>;
+  getSnapshot(conversationId: string): Promise<ConversationSnapshot>;
   waitForCompletion(
     conversationId: string,
     input: WaitConversationRequest,
@@ -154,6 +163,20 @@ export class HttpBridgeClient implements BridgeClient {
     });
   }
 
+  public async getSnapshot(conversationId: string): Promise<ConversationSnapshot> {
+    return this.requestData(`/api/conversations/${conversationId}/snapshot`, {
+      method: 'GET',
+      responseSchema: GetSnapshotResponseSchema,
+    });
+  }
+
+  public async getConversationStatus(conversationId: string): Promise<ConversationSnapshot> {
+    return this.requestData(`/api/conversations/${conversationId}/status`, {
+      method: 'GET',
+      responseSchema: GetSnapshotResponseSchema,
+    });
+  }
+
   public async waitForCompletion(
     conversationId: string,
     input: WaitConversationRequest,
@@ -195,17 +218,13 @@ export class HttpBridgeClient implements BridgeClient {
       responseSchema: ZodTypeAny;
     },
   ): Promise<T> {
-    const response = await this.fetchImplementation(`${this.baseUrl}${pathname}`, {
-      method: options.method,
-      headers: {
-        'content-type': 'application/json',
-      },
-      ...(options.body ? { body: JSON.stringify(options.body) } : {}),
-    });
+    const response =
+      this.fetchImplementation === fetch
+        ? await this.requestViaNode(pathname, options)
+        : await this.requestViaFetch(pathname, options);
 
-    const payload = (await response.json()) as unknown;
     if (!response.ok) {
-      const failure = ApiFailureSchema.safeParse(payload);
+      const failure = ApiFailureSchema.safeParse(response.payload);
       if (failure.success) {
         throw new BridgeClientError(
           failure.data.error.code,
@@ -219,11 +238,11 @@ export class HttpBridgeClient implements BridgeClient {
         'BRIDGE_HTTP_ERROR',
         'Bridge request failed with an unparseable error response',
         response.status,
-        payload,
+        response.payload,
       );
     }
 
-    const parsed = options.responseSchema.safeParse(payload);
+    const parsed = options.responseSchema.safeParse(response.payload);
     if (!parsed.success) {
       throw new BridgeClientError(
         'BRIDGE_VALIDATION_ERROR',
@@ -236,6 +255,115 @@ export class HttpBridgeClient implements BridgeClient {
     return (parsed.data as { data: T }).data;
   }
 
+  private async requestViaFetch(
+    pathname: string,
+    options: {
+      method: 'GET' | 'POST';
+      body?: unknown;
+      responseSchema: ZodTypeAny;
+    },
+  ): Promise<BridgeHttpResponse> {
+    let response: Response;
+    try {
+      response = await this.fetchImplementation(`${this.baseUrl}${pathname}`, {
+        method: options.method,
+        headers: {
+          'content-type': 'application/json',
+        },
+        ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+      });
+    } catch (error) {
+      throw new BridgeClientError(
+        'BRIDGE_FETCH_FAILED',
+        error instanceof Error ? error.message : 'Bridge fetch failed',
+        0,
+        error,
+      );
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload: (await response.json()) as unknown,
+    };
+  }
+
+  private async requestViaNode(
+    pathname: string,
+    options: {
+      method: 'GET' | 'POST';
+      body?: unknown;
+      responseSchema: ZodTypeAny;
+    },
+  ): Promise<BridgeHttpResponse> {
+    const target = new URL(pathname, this.baseUrl);
+    const body = options.body ? JSON.stringify(options.body) : undefined;
+    const timeoutMs = resolveTimeoutMs(options.body);
+
+    return new Promise<BridgeHttpResponse>((resolve, reject) => {
+      const transport = target.protocol === 'https:' ? https : http;
+      const request = transport.request(
+        target,
+        {
+          method: options.method,
+          headers: {
+            'content-type': 'application/json',
+            ...(body ? { 'content-length': Buffer.byteLength(body).toString() } : {}),
+          },
+        },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk) => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          });
+          response.on('end', () => {
+            const rawPayload = Buffer.concat(chunks).toString('utf8');
+            try {
+              const payload = rawPayload.length > 0 ? JSON.parse(rawPayload) : null;
+              resolve({
+                ok: (response.statusCode ?? 500) >= 200 && (response.statusCode ?? 500) < 300,
+                status: response.statusCode ?? 500,
+                payload,
+              });
+            } catch (error) {
+              reject(
+                new BridgeClientError(
+                  'BRIDGE_HTTP_ERROR',
+                  'Bridge returned a non-JSON response',
+                  response.statusCode ?? 500,
+                  {
+                    error: error instanceof Error ? error.message : String(error),
+                    rawPayload,
+                  },
+                ),
+              );
+            }
+          });
+        },
+      );
+
+      request.setTimeout(timeoutMs, () => {
+        request.destroy(new Error(`Bridge request timed out after ${timeoutMs}ms`));
+      });
+      request.on('error', (error) => {
+        reject(
+          new BridgeClientError(
+            'BRIDGE_FETCH_FAILED',
+            error instanceof Error ? error.message : 'Bridge fetch failed',
+            0,
+            error,
+          ),
+        );
+      });
+
+      if (body) {
+        request.write(body);
+      }
+
+      request.end();
+    });
+  }
+
   private async requestData<ResponseSchema extends ZodTypeAny>(
     pathname: string,
     options: {
@@ -246,4 +374,15 @@ export class HttpBridgeClient implements BridgeClient {
   ): Promise<z.output<ResponseSchema>['data']> {
     return this.request<z.output<ResponseSchema>['data']>(pathname, options);
   }
+}
+
+function resolveTimeoutMs(body: unknown): number {
+  if (body && typeof body === 'object' && 'maxWaitMs' in body) {
+    const maxWaitMs = (body as { maxWaitMs?: unknown }).maxWaitMs;
+    if (typeof maxWaitMs === 'number' && Number.isFinite(maxWaitMs) && maxWaitMs > 0) {
+      return maxWaitMs + 30_000;
+    }
+  }
+
+  return 60_000;
 }

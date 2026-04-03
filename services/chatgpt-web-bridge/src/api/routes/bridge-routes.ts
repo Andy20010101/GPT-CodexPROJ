@@ -76,6 +76,12 @@ export function registerBridgeRoutes(
     return WaitConversationResponseSchema.parse({ ok: true, data });
   });
 
+  app.get('/api/conversations/:id/status', async (request) => {
+    const params = ConversationPathParamsSchema.parse(request.params);
+    const data = await conversationService.getSnapshot(params.id);
+    return GetSnapshotResponseSchema.parse({ ok: true, data });
+  });
+
   app.get('/api/conversations/:id/snapshot', async (request) => {
     const params = ConversationPathParamsSchema.parse(request.params);
     const data = await conversationService.getSnapshot(params.id);

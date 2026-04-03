@@ -22,6 +22,27 @@ import type {
 } from '../types/runtime';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+const CURRENT_SESSION_PROJECT = 'current-session';
+
+function getCurrentSessionProjectAliases(): Set<string> {
+  const configuredAliases = process.env.BRIDGE_CURRENT_SESSION_PROJECT_ALIASES;
+  const rawAliases =
+    configuredAliases && configuredAliases.trim().length > 0
+      ? configuredAliases.split(',')
+      : [CURRENT_SESSION_PROJECT, 'default'];
+
+  return new Set(
+    rawAliases
+      .map((alias) => alias.trim().toLowerCase())
+      .filter((alias) => alias.length > 0),
+  );
+}
+
+function normalizeProjectName(projectName: string): string {
+  return getCurrentSessionProjectAliases().has(projectName.trim().toLowerCase())
+    ? CURRENT_SESSION_PROJECT
+    : projectName;
+}
 
 function sleep(durationMs: number): Promise<void> {
   return new Promise((resolve) => {
@@ -69,13 +90,13 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
   ) {}
 
   public async openSession(input: AdapterSessionOpenInput): Promise<SessionSummary> {
-    const { pageUrl } = await this.browserManager.openSession(input);
+    const { pageUrl, browserUrl } = await this.browserManager.openSession(input);
     const page = this.browserManager.getPage(input.sessionId);
     await this.preflightGuard.ensureReady(page);
 
     return {
       sessionId: input.sessionId,
-      browserUrl: input.browserUrl,
+      browserUrl,
       pageUrl,
       connectedAt: new Date().toISOString(),
     };
@@ -85,15 +106,29 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
     const page = this.browserManager.getPage(input.session.sessionId);
     await this.preflightGuard.ensureReady(page);
 
+    const resolvedProjectName = normalizeProjectName(input.projectName);
+    if (resolvedProjectName === CURRENT_SESSION_PROJECT) {
+      if (input.model) {
+        await this.switchModel(page, input.model);
+      }
+
+      return {
+        ...input.session,
+        pageUrl: page.url(),
+        projectName: resolvedProjectName,
+        model: input.model ?? input.session.model,
+      };
+    }
+
     const didSelectProject = await page.evaluate(
       (projectName, selectors) => {
-        const normalizedName = (value: string) =>
-          value.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '');
-        const expected = normalizedName(projectName);
+        const expected = projectName.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '');
         for (const selector of selectors) {
           const candidates = Array.from(document.querySelectorAll<HTMLAnchorElement>(selector));
           const match = candidates.find((candidate) => {
-            const text = normalizedName(candidate.textContent ?? '');
+            const text = (candidate.textContent ?? '')
+              .toLowerCase()
+              .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '');
             return text.includes(expected);
           });
           if (match) {
@@ -103,13 +138,13 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
         }
         return false;
       },
-      input.projectName,
+      resolvedProjectName,
       [...ChatGPTSelectors.navigation.sidebarProjectLinks],
     );
 
     if (!didSelectProject) {
       throw new AppError('PROJECT_NOT_FOUND', 'ChatGPT project was not found in the sidebar', 404, {
-        projectName: input.projectName,
+        projectName: resolvedProjectName,
       });
     }
 
@@ -124,7 +159,7 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
     return {
       ...input.session,
       pageUrl: page.url(),
-      projectName: input.projectName,
+      projectName: resolvedProjectName,
       model: input.model ?? input.session.model,
     };
   }
@@ -175,6 +210,7 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
     const page = this.browserManager.getPage(input.session.sessionId);
     const deadline = Date.now() + (input.maxWaitMs ?? 120_000);
     const interval = input.pollIntervalMs ?? 1_000;
+    const stablePolls = input.stablePolls ?? 2;
 
     let lastAssistantMessage = '';
     let stableReads = 0;
@@ -197,7 +233,7 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
           stableReads = 1;
         }
 
-        if (stableReads >= 2) {
+        if (stableReads >= stablePolls) {
           return snapshot;
         }
       }
@@ -282,25 +318,81 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
   private async sendText(page: Page, message: string): Promise<void> {
     await this.preflightGuard.ensureReady(page);
     const composerSelector = await waitForAnySelector(page, ChatGPTSelectors.composer.input);
-    const composer = await page.$(composerSelector);
-    if (!composer) {
-      throw new AppError('DOM_DRIFT_DETECTED', 'Composer input is missing', 503);
-    }
+    const wroteMessage = await page.evaluate(
+      (selector, nextMessage) => {
+        const input = document.querySelector<
+          HTMLTextAreaElement | HTMLInputElement | HTMLElement
+        >(selector);
+        if (!input) {
+          return false;
+        }
 
-    await composer.click({ clickCount: 1 });
-    await page.keyboard.down('Control');
-    await page.keyboard.press('KeyA');
-    await page.keyboard.up('Control');
-    await page.keyboard.press('Backspace');
-    await page.keyboard.type(message);
+        input.focus();
+
+        if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+          const prototype = Object.getPrototypeOf(input);
+          const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+          if (descriptor?.set) {
+            descriptor.set.call(input, nextMessage);
+          } else {
+            input.value = nextMessage;
+          }
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+
+        input.textContent = nextMessage;
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, data: nextMessage }));
+        return true;
+      },
+      composerSelector,
+      message,
+    );
+
+    if (!wroteMessage) {
+      throw new AppError('DOM_DRIFT_DETECTED', 'Composer input is missing', 503, {
+        composerSelector,
+      });
+    }
 
     const sendHandle = await firstHandle(page, ChatGPTSelectors.composer.sendButton);
     if (sendHandle) {
-      await sendHandle.click();
-      return;
+      const box = await sendHandle.boundingBox();
+      if (box) {
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      }
+      await sleep(400);
+      const clearedAfterClick = await page.evaluate((selector) => {
+        const input = document.querySelector<HTMLTextAreaElement>(selector);
+        if (!input) {
+          return true;
+        }
+        const value = input.value ?? input.textContent ?? '';
+        return value.trim().length === 0;
+      }, composerSelector);
+      if (clearedAfterClick) {
+        return;
+      }
     }
 
     await page.keyboard.press('Enter');
+    await sleep(400);
+
+    const clearedAfterEnter = await page.evaluate((selector) => {
+      const input = document.querySelector<HTMLTextAreaElement>(selector);
+      if (!input) {
+        return true;
+      }
+      const value = input.value ?? input.textContent ?? '';
+      return value.trim().length === 0;
+    }, composerSelector);
+
+    if (!clearedAfterEnter) {
+      throw new AppError('CHATGPT_NOT_READY', 'Composer input did not submit the message', 503, {
+        composerSelector,
+      });
+    }
   }
 
   private async readSnapshot(

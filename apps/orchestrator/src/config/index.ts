@@ -17,6 +17,10 @@ export type OrchestratorConfig = {
   bridgeProjectName: string;
   reviewModelHint?: string | undefined;
   reviewMaxWaitMs: number;
+  planningModelHint: string;
+  planningMaxWaitMs: number;
+  planningPollIntervalMs: number;
+  planningStablePolls: number;
   codexRunnerMode: 'stub' | 'cli';
   codexCliBin: string;
   codexCliArgs: string[];
@@ -52,6 +56,10 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
     bridgeProjectName: process.env.BRIDGE_PROJECT_NAME ?? 'Default',
     ...(process.env.REVIEW_MODEL_HINT ? { reviewModelHint: process.env.REVIEW_MODEL_HINT } : {}),
     reviewMaxWaitMs: parseInteger(process.env.REVIEW_MAX_WAIT_MS, 180000),
+    planningModelHint: process.env.PLANNING_MODEL_HINT ?? 'pro',
+    planningMaxWaitMs: parseInteger(process.env.PLANNING_MAX_WAIT_MS, 3_000_000),
+    planningPollIntervalMs: parseInteger(process.env.PLANNING_POLL_INTERVAL_MS, 5000),
+    planningStablePolls: parseInteger(process.env.PLANNING_STABLE_POLLS, 3),
     codexRunnerMode: process.env.CODEX_RUNNER_MODE === 'cli' ? 'cli' : 'stub',
     codexCliBin: process.env.CODEX_CLI_BIN ?? 'codex',
     codexCliArgs: parseArgString(process.env.CODEX_CLI_ARGS),
@@ -88,6 +96,8 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
         maxConcurrentJobsPerKind: {
           task_execution: parseInteger(process.env.SCHEDULER_MAX_TASK_EXECUTION, 2),
           task_review: parseInteger(process.env.SCHEDULER_MAX_TASK_REVIEW, 1),
+          task_review_request: parseInteger(process.env.SCHEDULER_MAX_TASK_REVIEW_REQUEST, 1),
+          task_review_finalize: parseInteger(process.env.SCHEDULER_MAX_TASK_REVIEW_FINALIZE, 1),
           release_review: parseInteger(process.env.SCHEDULER_MAX_RELEASE_REVIEW, 1),
         },
         reservedSlots: [],

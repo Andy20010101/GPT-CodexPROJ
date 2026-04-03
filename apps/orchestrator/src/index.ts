@@ -26,6 +26,11 @@ import { QuotaControlService } from './services/quota-control-service';
 import { RecoveryService } from './services/recovery-service';
 import { DebugSnapshotService } from './services/debug-snapshot-service';
 import { E2eValidationService } from './services/e2e-validation-service';
+import { PlanningFinalizeSweeperService } from './services/planning-finalize-sweeper-service';
+import { PlanningModelRoutingService } from './services/planning-model-routing-service';
+import { PlanningService } from './services/planning-service';
+import { PlanningSufficiencyGateService } from './services/planning-sufficiency-gate-service';
+import { PlanningValidationService } from './services/planning-validation-service';
 import { ReleaseGateService } from './services/release-gate-service';
 import { ReleaseReviewService } from './services/release-review-service';
 import { RemediationPlaybookService } from './services/remediation-playbook-service';
@@ -65,6 +70,7 @@ import { FileFailureRepository } from './storage/file-failure-repository';
 import { FileHeartbeatRepository } from './storage/file-heartbeat-repository';
 import { FileJobRepository } from './storage/file-job-repository';
 import { FileProcessRepository } from './storage/file-process-repository';
+import { FilePlanningRepository } from './storage/file-planning-repository';
 import { FileQueueRepository } from './storage/file-queue-repository';
 import { FileReleaseRepository } from './storage/file-release-repository';
 import { FileRemediationRepository } from './storage/file-remediation-repository';
@@ -128,6 +134,9 @@ export type OrchestratorRuntimeBundle = {
   drainService: DrainService;
   heartbeatService: HeartbeatService;
   releaseReviewService: ReleaseReviewService;
+  planningService: PlanningService;
+  planningFinalizeSweeperService: PlanningFinalizeSweeperService;
+  planningValidationService: PlanningValidationService;
   releaseGateService: ReleaseGateService;
   runAcceptanceService: RunAcceptanceService;
   staleJobReclaimService: StaleJobReclaimService;
@@ -149,6 +158,7 @@ export type OrchestratorRuntimeBundle = {
   processRepository: FileProcessRepository;
   queueRepository: FileQueueRepository;
   releaseRepository: FileReleaseRepository;
+  planningRepository: FilePlanningRepository;
   remediationRepository: FileRemediationRepository;
   rollbackRepository: FileRollbackRepository;
   schedulingRepository: FileSchedulingRepository;
@@ -196,6 +206,7 @@ export function createOrchestratorRuntimeBundle(
   const queueRepository = new FileQueueRepository(resolvedArtifactDir);
   const releaseRepository = new FileReleaseRepository(resolvedArtifactDir);
   const remediationRepository = new FileRemediationRepository(resolvedArtifactDir);
+  const planningRepository = new FilePlanningRepository(resolvedArtifactDir);
   const reviewRepository = new FileReviewRepository(resolvedArtifactDir);
   const rollbackRepository = new FileRollbackRepository(resolvedArtifactDir);
   const schedulingRepository = new FileSchedulingRepository(resolvedArtifactDir);
@@ -284,12 +295,30 @@ export function createOrchestratorRuntimeBundle(
       maxWaitMs: config.reviewMaxWaitMs,
     },
   );
+  const planningModelRoutingService = new PlanningModelRoutingService({
+    defaultModel: config.planningModelHint,
+    maxWaitMs: config.planningMaxWaitMs,
+    pollIntervalMs: config.planningPollIntervalMs,
+    stablePolls: config.planningStablePolls,
+  });
+  const planningService = new PlanningService(
+    bridgeClient,
+    planningRepository,
+    evidenceLedgerService,
+    planningModelRoutingService,
+    undefined,
+    {
+      browserUrl: config.bridgeBrowserUrl,
+      projectName: config.bridgeProjectName,
+    },
+  );
   const reviewGateService = new ReviewGateService(
     evidenceRepository,
     evidenceLedgerService,
     taskLoopService,
   );
   const gateEvaluator = new GateEvaluator();
+  const planningSufficiencyGateService = new PlanningSufficiencyGateService();
   const orchestratorService = new OrchestratorService(
     runRepository,
     taskRepository,
@@ -300,6 +329,8 @@ export function createOrchestratorRuntimeBundle(
     taskLoopService,
     evidenceLedgerService,
     gateEvaluator,
+    planningService,
+    planningSufficiencyGateService,
     new ExecutionService(executorRegistry, executionEvidenceService),
     workspaceRuntimeService,
     reviewService,
@@ -533,6 +564,21 @@ export function createOrchestratorRuntimeBundle(
     stabilityGovernanceService,
     evidenceLedgerService,
   );
+  const planningFinalizeSweeperService = new PlanningFinalizeSweeperService(
+    runRepository,
+    planningRepository,
+    orchestratorService,
+    evidenceLedgerService,
+  );
+  const planningValidationService = new PlanningValidationService(
+    resolvedArtifactDir,
+    orchestratorService,
+    workflowRuntimeService,
+    runRepository,
+    taskRepository,
+    reviewRepository,
+    evidenceLedgerService,
+  );
   const daemonRuntimeService = new DaemonRuntimeService(
     daemonRepository,
     runRepository,
@@ -582,6 +628,9 @@ export function createOrchestratorRuntimeBundle(
     drainService,
     heartbeatService,
     releaseReviewService,
+    planningService,
+    planningFinalizeSweeperService,
+    planningValidationService,
     releaseGateService,
     runAcceptanceService,
     staleJobReclaimService,
@@ -603,6 +652,7 @@ export function createOrchestratorRuntimeBundle(
     processRepository,
     queueRepository,
     releaseRepository,
+    planningRepository,
     remediationRepository,
     rollbackRepository,
     schedulingRepository,
@@ -630,6 +680,11 @@ export * from './services/heartbeat-service';
 export * from './services/job-disposition-service';
 export * from './services/debug-snapshot-service';
 export * from './services/e2e-validation-service';
+export * from './services/planning-finalize-sweeper-service';
+export * from './services/planning-model-routing-service';
+export * from './services/planning-service';
+export * from './services/planning-sufficiency-gate-service';
+export * from './services/planning-validation-service';
 export * from './services/remediation-playbook-service';
 export * from './services/remediation-service';
 export * from './services/retained-workspace-service';

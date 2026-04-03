@@ -21,12 +21,17 @@ export class Conversation {
     });
   }
 
-  public async wait(maxWaitMs?: number, pollIntervalMs?: number): Promise<ConversationSnapshot> {
+  public async wait(
+    maxWaitMs?: number,
+    pollIntervalMs?: number,
+    stablePolls?: number,
+  ): Promise<ConversationSnapshot> {
     return this.adapter.waitForConversation({
       session: this.session,
       conversationId: this.conversationId,
       maxWaitMs,
       pollIntervalMs,
+      stablePolls,
     });
   }
 

@@ -79,6 +79,15 @@ function classifyTaxonomy(code: string, message: string): FailureTaxonomy {
   if (code === 'JOB_CANCELLED' || code === 'RUNNER_CANCELLED') {
     return 'cancellation';
   }
+  if (
+    code === 'REVIEW_FINALIZE_RETRYABLE' ||
+    code === 'REVIEW_MATERIALIZATION_PENDING' ||
+    code === 'PLANNING_FINALIZE_RETRYABLE' ||
+    code === 'PLANNING_MATERIALIZATION_PENDING' ||
+    code === 'BRIDGE_FINALIZE_RACE'
+  ) {
+    return 'materialization';
+  }
   if (code.includes('TIMEOUT')) {
     return 'timeout';
   }
@@ -104,6 +113,9 @@ function classifyTaxonomy(code: string, message: string): FailureTaxonomy {
   if (code.includes('REVIEW') || code.includes('STRUCTURED_OUTPUT')) {
     return 'review';
   }
+  if (code.includes('PLANNING')) {
+    return 'planning';
+  }
   if (code.includes('EXECUTION')) {
     return 'execution';
   }
@@ -117,5 +129,10 @@ function isRetriableTaxonomy(taxonomy: FailureTaxonomy, code: string): boolean {
   if (code === 'CODEX_CLI_NOT_FOUND') {
     return false;
   }
-  return taxonomy === 'transient' || taxonomy === 'timeout' || taxonomy === 'drift';
+  return (
+    taxonomy === 'transient' ||
+    taxonomy === 'timeout' ||
+    taxonomy === 'drift' ||
+    taxonomy === 'materialization'
+  );
 }

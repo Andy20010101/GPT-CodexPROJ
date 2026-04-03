@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import {
   DebugSnapshotSchema,
+  PlanningFinalizeSweepSummarySchema,
+  PlanningPendingEntrySchema,
   RemediationResultSchema,
   SchedulingStateSchema,
   StabilityReportSchema,
@@ -100,5 +102,22 @@ export const GetRuntimeRollbacksResponseSchema = successEnvelope(
 export const GetRuntimeDebugSnapshotsResponseSchema = successEnvelope(
   z.object({
     snapshots: z.array(DebugSnapshotSchema),
+  }),
+);
+
+export const GetPlanningFinalizePendingResponseSchema = successEnvelope(
+  z.object({
+    entries: z.array(PlanningPendingEntrySchema),
+  }),
+);
+
+export const RunPlanningFinalizeSweeperRequestSchema = z.object({
+  runId: z.string().uuid().optional(),
+  requestedBy: z.string().min(1).default('api'),
+});
+
+export const RunPlanningFinalizeSweeperResponseSchema = successEnvelope(
+  z.object({
+    summary: PlanningFinalizeSweepSummarySchema,
   }),
 );

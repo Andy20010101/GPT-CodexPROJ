@@ -13,6 +13,10 @@ import { getRunRoot } from '../utils/run-paths';
 export class FileEvidenceRepository {
   public constructor(private readonly artifactDir: string) {}
 
+  public getArtifactDir(): string {
+    return this.artifactDir;
+  }
+
   public async appendEvidence(evidence: EvidenceManifest): Promise<string> {
     const outputPath = path.join(
       getRunRoot(this.artifactDir, evidence.runId),
