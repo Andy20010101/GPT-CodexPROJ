@@ -28,6 +28,7 @@ import { SessionLease } from '../browser/session-lease';
 import { BridgeHealthService } from './bridge-health-service';
 import { SessionResumeGuard } from '../guards/session-resume-guard';
 import { BrowserAttachPreflightGuard } from '../guards/browser-attach-preflight-guard';
+import { resolveBrowserEndpoint, resolveStartupUrl } from '../utils/devtools-endpoint-normalizer';
 
 export class ConversationService {
   private readonly sessions = new Map<string, SessionRecord>();
@@ -47,10 +48,29 @@ export class ConversationService {
     const sessionId = randomUUID();
     const preparedInput = this.browserAttachPreflightGuard
       ? await this.browserAttachPreflightGuard.prepareSessionInput(input)
-      : input;
+      : (() => {
+          const browserEndpoint = resolveBrowserEndpoint(input);
+          if (!browserEndpoint) {
+            throw new AppError(
+              'BROWSER_ENDPOINT_MISCONFIGURED',
+              'OpenSession requires a DevTools browser endpoint or a bridge preflight guard.',
+              400,
+              {
+                browserUrl: input.browserUrl,
+                browserEndpoint: input.browserEndpoint,
+                startupUrl: input.startupUrl,
+              },
+            );
+          }
+
+          return {
+            browserEndpoint,
+            startupUrl: resolveStartupUrl(input),
+          };
+        })();
     const openedSession = await this.adapter.openSession({
       sessionId,
-      browserUrl: preparedInput.browserUrl,
+      browserEndpoint: preparedInput.browserEndpoint,
       startupUrl: preparedInput.startupUrl,
     });
     const session: SessionRecord = {

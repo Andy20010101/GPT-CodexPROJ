@@ -55,6 +55,7 @@ export class BrowserEndpointDiscoveryService {
 
   public async discover(input?: {
     browserUrl?: string | undefined;
+    browserEndpoint?: string | undefined;
   }): Promise<BrowserEndpointDiscovery> {
     const candidates: BrowserEndpointCandidate[] = [];
     const seen = new Set<string>();
@@ -64,11 +65,12 @@ export class BrowserEndpointDiscoveryService {
       this.windowsAttachDiscovery(),
     ]);
 
-    const pushCandidate = (
-      rawUrl: string,
-      source: BrowserEndpointCandidateSource,
-      reason: string,
-    ): void => {
+      const pushCandidate = (
+        rawUrl: string,
+        source: BrowserEndpointCandidateSource,
+        reason: string,
+        metadata?: Record<string, unknown>,
+      ): void => {
       const normalized = normalizeDevtoolsEndpoint(rawUrl);
       if (!normalized) {
         return;
@@ -91,16 +93,23 @@ export class BrowserEndpointDiscoveryService {
           discoveredAt: this.now(),
           metadata: {
             evidenceKind: 'browser_endpoint_candidate',
+            ...metadata,
           },
         }),
       );
     };
 
-    if (input?.browserUrl) {
+    if (input?.browserEndpoint) {
+      pushCandidate(
+        input.browserEndpoint,
+        'request_input',
+        'Requested browserEndpoint override was already a DevTools-compatible endpoint.',
+      );
+    } else if (input?.browserUrl) {
       pushCandidate(
         input.browserUrl,
         'request_input',
-        'Requested browser URL was already a DevTools-compatible endpoint.',
+        'Requested browserUrl legacy alias was already a DevTools-compatible endpoint.',
       );
     }
 
@@ -133,17 +142,30 @@ export class BrowserEndpointDiscoveryService {
         `http://127.0.0.1:${remoteDebuggingPort}`,
         'windows_browser_process',
         `Discovered active Windows browser remote debugging port ${remoteDebuggingPort} from browser process command lines.`,
+        {
+          remoteDebuggingPort,
+          topologyLayer: 'windows_local_source',
+        },
       );
       pushCandidate(
         `http://localhost:${remoteDebuggingPort}`,
         'windows_browser_process',
         `Discovered active Windows browser remote debugging port ${remoteDebuggingPort} from browser process command lines.`,
+        {
+          remoteDebuggingPort,
+          topologyLayer: 'windows_local_source',
+        },
       );
       for (const hostCandidate of hostIpCandidates) {
         pushCandidate(
           `http://${hostCandidate.host}:${remoteDebuggingPort}`,
           'windows_browser_process',
           `Derived from an active Windows browser remote debugging port ${remoteDebuggingPort} combined with the WSL-visible host candidate ${hostCandidate.host}.`,
+          {
+            remoteDebuggingPort,
+            topologyLayer: 'wsl_visible_host_candidate',
+            hostCandidate,
+          },
         );
       }
     }
@@ -161,6 +183,14 @@ export class BrowserEndpointDiscoveryService {
           `http://${rule.listenAddress}:${rule.listenPort}`,
           'windows_portproxy_rule',
           `Discovered from Windows portproxy listen ${rule.listenAddress}:${rule.listenPort}.${reasonSuffix}`,
+          {
+            listenAddress: rule.listenAddress,
+            listenPort: rule.listenPort,
+            connectAddress: rule.connectAddress,
+            connectPort: rule.connectPort,
+            matchedRemoteDebuggingPort,
+            topologyLayer: 'wsl_visible_portproxy',
+          },
         );
       } else {
         for (const hostCandidate of hostIpCandidates) {
@@ -168,6 +198,15 @@ export class BrowserEndpointDiscoveryService {
             `http://${hostCandidate.host}:${rule.listenPort}`,
             'windows_portproxy_rule',
             `Discovered from Windows portproxy listen ${rule.listenAddress}:${rule.listenPort} via WSL host candidate ${hostCandidate.host}.${reasonSuffix}`,
+            {
+              listenAddress: rule.listenAddress,
+              listenPort: rule.listenPort,
+              connectAddress: rule.connectAddress,
+              connectPort: rule.connectPort,
+              matchedRemoteDebuggingPort,
+              hostCandidate,
+              topologyLayer: 'wsl_visible_portproxy',
+            },
           );
         }
       }
@@ -199,12 +238,15 @@ export class BrowserEndpointDiscoveryService {
     return BrowserEndpointDiscoverySchema.parse({
       discoveryId: randomUUID(),
       ...(input?.browserUrl ? { requestedBrowserUrl: input.browserUrl } : {}),
+      ...(input?.browserEndpoint ? { requestedBrowserEndpoint: input.browserEndpoint } : {}),
       candidates,
       discoveredAt: this.now(),
       metadata: {
         evidenceKind: 'browser_attach_readiness',
         ports,
+        hostIpCandidates,
         windowsPortProxyRules: windowsAttachTopology.portProxyRules,
+        windowsBrowserProcesses: windowsAttachTopology.browserProcesses,
         windowsRemoteDebuggingPorts: windowsAttachTopology.remoteDebuggingPorts,
       },
     });

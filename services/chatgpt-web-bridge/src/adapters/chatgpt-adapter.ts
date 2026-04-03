@@ -92,7 +92,7 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
   public async openSession(input: AdapterSessionOpenInput): Promise<SessionSummary> {
     const { pageUrl, browserUrl } = await this.browserManager.openSession(input);
     const page = this.browserManager.getPage(input.sessionId);
-    await this.preflightGuard.ensureReady(page);
+    await this.preflightGuard.ensureReady(page, 'session_attach');
 
     return {
       sessionId: input.sessionId,
@@ -104,7 +104,7 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
 
   public async selectProject(input: AdapterSelectProjectInput): Promise<SessionSummary> {
     const page = this.browserManager.getPage(input.session.sessionId);
-    await this.preflightGuard.ensureReady(page);
+    await this.preflightGuard.ensureReady(page, 'session_attach');
 
     const resolvedProjectName = normalizeProjectName(input.projectName);
     if (resolvedProjectName === CURRENT_SESSION_PROJECT) {
@@ -192,7 +192,7 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
 
   public async sendMessage(input: AdapterMessageInput): Promise<ConversationSnapshot> {
     const page = this.browserManager.getPage(input.session.sessionId);
-    await this.preflightGuard.ensureReady(page);
+    await this.preflightGuard.ensureReady(page, 'send');
     await this.attachFiles(page, input.inputFiles);
     await this.sendText(page, input.message);
 
@@ -316,7 +316,7 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
   }
 
   private async sendText(page: Page, message: string): Promise<void> {
-    await this.preflightGuard.ensureReady(page);
+    await this.preflightGuard.ensureReady(page, 'send');
     const composerSelector = await waitForAnySelector(page, ChatGPTSelectors.composer.input);
     const wroteMessage = await page.evaluate(
       (selector, nextMessage) => {

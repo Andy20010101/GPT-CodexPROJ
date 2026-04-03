@@ -19,7 +19,7 @@ export class SessionResumeGuard {
     try {
       const reopened = await this.adapter.openSession({
         sessionId: session.sessionId,
-        browserUrl: session.browserUrl,
+        browserEndpoint: session.browserUrl,
         startupUrl: session.startupUrl,
       });
       const selected = session.projectName

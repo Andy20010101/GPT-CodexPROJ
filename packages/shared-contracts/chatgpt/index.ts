@@ -120,10 +120,23 @@ export type BridgeHealthSummary = z.infer<typeof BridgeHealthSummarySchema>;
 
 export const BridgeHealthResponseSchema = successEnvelope(BridgeHealthSummarySchema);
 
-export const OpenSessionRequestSchema = z.object({
-  browserUrl: z.string().url(),
-  startupUrl: z.string().url().optional(),
-});
+export const OpenSessionRequestSchema = z
+  .object({
+    browserUrl: z.string().url().optional(),
+    browserEndpoint: z.string().url().optional(),
+    startupUrl: z.string().url().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.browserUrl || value.browserEndpoint || value.startupUrl) {
+      return;
+    }
+
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'At least one of browserUrl, browserEndpoint, or startupUrl must be provided.',
+      path: ['browserUrl'],
+    });
+  });
 
 export const OpenSessionResponseSchema = successEnvelope(SessionSummarySchema);
 export type OpenSessionRequest = z.infer<typeof OpenSessionRequestSchema>;

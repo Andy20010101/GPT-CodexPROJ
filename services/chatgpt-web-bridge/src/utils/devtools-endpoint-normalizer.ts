@@ -44,6 +44,7 @@ export function isDevtoolsEndpoint(input: string | undefined): boolean {
 
 export function resolveStartupUrl(input: {
   browserUrl?: string | undefined;
+  browserEndpoint?: string | undefined;
   startupUrl?: string | undefined;
 }): string | undefined {
   if (input.startupUrl) {
@@ -52,6 +53,21 @@ export function resolveStartupUrl(input: {
 
   if (input.browserUrl && !isDevtoolsEndpoint(input.browserUrl)) {
     return input.browserUrl;
+  }
+
+  return undefined;
+}
+
+export function resolveBrowserEndpoint(input: {
+  browserUrl?: string | undefined;
+  browserEndpoint?: string | undefined;
+}): string | undefined {
+  if (input.browserEndpoint) {
+    return normalizeDevtoolsEndpoint(input.browserEndpoint)?.endpoint;
+  }
+
+  if (input.browserUrl && isDevtoolsEndpoint(input.browserUrl)) {
+    return normalizeDevtoolsEndpoint(input.browserUrl)?.endpoint;
   }
 
   return undefined;

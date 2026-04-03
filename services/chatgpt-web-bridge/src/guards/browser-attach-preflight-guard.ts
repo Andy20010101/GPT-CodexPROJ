@@ -7,14 +7,16 @@ export class BrowserAttachPreflightGuard {
   ) {}
 
   public async prepareSessionInput(input: {
-    browserUrl: string;
+    browserUrl?: string | undefined;
+    browserEndpoint?: string | undefined;
     startupUrl?: string | undefined;
   }): Promise<{
-    browserUrl: string;
+    browserEndpoint: string;
     startupUrl?: string | undefined;
   }> {
     const diagnostic = await this.diagnosticsService.runBrowserAttachDiagnostic({
       browserUrl: input.browserUrl,
+      browserEndpoint: input.browserEndpoint,
       startupUrl: input.startupUrl,
     });
     await this.diagnosticsService.recordBrowserAttachPreflight({
@@ -37,7 +39,7 @@ export class BrowserAttachPreflightGuard {
     }
 
     return {
-      browserUrl: diagnostic.selectedCandidate.endpoint,
+      browserEndpoint: diagnostic.selectedCandidate.endpoint,
       ...(diagnostic.effectiveStartupUrl
         ? { startupUrl: diagnostic.effectiveStartupUrl }
         : {}),

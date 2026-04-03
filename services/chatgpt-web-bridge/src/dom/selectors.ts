@@ -38,11 +38,18 @@ export const ChatGPTSelectors = {
   },
 } as const;
 
-export const ChatGPTReadyRequirements: readonly SelectorRequirement[] = [
+export const ChatGPTSessionAttachRequirements: readonly SelectorRequirement[] = [
   {
     name: 'composer.input',
     candidates: ChatGPTSelectors.composer.input,
   },
+];
+
+export const ChatGPTSendRequirements: readonly SelectorRequirement[] = [
+  ...ChatGPTSessionAttachRequirements,
+];
+
+export const ChatGPTSnapshotRequirements: readonly SelectorRequirement[] = [
   {
     name: 'response.messages',
     candidates: ChatGPTSelectors.response.messages,

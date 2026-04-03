@@ -1,8 +1,15 @@
 import type { Page } from 'puppeteer-core';
 
 import { DriftDetector, type SelectorProbe } from '../dom/drift-detector';
-import { ChatGPTReadyRequirements, ChatGPTSelectors } from '../dom/selectors';
+import {
+  ChatGPTSelectors,
+  ChatGPTSendRequirements,
+  ChatGPTSessionAttachRequirements,
+  ChatGPTSnapshotRequirements,
+} from '../dom/selectors';
 import { AppError } from '../types/error';
+
+export type PageReadinessProfile = 'session_attach' | 'send' | 'snapshot';
 
 class PuppeteerSelectorProbe implements SelectorProbe {
   public constructor(private readonly page: Page) {}
@@ -15,7 +22,10 @@ class PuppeteerSelectorProbe implements SelectorProbe {
 export class PreflightGuard {
   public constructor(private readonly driftDetector = new DriftDetector()) {}
 
-  public async ensureReady(page: Page): Promise<void> {
+  public async ensureReady(
+    page: Page,
+    profile: PageReadinessProfile = 'send',
+  ): Promise<void> {
     if (page.url().includes('/auth/login')) {
       throw new AppError('CHATGPT_NOT_READY', 'ChatGPT page is not logged in', 503, {
         url: page.url(),
@@ -31,6 +41,13 @@ export class PreflightGuard {
       }
     }
 
-    await this.driftDetector.assertRequiredSelectors(probe, ChatGPTReadyRequirements, 'preflight');
+    const requirements =
+      profile === 'snapshot'
+        ? ChatGPTSnapshotRequirements
+        : profile === 'session_attach'
+          ? ChatGPTSessionAttachRequirements
+          : ChatGPTSendRequirements;
+
+    await this.driftDetector.assertRequiredSelectors(probe, requirements, `preflight:${profile}`);
   }
 }

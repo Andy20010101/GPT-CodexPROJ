@@ -5,7 +5,7 @@ import type {
 
 export type AdapterSessionOpenInput = {
   readonly sessionId: string;
-  readonly browserUrl: string;
+  readonly browserEndpoint: string;
   readonly startupUrl?: string | undefined;
 };
 

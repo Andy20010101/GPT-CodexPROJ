@@ -18,19 +18,19 @@ export class BrowserManager {
 
   public async openSession(input: {
     sessionId: string;
-    browserUrl: string;
+    browserEndpoint: string;
     startupUrl?: string | undefined;
-  }): Promise<{ pageUrl: string }> {
-    const browser = await puppeteer.connect({ browserURL: input.browserUrl });
+  }): Promise<{ pageUrl: string; browserUrl: string }> {
+    const browser = await puppeteer.connect({ browserURL: input.browserEndpoint });
     const page = await this.pageFactory.bindChatGPTPage(browser, input.startupUrl);
     this.sessions.set(input.sessionId, {
       browser,
       page,
-      browserUrl: input.browserUrl,
+      browserUrl: input.browserEndpoint,
       startupUrl: input.startupUrl,
     });
 
-    return { pageUrl: page.url() };
+    return { pageUrl: page.url(), browserUrl: input.browserEndpoint };
   }
 
   public getPage(sessionId: string): Page {

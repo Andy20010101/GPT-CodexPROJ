@@ -7,6 +7,7 @@ import { ApiFailureSchema } from '../packages/shared-contracts/chatgpt';
 type ScriptOptions = {
   readonly baseUrl: string;
   readonly browserUrl?: string;
+  readonly browserEndpoint?: string;
   readonly startupUrl?: string;
 };
 
@@ -14,6 +15,7 @@ function parseArgs(argv: readonly string[]): ScriptOptions {
   const options: {
     baseUrl: string;
     browserUrl?: string;
+    browserEndpoint?: string;
     startupUrl?: string;
   } = {
     baseUrl: process.env.BRIDGE_BASE_URL ?? 'http://127.0.0.1:3100',
@@ -28,6 +30,11 @@ function parseArgs(argv: readonly string[]): ScriptOptions {
     }
     if (arg === '--browser-url') {
       options.browserUrl = argv[index + 1];
+      index += 1;
+      continue;
+    }
+    if (arg === '--browser-endpoint') {
+      options.browserEndpoint = argv[index + 1];
       index += 1;
       continue;
     }
@@ -68,6 +75,9 @@ async function main(): Promise<void> {
   if (options.browserUrl) {
     query.set('browserUrl', options.browserUrl);
   }
+  if (options.browserEndpoint) {
+    query.set('browserEndpoint', options.browserEndpoint);
+  }
 
   const endpointsResponse = await fetch(
     `${options.baseUrl}/api/diagnostics/browser-endpoints${
@@ -83,6 +93,7 @@ async function main(): Promise<void> {
     },
     body: JSON.stringify({
       ...(options.browserUrl ? { browserUrl: options.browserUrl } : {}),
+      ...(options.browserEndpoint ? { browserEndpoint: options.browserEndpoint } : {}),
       ...(options.startupUrl ? { startupUrl: options.startupUrl } : {}),
     }),
   });
@@ -94,6 +105,9 @@ async function main(): Promise<void> {
   process.stdout.write(`Bridge base URL: ${options.baseUrl}\n`);
   process.stdout.write(
     `Requested browser URL: ${options.browserUrl ?? '<not provided; diagnostics used configured candidates>'}\n`,
+  );
+  process.stdout.write(
+    `Requested browser endpoint: ${options.browserEndpoint ?? '<not provided>'}\n`,
   );
 
   printSection('Discovered Endpoint Candidates');
@@ -122,6 +136,16 @@ async function main(): Promise<void> {
         .filter((entry): entry is string => entry !== null)
         .join(' '),
     );
+    const rootCause =
+      typeof probe.metadata.topology === 'object' &&
+      probe.metadata.topology &&
+      'rootCause' in probe.metadata.topology &&
+      typeof probe.metadata.topology.rootCause === 'string'
+        ? probe.metadata.topology.rootCause
+        : undefined;
+    if (rootCause) {
+      process.stdout.write(` rootCause=${rootCause}`);
+    }
     process.stdout.write('\n');
   }
 
@@ -160,6 +184,9 @@ async function main(): Promise<void> {
   );
   process.stdout.write(
     `Latest diagnostic artifact: ${diagnostic.data.latestArtifactPath ?? '<not reported>'}\n`,
+  );
+  process.stdout.write(
+    `Topology artifact: ${diagnostic.data.topologyArtifactPath ?? '<not reported>'}\n`,
   );
 
   if (diagnostic.data.attachReady && diagnostic.data.selectedCandidate) {

@@ -86,6 +86,7 @@ export type BrowserEndpointCandidate = z.infer<typeof BrowserEndpointCandidateSc
 export const BrowserEndpointDiscoverySchema = z.object({
   discoveryId: z.string().uuid(),
   requestedBrowserUrl: z.string().url().optional(),
+  requestedBrowserEndpoint: z.string().url().optional(),
   candidates: z.array(BrowserEndpointCandidateSchema),
   artifactPath: z.string().optional(),
   discoveredAt: z.string().datetime(),
@@ -96,6 +97,7 @@ export type BrowserEndpointDiscovery = z.infer<typeof BrowserEndpointDiscoverySc
 
 export const BrowserEndpointDiscoveryQuerySchema = z.object({
   browserUrl: z.string().url().optional(),
+  browserEndpoint: z.string().url().optional(),
 });
 
 export type BrowserEndpointDiscoveryQuery = z.infer<
@@ -137,6 +139,7 @@ export type BrowserEndpointProbe = z.infer<typeof BrowserEndpointProbeSchema>;
 export const BrowserAttachDiagnosticSchema = z.object({
   diagnosticId: z.string().uuid(),
   requestedBrowserUrl: z.string().url().optional(),
+  requestedBrowserEndpoint: z.string().url().optional(),
   effectiveStartupUrl: z.string().url().optional(),
   attachReady: z.boolean(),
   candidates: z.array(BrowserEndpointCandidateSchema),
@@ -146,6 +149,7 @@ export const BrowserAttachDiagnosticSchema = z.object({
   failureCategory: BrowserAttachFailureCategorySchema.optional(),
   recommendations: z.array(BrowserAttachRecommendationSchema).default([]),
   discoveryArtifactPath: z.string().optional(),
+  topologyArtifactPath: z.string().optional(),
   latestArtifactPath: z.string().optional(),
   createdAt: z.string().datetime(),
   metadata: z.record(z.unknown()).default({}),
@@ -157,6 +161,7 @@ export const BrowserAttachPreflightSchema = z.object({
   preflightId: z.string().uuid(),
   diagnosticId: z.string().uuid(),
   requestedBrowserUrl: z.string().url().optional(),
+  requestedBrowserEndpoint: z.string().url().optional(),
   effectiveBrowserUrl: z.string().url().optional(),
   effectiveStartupUrl: z.string().url().optional(),
   allowOpenSession: z.boolean(),
@@ -171,6 +176,7 @@ export type BrowserAttachPreflight = z.infer<typeof BrowserAttachPreflightSchema
 
 export const BrowserAttachRunRequestSchema = z.object({
   browserUrl: z.string().url().optional(),
+  browserEndpoint: z.string().url().optional(),
   startupUrl: z.string().url().optional(),
 });
 
