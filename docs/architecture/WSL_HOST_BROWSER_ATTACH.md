@@ -65,6 +65,7 @@ The bridge candidate strategy tries:
 1. explicitly configured endpoints
 2. localhost endpoints
 3. WSL host IP endpoints discovered from route gateway and `resolv.conf`
+4. Windows `portproxy` listen ports discovered directly from `netsh interface portproxy show all`
 
 If localhost fails but host IP works, the bridge will select the host IP candidate.
 
@@ -73,6 +74,8 @@ If your real attach path is a portproxy endpoint such as `172.18.144.1:9225`, pa
 ```bash
 TMPDIR=/tmp npx tsx scripts/check-browser-attach.ts --browser-url http://172.18.144.1:9225
 ```
+
+In the common case you do not need to hand-copy that port anymore. If the Windows `portproxy` rule exists, the bridge diagnostics can discover the WSL-visible listen port automatically.
 
 ## One-command check
 

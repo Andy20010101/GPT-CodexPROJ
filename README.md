@@ -139,6 +139,8 @@ If your WSL-visible CDP endpoint is a bridged host port such as `172.18.144.1:92
 TMPDIR=/tmp npx tsx scripts/check-browser-attach.ts --browser-url http://172.18.144.1:9225
 ```
 
+If Windows `portproxy` is already configured, the diagnostics route can also discover the WSL-visible listen port automatically and does not need that port copied into every request.
+
 Run orchestrator tests only:
 
 ```bash

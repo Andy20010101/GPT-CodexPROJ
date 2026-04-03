@@ -12,6 +12,10 @@ import {
   discoverHostIpCandidates,
   type HostIpCandidate,
 } from '../utils/host-ip-discovery';
+import {
+  WindowsBrowserAttachDiscoveryService,
+  type WindowsBrowserAttachTopology,
+} from './windows-browser-attach-discovery-service';
 
 type DiscoveryEnv = Record<string, string | undefined>;
 
@@ -35,11 +39,17 @@ function splitCandidates(value: string | undefined): string[] {
     .filter((entry) => entry.length > 0);
 }
 
+function isWildcardListenAddress(address: string): boolean {
+  return address === '0.0.0.0' || address === '::' || address === '*';
+}
+
 export class BrowserEndpointDiscoveryService {
   public constructor(
     private readonly env: DiscoveryEnv = process.env,
     private readonly hostIpDiscovery: () => Promise<HostIpCandidate[]> = () =>
       discoverHostIpCandidates(),
+    private readonly windowsAttachDiscovery: () => Promise<WindowsBrowserAttachTopology> = () =>
+      new WindowsBrowserAttachDiscoveryService().discover(),
     private readonly now: () => string = () => new Date().toISOString(),
   ) {}
 
@@ -49,6 +59,10 @@ export class BrowserEndpointDiscoveryService {
     const candidates: BrowserEndpointCandidate[] = [];
     const seen = new Set<string>();
     const ports = parsePorts(this.env);
+    const [hostIpCandidates, windowsAttachTopology] = await Promise.all([
+      this.hostIpDiscovery(),
+      this.windowsAttachDiscovery(),
+    ]);
 
     const pushCandidate = (
       rawUrl: string,
@@ -114,6 +128,51 @@ export class BrowserEndpointDiscoveryService {
       );
     }
 
+    for (const remoteDebuggingPort of windowsAttachTopology.remoteDebuggingPorts) {
+      pushCandidate(
+        `http://127.0.0.1:${remoteDebuggingPort}`,
+        'windows_browser_process',
+        `Discovered active Windows browser remote debugging port ${remoteDebuggingPort} from browser process command lines.`,
+      );
+      pushCandidate(
+        `http://localhost:${remoteDebuggingPort}`,
+        'windows_browser_process',
+        `Discovered active Windows browser remote debugging port ${remoteDebuggingPort} from browser process command lines.`,
+      );
+      for (const hostCandidate of hostIpCandidates) {
+        pushCandidate(
+          `http://${hostCandidate.host}:${remoteDebuggingPort}`,
+          'windows_browser_process',
+          `Derived from an active Windows browser remote debugging port ${remoteDebuggingPort} combined with the WSL-visible host candidate ${hostCandidate.host}.`,
+        );
+      }
+    }
+
+    for (const rule of windowsAttachTopology.portProxyRules) {
+      const matchedRemoteDebuggingPort = windowsAttachTopology.remoteDebuggingPorts.includes(
+        rule.connectPort,
+      );
+      const reasonSuffix = matchedRemoteDebuggingPort
+        ? ` It matches an active Windows browser remote debugging port ${rule.connectPort}.`
+        : ` It forwards to Windows ${rule.connectAddress}:${rule.connectPort}.`;
+
+      if (!isWildcardListenAddress(rule.listenAddress) && rule.listenAddress !== '127.0.0.1') {
+        pushCandidate(
+          `http://${rule.listenAddress}:${rule.listenPort}`,
+          'windows_portproxy_rule',
+          `Discovered from Windows portproxy listen ${rule.listenAddress}:${rule.listenPort}.${reasonSuffix}`,
+        );
+      } else {
+        for (const hostCandidate of hostIpCandidates) {
+          pushCandidate(
+            `http://${hostCandidate.host}:${rule.listenPort}`,
+            'windows_portproxy_rule',
+            `Discovered from Windows portproxy listen ${rule.listenAddress}:${rule.listenPort} via WSL host candidate ${hostCandidate.host}.${reasonSuffix}`,
+          );
+        }
+      }
+    }
+
     for (const port of ports) {
       pushCandidate(
         `http://127.0.0.1:${port}`,
@@ -127,7 +186,6 @@ export class BrowserEndpointDiscoveryService {
       );
     }
 
-    const hostIpCandidates = await this.hostIpDiscovery();
     for (const hostCandidate of hostIpCandidates) {
       for (const port of ports) {
         pushCandidate(
@@ -146,6 +204,8 @@ export class BrowserEndpointDiscoveryService {
       metadata: {
         evidenceKind: 'browser_attach_readiness',
         ports,
+        windowsPortProxyRules: windowsAttachTopology.portProxyRules,
+        windowsRemoteDebuggingPorts: windowsAttachTopology.remoteDebuggingPorts,
       },
     });
   }

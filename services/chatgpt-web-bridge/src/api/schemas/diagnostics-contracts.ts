@@ -11,6 +11,8 @@ export const BrowserEndpointCandidateSourceSchema = z.enum([
   'localhost',
   'default_route_gateway',
   'resolv_conf_nameserver',
+  'windows_browser_process',
+  'windows_portproxy_rule',
 ]);
 
 export type BrowserEndpointCandidateSource = z.infer<

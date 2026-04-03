@@ -18,6 +18,26 @@ describe('BrowserEndpointDiscoveryService', () => {
           reason: 'WSL default gateway candidate.',
         },
       ],
+      async () => ({
+        portProxyRules: [
+          {
+            listenAddress: '172.22.224.1',
+            listenPort: 9225,
+            connectAddress: '127.0.0.1',
+            connectPort: 9224,
+          },
+        ],
+        browserProcesses: [
+          {
+            name: 'chrome.exe',
+            processId: 1234,
+            commandLine:
+              '"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9224',
+            remoteDebuggingPort: 9224,
+          },
+        ],
+        remoteDebuggingPorts: [9224],
+      }),
       () => '2026-04-03T08:00:00.000Z',
     );
 
@@ -30,6 +50,10 @@ describe('BrowserEndpointDiscoveryService', () => {
       'http://172.22.224.1:9444',
       'http://127.0.0.1:9222',
       'http://localhost:9333',
+      'http://127.0.0.1:9224',
+      'http://localhost:9224',
+      'http://172.22.224.1:9224',
+      'http://172.22.224.1:9225',
       'http://localhost:9222',
       'http://127.0.0.1:9333',
       'http://172.22.224.1:9222',
@@ -39,6 +63,10 @@ describe('BrowserEndpointDiscoveryService', () => {
       'request_input',
       'env_browser_url',
       'env_browser_url_candidates',
+      'windows_browser_process',
+      'windows_browser_process',
+      'windows_browser_process',
+      'windows_portproxy_rule',
       'localhost',
       'localhost',
       'default_route_gateway',
@@ -55,6 +83,7 @@ describe('BrowserEndpointDiscoveryService', () => {
     expect(discovery.metadata).toMatchObject({
       evidenceKind: 'browser_attach_readiness',
       ports: [9222, 9333],
+      windowsRemoteDebuggingPorts: [9224],
     });
   });
 });

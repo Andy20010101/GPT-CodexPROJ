@@ -46,6 +46,7 @@ The bridge builds endpoint candidates from:
 Ports default to `9222,9223`, or come from `BRIDGE_BROWSER_PORTS`.
 
 When the real attach path uses a non-default bridged port such as `9225`, the bridge should receive it explicitly through `BRIDGE_BROWSER_URL`, `BRIDGE_BROWSER_URL_CANDIDATES`, or the request body.
+The bridge also attempts to discover those bridged ports automatically from Windows `netsh interface portproxy show all`, so WSL-visible endpoints can appear without hand-copying the port into every request.
 
 Each candidate records:
 
