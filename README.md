@@ -17,6 +17,7 @@ This repository currently provides:
 - A monorepo skeleton with durable boundaries between apps, services, and shared contracts.
 - Architecture documentation and ADRs for the three-plane system.
 - A working `chatgpt-web-bridge` service with typed Fastify routes, in-memory session/conversation state, artifact export, DOM drift checks, and mockable browser boundaries.
+- A first browser-attach hardening layer for the bridge with endpoint discovery, DevTools probing, structured diagnostics, and `openSession` preflight gating for WSL-to-Windows host attach scenarios.
 - A control-plane orchestrator skeleton with requirement freeze, architecture freeze, task graph registration, gate-aware task loop transitions, evidence ledger persistence, a typed bridge client, and execution-plane dispatch through replaceable executors.
 - A first end-to-end single-task loop that can prepare an isolated workspace, execute through a local Codex CLI adapter, route structured review back through the bridge, and translate that review into `review_gate`.
 - A first multi-task runtime shell with a Fastify API, file-backed job queue, worker loop, retry/recovery handling, dependency-based task unlocking, release review, and run acceptance.
@@ -99,6 +100,10 @@ The bridge service currently exposes these routes:
 - `POST /api/conversations/:id/export/markdown`
 - `POST /api/conversations/:id/extract/structured-review`
 - `GET /api/drift/incidents`
+- `GET /api/diagnostics/browser-endpoints`
+- `GET /api/diagnostics/browser-attach`
+- `POST /api/diagnostics/browser-attach/run`
+- `GET /api/diagnostics/browser-attach/latest`
 
 ## Development
 
@@ -121,6 +126,18 @@ npm run dev --workspace @review-then-codex/chatgpt-web-bridge
 ```
 
 The bridge listens on `127.0.0.1:3100` by default. Override with `HOST`, `PORT`, and `BRIDGE_ARTIFACT_DIR` as needed.
+
+Run the browser attach diagnostics against a running bridge:
+
+```bash
+npm run check:browser-attach --workspace @review-then-codex/chatgpt-web-bridge
+```
+
+If your WSL-visible CDP endpoint is a bridged host port such as `172.18.144.1:9225`, probe it explicitly:
+
+```bash
+TMPDIR=/tmp npx tsx scripts/check-browser-attach.ts --browser-url http://172.18.144.1:9225
+```
 
 Run orchestrator tests only:
 
@@ -162,6 +179,9 @@ CODEX_CLI_BIN=codex
 CODEX_CLI_TIMEOUT_MS=600000
 BRIDGE_BASE_URL=http://127.0.0.1:3100
 BRIDGE_BROWSER_URL=https://chatgpt.com/
+BRIDGE_BROWSER_URL_CANDIDATES=http://127.0.0.1:9222,http://172.22.224.1:9223
+BRIDGE_BROWSER_PORTS=9222,9223
+BRIDGE_BROWSER_CONNECT_URL=http://127.0.0.1:9222
 BRIDGE_PROJECT_NAME=Default
 REVIEW_MODEL_HINT=gpt-5.4
 WORKSPACE_RUNTIME_BASE_DIR=/path/to/workspaces
@@ -195,6 +215,11 @@ RUNNER_FORCE_KILL_AFTER_MS=4000
 ```
 
 This is still a local runtime adapter. The repository does not claim that a production Codex API or cloud sandbox is already connected.
+
+For real planning proof and real review attach, the bridge also needs a Windows-side browser with remote debugging enabled and a DevTools endpoint that is reachable from WSL. Start by running the browser attach diagnostics and see:
+
+- [BROWSER_ATTACH_DIAGNOSTICS.md](/home/administrator/code/review-then-codex-system/docs/architecture/BROWSER_ATTACH_DIAGNOSTICS.md)
+- [WSL_HOST_BROWSER_ATTACH.md](/home/administrator/code/review-then-codex-system/docs/architecture/WSL_HOST_BROWSER_ATTACH.md)
 
 ## Execution Plane Boundary
 
