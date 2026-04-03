@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "check:browser-attach": "TMPDIR=/tmp tsx ../../scripts/check-browser-attach.ts",
     "test": "TMPDIR=/tmp vitest run",
     "test:real": "tsx tests/real/bridge-smoke.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

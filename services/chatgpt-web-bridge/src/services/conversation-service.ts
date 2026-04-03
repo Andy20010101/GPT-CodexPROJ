@@ -27,6 +27,7 @@ import { ExportService } from './export-service';
 import { SessionLease } from '../browser/session-lease';
 import { BridgeHealthService } from './bridge-health-service';
 import { SessionResumeGuard } from '../guards/session-resume-guard';
+import { BrowserAttachPreflightGuard } from '../guards/browser-attach-preflight-guard';
 
 export class ConversationService {
   private readonly sessions = new Map<string, SessionRecord>();
@@ -39,18 +40,22 @@ export class ConversationService {
     private readonly logger: Pick<Logger, 'info'>,
     private readonly bridgeHealthService?: BridgeHealthService,
     private readonly sessionResumeGuard?: SessionResumeGuard,
+    private readonly browserAttachPreflightGuard?: BrowserAttachPreflightGuard,
   ) {}
 
   public async openSession(input: OpenSessionRequest): Promise<SessionSummary> {
     const sessionId = randomUUID();
+    const preparedInput = this.browserAttachPreflightGuard
+      ? await this.browserAttachPreflightGuard.prepareSessionInput(input)
+      : input;
     const openedSession = await this.adapter.openSession({
       sessionId,
-      browserUrl: input.browserUrl,
-      startupUrl: input.startupUrl,
+      browserUrl: preparedInput.browserUrl,
+      startupUrl: preparedInput.startupUrl,
     });
     const session: SessionRecord = {
       ...openedSession,
-      startupUrl: input.startupUrl,
+      startupUrl: preparedInput.startupUrl,
     };
     this.sessions.set(sessionId, session);
     await this.recordReadyHealth(session);
