@@ -112,6 +112,43 @@ export class JobDispositionService {
     };
   }
 
+  public async forJobError(input: {
+    job: JobRecord;
+    error: {
+      code: string;
+      message: string;
+      details?: unknown;
+    };
+    source: string;
+    manualAttention?: boolean | undefined;
+    allowBlock?: boolean | undefined;
+    forceDisposition?: JobDispositionDetail['disposition'] | undefined;
+  }): Promise<{
+    disposition: JobDispositionDetail;
+  }> {
+    const failure = await this.failureClassificationService.recordFailure({
+      runId: input.job.runId,
+      ...(input.job.taskId ? { taskId: input.job.taskId } : {}),
+      jobId: input.job.jobId,
+      source: input.source,
+      error: input.error,
+    });
+    return {
+      disposition: await this.recordDisposition({
+        job: input.job,
+        taxonomy: failure.taxonomy,
+        reason: failure.message,
+        metadata: {
+          failureId: failure.failureId,
+          errorCode: input.error.code,
+        },
+        manualAttention: input.manualAttention ?? !failure.retriable,
+        allowBlock: input.allowBlock ?? false,
+        forceDisposition: input.forceDisposition,
+      }),
+    };
+  }
+
   public async forReleaseFailure(input: {
     job: JobRecord;
     result: ReleaseReviewResult;
@@ -196,7 +233,10 @@ export class JobDispositionService {
         }),
       taxonomy: input.taxonomy,
       reason: input.reason,
-      retryable: input.taxonomy === 'transient' || input.taxonomy === 'timeout',
+      retryable:
+        input.taxonomy === 'transient' ||
+        input.taxonomy === 'timeout' ||
+        input.taxonomy === 'materialization',
       timestamp: new Date().toISOString(),
       metadata: input.metadata ?? {},
     });
@@ -237,6 +277,7 @@ function resolveDisposition(input: {
   if (
     (input.taxonomy === 'timeout' ||
       input.taxonomy === 'transient' ||
+      input.taxonomy === 'materialization' ||
       input.taxonomy === 'drift') &&
     input.job.attempt < input.job.maxAttempts
   ) {

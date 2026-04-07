@@ -8,7 +8,7 @@ import {
   type ExecutionResult,
   type TestResult,
 } from '../contracts';
-import { createEmptyPatchSummary } from './patch-parser';
+import { createEmptyPatchSummary, parsePatchSummary } from './patch-parser';
 
 export type RawCommandResult = {
   stdout: string;
@@ -31,10 +31,19 @@ export type NormalizedCommandResult = Pick<
 export function normalizeCommandResult(input: {
   command: ExecutionCommand;
   raw: RawCommandResult;
+  patch?: string | undefined;
+  patchNotes?: readonly string[] | undefined;
 }): NormalizedCommandResult {
   const commandLabel = [input.command.command, ...input.command.args].join(' ').trim();
   const testResults = buildTestResults(input.command, input.raw);
-  const artifacts = buildArtifacts(input.command, input.raw, testResults);
+  const patchSummary = input.patch
+    ? parsePatchSummary(input.patch, {
+        notes: input.patchNotes ?? ['Patch inferred from git diff after command execution.'],
+      })
+    : createEmptyPatchSummary(
+        input.patchNotes ?? ['No repository patch detected after command execution.'],
+      );
+  const artifacts = buildArtifacts(input.command, input.raw, testResults, input.patch);
   const status: ExecutionResult['status'] = input.raw.exitCode === 0 ? 'succeeded' : 'failed';
 
   return {
@@ -43,7 +52,7 @@ export function normalizeCommandResult(input: {
       status === 'succeeded'
         ? `Command "${commandLabel}" completed successfully.`
         : `Command "${commandLabel}" failed with exit code ${input.raw.exitCode}.`,
-    patchSummary: createEmptyPatchSummary(['Command executor does not infer repository patches.']),
+    patchSummary,
     testResults,
     artifacts,
     stdout: input.raw.stdout,
@@ -72,8 +81,23 @@ function buildArtifacts(
   command: ExecutionCommand,
   raw: RawCommandResult,
   testResults: readonly TestResult[],
+  patch?: string | undefined,
 ): ExecutionArtifact[] {
   const artifacts: ExecutionArtifact[] = [];
+
+  if (patch) {
+    artifacts.push(
+      ExecutionArtifactSchema.parse({
+        artifactId: randomUUID(),
+        kind: 'patch',
+        label: 'workspace-patch',
+        content: patch,
+        metadata: {
+          purpose: command.purpose,
+        },
+      }),
+    );
+  }
 
   if (raw.stdout.trim().length > 0) {
     artifacts.push(

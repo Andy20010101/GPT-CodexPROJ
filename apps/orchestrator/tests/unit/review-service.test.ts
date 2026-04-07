@@ -14,6 +14,7 @@ import { ReviewService } from '../../src/services/review-service';
 import { FileEvidenceRepository } from '../../src/storage/file-evidence-repository';
 import { FileReviewRepository } from '../../src/storage/file-review-repository';
 import { createEmptyPatchSummary } from '../../src/utils/patch-parser';
+import { getReviewRuntimeStateFile } from '../../src/utils/run-paths';
 
 function buildTask(runId: string): TaskEnvelope {
   return {
@@ -121,8 +122,11 @@ function createService(artifactDir: string, bridgeClient: BridgeClient): ReviewS
 function withRuntimeBridgeMethods(
   overrides: Omit<
     BridgeClient,
-    'getBridgeHealth' | 'listDriftIncidents' | 'resumeSession' | 'recoverConversation'
-  >,
+    'getBridgeHealth' | 'listDriftIncidents' | 'resumeSession' | 'recoverConversation' | 'getSnapshot'
+  > & {
+    recoverConversation?: BridgeClient['recoverConversation'];
+    getSnapshot?: BridgeClient['getSnapshot'];
+  },
 ): BridgeClient {
   return {
     async getBridgeHealth() {
@@ -175,6 +179,18 @@ function withRuntimeBridgeMethods(
           issues: [],
           metadata: {},
         },
+      };
+    },
+    async getSnapshot(conversationId) {
+      return {
+        conversationId,
+        sessionId: randomUUID(),
+        projectName: 'Review Project',
+        status: 'completed',
+        source: 'memory',
+        messages: [],
+        startedAt: '2026-04-02T10:00:00.000Z',
+        updatedAt: '2026-04-02T10:01:00.000Z',
       };
     },
     ...overrides,
@@ -279,6 +295,7 @@ describe('ReviewService', () => {
     expect(
       await fs.readFile(path.join(review.reviewDir, 'structured-review.json'), 'utf8'),
     ).toContain('"status": "approved"');
+    expect(review.runtimeState.status).toBe('review_materializing');
     expect(review.evidence.map((entry) => entry.kind)).toEqual(
       expect.arrayContaining([
         'review_request',
@@ -289,8 +306,8 @@ describe('ReviewService', () => {
     );
   });
 
-  it('returns incomplete when the bridge keeps missing structured output', async () => {
-    const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-service-missing-'));
+  it('persists conversation state immediately after the request stage', async () => {
+    const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-service-request-'));
     const run = createRunRecord({
       title: 'Review run',
       createdBy: 'tester',
@@ -298,7 +315,90 @@ describe('ReviewService', () => {
     });
     const task = buildTask(run.runId);
     const executionResult = buildExecutionResult(run.runId, task.taskId);
-    let sendMessageCount = 0;
+    const conversationId = randomUUID();
+    const sessionId = randomUUID();
+    const service = createService(
+      artifactDir,
+      withRuntimeBridgeMethods({
+        async openSession() {
+          return {
+            sessionId,
+            browserUrl: 'https://chatgpt.com/',
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async selectProject(input) {
+          return {
+            sessionId: input.sessionId,
+            browserUrl: 'https://chatgpt.com/',
+            projectName: input.projectName,
+            model: input.model,
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async startConversation(input) {
+          return {
+            conversationId,
+            sessionId: input.sessionId,
+            projectName: input.projectName ?? 'Review Project',
+            model: input.model,
+            status: 'running',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async sendMessage() {
+          throw new Error('unexpected');
+        },
+        async waitForCompletion() {
+          throw new Error('unexpected');
+        },
+        async exportMarkdown() {
+          throw new Error('unexpected');
+        },
+        async extractStructuredReview() {
+          throw new Error('unexpected');
+        },
+      }),
+    );
+
+    const requested = await service.requestExecutionReview({
+      run,
+      task,
+      executionResult,
+      producer: 'reviewer',
+      attempt: 1,
+    });
+
+    expect(requested.runtimeState.status).toBe('review_waiting');
+    expect(requested.runtimeState.conversationId).toBe(conversationId);
+    expect(requested.runtimeState.sessionId).toBe(sessionId);
+
+    const persisted = JSON.parse(
+      await fs.readFile(
+        getReviewRuntimeStateFile(artifactDir, run.runId, requested.request.reviewId),
+        'utf8',
+      ),
+    ) as { conversationId?: string; status: string };
+    expect(persisted.conversationId).toBe(conversationId);
+    expect(persisted.status).toBe('review_waiting');
+  });
+
+  it('retries finalization after wait failure by reusing the same conversation', async () => {
+    const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-service-wait-retry-'));
+    const run = createRunRecord({
+      title: 'Review run',
+      createdBy: 'tester',
+      stage: 'task_execution',
+    });
+    const task = buildTask(run.runId);
+    const executionResult = buildExecutionResult(run.runId, task.taskId);
+    const conversationId = randomUUID();
+    let startConversationCount = 0;
+    let waitCount = 0;
+
     const service = createService(
       artifactDir,
       withRuntimeBridgeMethods({
@@ -319,10 +419,12 @@ describe('ReviewService', () => {
           };
         },
         async startConversation(input) {
+          startConversationCount += 1;
           return {
-            conversationId: randomUUID(),
+            conversationId,
             sessionId: input.sessionId,
             projectName: input.projectName ?? 'Review Project',
+            model: input.model,
             status: 'running',
             source: 'memory',
             messages: [],
@@ -331,23 +433,315 @@ describe('ReviewService', () => {
           };
         },
         async sendMessage() {
-          sendMessageCount += 1;
+          throw new Error('unexpected');
+        },
+        async waitForCompletion(id) {
+          waitCount += 1;
+          if (waitCount === 1) {
+            throw new BridgeClientError('BRIDGE_FETCH_FAILED', 'fetch failed', 0);
+          }
           return {
-            conversationId: randomUUID(),
+            conversationId: id,
             sessionId: randomUUID(),
             projectName: 'Review Project',
+            model: 'gpt-5.4',
+            status: 'completed',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:01:00.000Z',
+          };
+        },
+        async recoverConversation() {
+          throw new BridgeClientError('BRIDGE_RECOVERY_FAILED', 'recover failed', 500);
+        },
+        async exportMarkdown() {
+          return {
+            artifactPath: '/bridge/review.md',
+            manifestPath: '/bridge/review-manifest.json',
+            markdown: '# review\napproved\n',
+          };
+        },
+        async extractStructuredReview() {
+          return {
+            artifactPath: '/bridge/structured.json',
+            manifestPath: '/bridge/structured-manifest.json',
+            payload: {
+              status: 'approved',
+              summary: 'Review approved the task.',
+              findings: [],
+              missingTests: [],
+              architectureConcerns: [],
+              recommendedActions: [],
+            },
+          };
+        },
+      }),
+    );
+
+    const requested = await service.requestExecutionReview({
+      run,
+      task,
+      executionResult,
+      producer: 'reviewer',
+      attempt: 1,
+    });
+    const firstFinalize = await service.finalizeExecutionReview({
+      run,
+      task,
+      executionResult,
+      reviewId: requested.request.reviewId,
+      producer: 'reviewer',
+      attempt: 1,
+    });
+
+    expect(firstFinalize.status).toBe('pending');
+    if (firstFinalize.status !== 'pending') {
+      throw new Error('expected pending finalization');
+    }
+    expect(firstFinalize.error.code).toBe('REVIEW_FINALIZE_RETRYABLE');
+    expect(firstFinalize.runtimeState.status).toBe('review_waiting');
+
+    const secondFinalize = await service.finalizeExecutionReview({
+      run,
+      task,
+      executionResult,
+      reviewId: requested.request.reviewId,
+      producer: 'reviewer',
+      attempt: 2,
+    });
+
+    expect(secondFinalize.status).toBe('completed');
+    if (secondFinalize.status !== 'completed') {
+      throw new Error('expected completed finalization');
+    }
+    expect(secondFinalize.result.status).toBe('approved');
+    expect(startConversationCount).toBe(1);
+    expect(waitCount).toBe(2);
+    expect(secondFinalize.runtimeState.conversationId).toBe(conversationId);
+  });
+
+  it('retries finalization after ChatGPT wait timeout by reusing the same conversation', async () => {
+    const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-service-timeout-retry-'));
+    const run = createRunRecord({
+      title: 'Review run',
+      createdBy: 'tester',
+      stage: 'task_execution',
+    });
+    const task = buildTask(run.runId);
+    const executionResult = buildExecutionResult(run.runId, task.taskId);
+    const conversationId = randomUUID();
+    let startConversationCount = 0;
+    let waitCount = 0;
+    let recoverCount = 0;
+
+    const service = createService(
+      artifactDir,
+      withRuntimeBridgeMethods({
+        async openSession() {
+          return {
+            sessionId: randomUUID(),
+            browserUrl: 'https://chatgpt.com/',
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async selectProject(input) {
+          return {
+            sessionId: input.sessionId,
+            browserUrl: 'https://chatgpt.com/',
+            projectName: input.projectName,
+            model: input.model,
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async startConversation(input) {
+          startConversationCount += 1;
+          return {
+            conversationId,
+            sessionId: input.sessionId,
+            projectName: input.projectName ?? 'Review Project',
+            model: input.model,
             status: 'running',
             source: 'memory',
             messages: [],
             startedAt: '2026-04-02T10:00:00.000Z',
-            updatedAt: '2026-04-02T10:00:01.000Z',
+            updatedAt: '2026-04-02T10:00:00.000Z',
           };
         },
-        async waitForCompletion(conversationId) {
+        async sendMessage() {
+          throw new Error('unexpected');
+        },
+        async waitForCompletion(id) {
+          waitCount += 1;
+          if (waitCount === 1) {
+            throw new BridgeClientError(
+              'CHATGPT_NOT_READY',
+              'Conversation did not complete before timeout',
+              504,
+              {
+                conversationId: id,
+              },
+            );
+          }
           return {
-            conversationId,
+            conversationId: id,
             sessionId: randomUUID(),
             projectName: 'Review Project',
+            model: 'gpt-5.4',
+            status: 'completed',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:05:00.000Z',
+            lastAssistantMessage: 'approved',
+          };
+        },
+        async recoverConversation(id) {
+          recoverCount += 1;
+          return {
+            snapshot: {
+              conversationId: id,
+              sessionId: randomUUID(),
+              projectName: 'Review Project',
+              model: 'gpt-5.4',
+              status: 'running',
+              source: 'memory',
+              messages: [],
+              startedAt: '2026-04-02T10:00:00.000Z',
+              updatedAt: '2026-04-02T10:03:00.000Z',
+            },
+            health: {
+              status: 'ready',
+              checkedAt: '2026-04-02T10:03:00.000Z',
+              activeSessions: 1,
+              activeConversations: 1,
+              issues: [],
+              metadata: {},
+            },
+          };
+        },
+        async exportMarkdown() {
+          return {
+            artifactPath: '/bridge/review.md',
+            manifestPath: '/bridge/review-manifest.json',
+            markdown: '# review\napproved\n',
+          };
+        },
+        async extractStructuredReview() {
+          return {
+            artifactPath: '/bridge/structured.json',
+            manifestPath: '/bridge/structured-manifest.json',
+            payload: {
+              status: 'approved',
+              summary: 'Review approved the task.',
+              findings: [],
+              missingTests: [],
+              architectureConcerns: [],
+              recommendedActions: [],
+            },
+          };
+        },
+      }),
+    );
+
+    const requested = await service.requestExecutionReview({
+      run,
+      task,
+      executionResult,
+      producer: 'reviewer',
+      attempt: 1,
+    });
+    const firstFinalize = await service.finalizeExecutionReview({
+      run,
+      task,
+      executionResult,
+      reviewId: requested.request.reviewId,
+      producer: 'reviewer',
+      attempt: 1,
+    });
+
+    expect(firstFinalize.status).toBe('pending');
+    if (firstFinalize.status !== 'pending') {
+      throw new Error('expected pending finalization');
+    }
+    expect(firstFinalize.error.code).toBe('REVIEW_FINALIZE_RETRYABLE');
+    expect(firstFinalize.runtimeState.status).toBe('review_waiting');
+
+    const secondFinalize = await service.finalizeExecutionReview({
+      run,
+      task,
+      executionResult,
+      reviewId: requested.request.reviewId,
+      producer: 'reviewer',
+      attempt: 2,
+    });
+
+    expect(secondFinalize.status).toBe('completed');
+    if (secondFinalize.status !== 'completed') {
+      throw new Error('expected completed finalization');
+    }
+    expect(secondFinalize.result.status).toBe('approved');
+    expect(startConversationCount).toBe(1);
+    expect(waitCount).toBe(2);
+    expect(recoverCount).toBe(1);
+    expect(secondFinalize.runtimeState.conversationId).toBe(conversationId);
+  });
+
+  it('recovers materialization from the same conversation after export failure', async () => {
+    const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-service-export-retry-'));
+    const run = createRunRecord({
+      title: 'Review run',
+      createdBy: 'tester',
+      stage: 'task_execution',
+    });
+    const task = buildTask(run.runId);
+    const executionResult = buildExecutionResult(run.runId, task.taskId);
+    const conversationId = randomUUID();
+    let startConversationCount = 0;
+    let exportCount = 0;
+
+    const service = createService(
+      artifactDir,
+      withRuntimeBridgeMethods({
+        async openSession() {
+          return {
+            sessionId: randomUUID(),
+            browserUrl: 'https://chatgpt.com/',
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async selectProject(input) {
+          return {
+            sessionId: input.sessionId,
+            browserUrl: 'https://chatgpt.com/',
+            projectName: input.projectName,
+            model: input.model,
+            connectedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async startConversation(input) {
+          startConversationCount += 1;
+          return {
+            conversationId,
+            sessionId: input.sessionId,
+            projectName: input.projectName ?? 'Review Project',
+            model: input.model,
+            status: 'running',
+            source: 'memory',
+            messages: [],
+            startedAt: '2026-04-02T10:00:00.000Z',
+            updatedAt: '2026-04-02T10:00:00.000Z',
+          };
+        },
+        async sendMessage() {
+          throw new Error('unexpected');
+        },
+        async waitForCompletion(id) {
+          return {
+            conversationId: id,
+            sessionId: randomUUID(),
+            projectName: 'Review Project',
+            model: 'gpt-5.4',
             status: 'completed',
             source: 'memory',
             messages: [],
@@ -356,84 +750,72 @@ describe('ReviewService', () => {
           };
         },
         async exportMarkdown() {
+          exportCount += 1;
+          if (exportCount === 1) {
+            throw new BridgeClientError('BRIDGE_FETCH_FAILED', 'fetch failed', 0);
+          }
           return {
             artifactPath: '/bridge/review.md',
             manifestPath: '/bridge/review-manifest.json',
-            markdown: '# review\nmissing json\n',
+            markdown: '# review\napproved\n',
           };
         },
         async extractStructuredReview() {
-          throw new BridgeClientError(
-            'STRUCTURED_OUTPUT_NOT_FOUND',
-            'Missing structured output',
-            404,
-          );
+          return {
+            artifactPath: '/bridge/structured.json',
+            manifestPath: '/bridge/structured-manifest.json',
+            payload: {
+              status: 'approved',
+              summary: 'Review approved the task.',
+              findings: [],
+              missingTests: [],
+              architectureConcerns: [],
+              recommendedActions: [],
+            },
+          };
         },
       }),
     );
 
-    const review = await service.reviewExecution({
+    const requested = await service.requestExecutionReview({
       run,
       task,
       executionResult,
       producer: 'reviewer',
+      attempt: 1,
     });
-
-    expect(sendMessageCount).toBe(1);
-    expect(review.result.status).toBe('incomplete');
-    expect(review.result.metadata.errorCode).toBe('REVIEW_STRUCTURED_OUTPUT_MISSING');
-    expect(review.evidence.map((entry) => entry.kind)).toEqual(
-      expect.arrayContaining(['review_request', 'review_result', 'bridge_markdown']),
-    );
-  });
-
-  it('returns incomplete when a bridge call fails before review extraction', async () => {
-    const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'review-service-bridge-fail-'));
-    const run = createRunRecord({
-      title: 'Review run',
-      createdBy: 'tester',
-      stage: 'task_execution',
-    });
-    const task = buildTask(run.runId);
-    const executionResult = buildExecutionResult(run.runId, task.taskId);
-    const service = createService(
-      artifactDir,
-      withRuntimeBridgeMethods({
-        async openSession() {
-          throw new BridgeClientError('SESSION_NOT_FOUND', 'No browser session', 404);
-        },
-        async selectProject() {
-          throw new Error('unreachable');
-        },
-        async startConversation() {
-          throw new Error('unreachable');
-        },
-        async sendMessage() {
-          throw new Error('unreachable');
-        },
-        async waitForCompletion() {
-          throw new Error('unreachable');
-        },
-        async exportMarkdown() {
-          throw new Error('unreachable');
-        },
-        async extractStructuredReview() {
-          throw new Error('unreachable');
-        },
-      }),
-    );
-
-    const review = await service.reviewExecution({
+    const firstFinalize = await service.finalizeExecutionReview({
       run,
       task,
       executionResult,
+      reviewId: requested.request.reviewId,
       producer: 'reviewer',
+      attempt: 1,
     });
 
-    expect(review.result.status).toBe('incomplete');
-    expect(review.result.metadata.errorCode).toBe('REVIEW_BRIDGE_CALL_FAILED');
-    expect(review.evidence.map((entry) => entry.kind)).toEqual(
-      expect.arrayContaining(['review_request', 'review_result']),
-    );
+    expect(firstFinalize.status).toBe('pending');
+    if (firstFinalize.status !== 'pending') {
+      throw new Error('expected pending finalization');
+    }
+    expect(firstFinalize.error.code).toBe('REVIEW_MATERIALIZATION_PENDING');
+    expect(firstFinalize.runtimeState.status).toBe('review_materializing');
+
+    const secondFinalize = await service.finalizeExecutionReview({
+      run,
+      task,
+      executionResult,
+      reviewId: requested.request.reviewId,
+      producer: 'reviewer',
+      attempt: 2,
+    });
+
+    expect(secondFinalize.status).toBe('completed');
+    if (secondFinalize.status !== 'completed') {
+      throw new Error('expected completed finalization');
+    }
+    expect(secondFinalize.result.status).toBe('approved');
+    expect(startConversationCount).toBe(1);
+    expect(exportCount).toBe(2);
+    expect(secondFinalize.runtimeState.conversationId).toBe(conversationId);
   });
 });

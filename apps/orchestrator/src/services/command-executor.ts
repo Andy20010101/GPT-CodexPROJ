@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
 
 import {
   ExecutionResultSchema,
@@ -23,6 +24,15 @@ export type CommandRunnerInput = {
 export interface CommandRunner {
   run(input: CommandRunnerInput): Promise<RawCommandResult>;
 }
+
+export interface WorkspacePatchCollector {
+  collect(input: { workspacePath: string }): Promise<{
+    patch?: string | undefined;
+    notes?: readonly string[] | undefined;
+  }>;
+}
+
+const execFileAsync = promisify(execFile);
 
 export class SpawnCommandRunner implements CommandRunner {
   public async run(input: CommandRunnerInput): Promise<RawCommandResult> {
@@ -59,6 +69,57 @@ export class SpawnCommandRunner implements CommandRunner {
   }
 }
 
+export class GitWorkspacePatchCollector implements WorkspacePatchCollector {
+  public async collect(input: { workspacePath: string }): Promise<{
+    patch?: string | undefined;
+    notes?: readonly string[] | undefined;
+  }> {
+    try {
+      await execFileAsync('git', ['rev-parse', '--show-toplevel'], {
+        cwd: input.workspacePath,
+        encoding: 'utf8',
+        maxBuffer: 10 * 1024 * 1024,
+      });
+    } catch {
+      return {
+        notes: ['Workspace is not a git repository; no patch evidence was collected.'],
+      };
+    }
+
+    try {
+      await execFileAsync('git', ['add', '-N', '--all', '.'], {
+        cwd: input.workspacePath,
+        encoding: 'utf8',
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      const result = await execFileAsync(
+        'git',
+        ['diff', '--no-ext-diff', '--binary', 'HEAD', '--', '.'],
+        {
+          cwd: input.workspacePath,
+          encoding: 'utf8',
+          maxBuffer: 10 * 1024 * 1024,
+        },
+      );
+      const patch = result.stdout.trim().length > 0 ? result.stdout : undefined;
+
+      return patch
+        ? {
+            patch,
+            notes: ['Patch inferred from git diff against HEAD after command execution.'],
+          }
+        : {
+            notes: ['No repository patch detected after command execution.'],
+          };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown git diff failure';
+      return {
+        notes: [`Git diff collection failed after command execution: ${message}`],
+      };
+    }
+  }
+}
+
 export class CommandExecutor implements ExecutionExecutor {
   public readonly type = 'command' as const;
 
@@ -66,13 +127,14 @@ export class CommandExecutor implements ExecutionExecutor {
     private readonly runner: CommandRunner = new SpawnCommandRunner(),
     private readonly runnerLifecycleService?: RunnerLifecycleService,
     private readonly timeoutMs: number = 600000,
+    private readonly patchCollector: WorkspacePatchCollector = new GitWorkspacePatchCollector(),
   ) {}
 
   public getCapability(): ExecutorCapability {
     return ExecutorCapabilitySchema.parse({
       type: this.type,
       description: 'Local shell-command executor for smoke tests and reproducible command runs.',
-      supportsPatchOutput: false,
+      supportsPatchOutput: true,
       supportsTestResults: true,
       supportsStructuredPrompt: false,
       supportsWorkspaceCommands: true,
@@ -117,9 +179,14 @@ export class CommandExecutor implements ExecutionExecutor {
           env: request.command.env,
           shell: request.command.shell,
         }));
+      const patchEvidence = await this.patchCollector.collect({
+        workspacePath: request.workspacePath,
+      });
       const normalized = normalizeCommandResult({
         command: request.command,
         raw,
+        patch: patchEvidence.patch,
+        patchNotes: patchEvidence.notes,
       });
 
       return ExecutionResultSchema.parse({

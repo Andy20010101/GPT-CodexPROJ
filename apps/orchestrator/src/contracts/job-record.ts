@@ -2,7 +2,13 @@ import { z } from 'zod';
 
 import { PriorityLevelSchema } from './priority-level';
 
-export const JobKindSchema = z.enum(['task_execution', 'task_review', 'release_review']);
+export const JobKindSchema = z.enum([
+  'task_execution',
+  'task_review',
+  'task_review_request',
+  'task_review_finalize',
+  'release_review',
+]);
 export type JobKind = z.infer<typeof JobKindSchema>;
 
 export const JobStatusSchema = z.enum([

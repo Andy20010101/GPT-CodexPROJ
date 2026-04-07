@@ -240,6 +240,19 @@ function createApprovedBridgeClient(): BridgeClient {
         },
       };
     },
+    async getSnapshot() {
+      return {
+        conversationId,
+        sessionId,
+        projectName: 'Execution Review Project',
+        model: 'gpt-5.4',
+        status: 'completed',
+        source: 'memory',
+        messages: [],
+        startedAt: '2026-04-02T12:08:00.000Z',
+        updatedAt: '2026-04-02T12:08:30.000Z',
+      };
+    },
     async waitForCompletion() {
       return {
         conversationId,

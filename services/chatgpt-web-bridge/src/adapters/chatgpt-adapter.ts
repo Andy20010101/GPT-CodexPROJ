@@ -167,14 +167,12 @@ export class PuppeteerChatGPTAdapter implements ChatGPTAdapter {
   public async startConversation(
     input: AdapterStartConversationInput,
   ): Promise<ConversationSnapshot> {
-    let session = input.session;
-    if (session.projectName !== input.projectName || session.model !== input.model) {
-      session = await this.selectProject({
-        session,
-        projectName: input.projectName,
-        ...(input.model ? { model: input.model } : {}),
-      });
-    }
+    await this.browserManager.prepareFreshConversationPage(input.session.sessionId);
+    const session = await this.selectProject({
+      session: input.session,
+      projectName: input.projectName,
+      ...(input.model ? { model: input.model } : {}),
+    });
 
     const page = this.browserManager.getPage(session.sessionId);
     await this.attachFiles(page, input.inputFiles);

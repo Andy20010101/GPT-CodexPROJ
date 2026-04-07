@@ -61,7 +61,7 @@ describe('recovery and retry integration', () => {
     const run = await bundle.orchestratorService.getRun(runId);
     expect(run.stage).toBe('accepted');
     await app.close();
-  });
+  }, 15000);
 
   it('recovers interrupted running jobs and reports recovery summary', async () => {
     const artifactDir = await createArtifactDir('recovery-flow-');

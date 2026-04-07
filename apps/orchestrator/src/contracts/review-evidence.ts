@@ -6,6 +6,7 @@ export const ReviewEvidenceSchema = z.object({
   taskId: z.string().uuid(),
   executionId: z.string().uuid(),
   requestPath: z.string().min(1),
+  runtimeStatePath: z.string().min(1).optional(),
   resultPath: z.string().min(1),
   markdownPath: z.string().min(1).optional(),
   structuredReviewPath: z.string().min(1).optional(),

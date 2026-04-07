@@ -4,6 +4,7 @@ import type { DaemonState, RuntimeMetrics, WorkerRecord } from '../contracts';
 import { DaemonStateSchema } from '../contracts';
 import { FileDaemonRepository } from '../storage/file-daemon-repository';
 import { FileRunRepository } from '../storage/file-run-repository';
+import { OrchestratorError } from '../utils/error';
 import { EvidenceLedgerService } from './evidence-ledger-service';
 import { WorkflowRuntimeService } from './workflow-runtime-service';
 import { DrainService } from './drain-service';
@@ -16,6 +17,7 @@ import { WorkspaceGcService } from './workspace-gc-service';
 export class DaemonRuntimeService {
   private pollTimer?: NodeJS.Timeout | undefined;
   private gcTimer?: NodeJS.Timeout | undefined;
+  private tickPromise?: Promise<RuntimeMetrics> | undefined;
 
   public constructor(
     private readonly daemonRepository: FileDaemonRepository,
@@ -131,12 +133,33 @@ export class DaemonRuntimeService {
   }
 
   public async tick(): Promise<RuntimeMetrics> {
+    if (this.tickPromise) {
+      return this.tickPromise;
+    }
+
+    const tickPromise = this.runTick().finally(() => {
+      if (this.tickPromise === tickPromise) {
+        this.tickPromise = undefined;
+      }
+    });
+    this.tickPromise = tickPromise;
+    return tickPromise;
+  }
+
+  private async runTick(): Promise<RuntimeMetrics> {
     const state = await this.requireState();
     const reclaim = await this.staleJobReclaimService.reclaim();
     if (this.config.autoQueueRunnableTasks && state.state === 'running') {
       const runs = await this.runRepository.listRuns();
       for (const run of runs.filter((entry) => entry.stage !== 'accepted')) {
-        await this.workflowRuntimeService.enqueueRunnableTasks(run.runId);
+        try {
+          await this.workflowRuntimeService.enqueueRunnableTasks(run.runId);
+        } catch (error) {
+          if (error instanceof OrchestratorError && error.code === 'TASK_GRAPH_NOT_FOUND') {
+            continue;
+          }
+          throw error;
+        }
       }
     }
 

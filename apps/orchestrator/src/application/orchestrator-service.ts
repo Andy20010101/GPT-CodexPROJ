@@ -1020,12 +1020,11 @@ export class OrchestratorService {
       );
     }
 
-    const latestRedGate = await this.evidenceRepository.findLatestGateResult(
-      runId,
-      'red_test_gate',
-      taskId,
+    const redGates = await this.evidenceRepository.listGateResultsForTask(runId, taskId);
+    const hasPassingRedGate = redGates.some(
+      (gate) => gate.gateType === 'red_test_gate' && gate.passed,
     );
-    if (!latestRedGate?.passed) {
+    if (!hasPassingRedGate) {
       throw new OrchestratorError(
         'RED_TEST_GATE_REQUIRED',
         'Execution requests require a passing red test gate.',

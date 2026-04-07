@@ -557,7 +557,9 @@ export class RunQueueService {
 function defaultPriorityForKind(kind: JobKind): PriorityLevel {
   switch (kind) {
     case 'release_review':
+    case 'task_review_finalize':
       return 'high';
+    case 'task_review_request':
     case 'task_review':
       return 'normal';
     case 'task_execution':

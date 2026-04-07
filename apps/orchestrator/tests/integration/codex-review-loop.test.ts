@@ -252,6 +252,19 @@ function createBridgeClient(options?: {
         },
       };
     },
+    async getSnapshot() {
+      return {
+        conversationId,
+        sessionId,
+        projectName: 'Review Project',
+        model: 'gpt-5.4',
+        status: 'completed',
+        source: 'memory',
+        messages: [],
+        startedAt: '2026-04-02T13:07:00.000Z',
+        updatedAt: '2026-04-02T13:07:30.000Z',
+      };
+    },
     async waitForCompletion() {
       return {
         conversationId,

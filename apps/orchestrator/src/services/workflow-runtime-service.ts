@@ -248,7 +248,7 @@ export class WorkflowRuntimeService {
   }
 
   private async primeTaskForExecution(task: TaskEnvelope): Promise<TaskEnvelope> {
-    let currentTask = task;
+    let currentTask = await this.taskRepository.getTask(task.runId, task.taskId);
     await this.orchestratorService.evaluateGate({
       runId: currentTask.runId,
       gateType: 'architecture_gate',
@@ -265,18 +265,24 @@ export class WorkflowRuntimeService {
           },
         );
       }
-      currentTask = await this.orchestratorService.attachTestPlan(
-        currentTask.runId,
-        currentTask.taskId,
-        currentTask.testPlan,
-      );
+      currentTask = await this.applyPrimingTransition({
+        task: currentTask,
+        apply: () =>
+          this.orchestratorService.attachTestPlan(
+            currentTask.runId,
+            currentTask.taskId,
+            currentTask.testPlan,
+          ),
+      });
     }
+    currentTask = await this.taskRepository.getTask(currentTask.runId, currentTask.taskId);
     if (currentTask.status === 'tests_planned') {
-      currentTask = await this.orchestratorService.markTestsRed(
-        currentTask.runId,
-        currentTask.taskId,
-      );
+      currentTask = await this.applyPrimingTransition({
+        task: currentTask,
+        apply: () => this.orchestratorService.markTestsRed(currentTask.runId, currentTask.taskId),
+      });
     }
+    currentTask = await this.taskRepository.getTask(currentTask.runId, currentTask.taskId);
     if (currentTask.status === 'tests_red') {
       await this.orchestratorService.evaluateGate({
         runId: currentTask.runId,
@@ -287,6 +293,26 @@ export class WorkflowRuntimeService {
     }
 
     return this.taskRepository.getTask(currentTask.runId, currentTask.taskId);
+  }
+
+  private async applyPrimingTransition(input: {
+    task: TaskEnvelope;
+    apply: () => Promise<TaskEnvelope>;
+  }): Promise<TaskEnvelope> {
+    try {
+      return await input.apply();
+    } catch (error) {
+      if (!(error instanceof OrchestratorError) || error.code !== 'INVALID_TASK_LOOP_TRANSITION') {
+        throw error;
+      }
+
+      const currentTask = await this.taskRepository.getTask(input.task.runId, input.task.taskId);
+      if (currentTask.status !== input.task.status) {
+        return currentTask;
+      }
+
+      throw error;
+    }
   }
 }
 

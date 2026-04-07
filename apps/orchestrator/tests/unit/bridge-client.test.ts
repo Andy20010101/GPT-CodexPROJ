@@ -1,3 +1,5 @@
+import http from 'node:http';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { HttpBridgeClient } from '../../src/services/bridge-client';
@@ -52,5 +54,64 @@ describe('HttpBridgeClient', () => {
       code: 'BRIDGE_VALIDATION_ERROR',
       statusCode: 200,
     });
+  });
+
+  it('uses the built-in node transport for wait requests when no fetch mock is provided', async () => {
+    const server = http.createServer((request, response) => {
+      if (request.url !== '/api/conversations/conversation-1/wait') {
+        response.writeHead(404, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ ok: false, error: { code: 'NOT_FOUND', message: 'nope' } }));
+        return;
+      }
+
+      setTimeout(() => {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            ok: true,
+            data: {
+              conversationId: '11111111-1111-4111-8111-111111111111',
+              sessionId: '22222222-2222-4222-8222-222222222222',
+              projectName: 'Default',
+              status: 'completed',
+              source: 'adapter',
+              messages: [],
+              startedAt: '2026-04-03T00:00:00.000Z',
+              updatedAt: '2026-04-03T00:00:30.000Z',
+            },
+          }),
+        );
+      }, 50);
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+
+    try {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      const client = new HttpBridgeClient(`http://127.0.0.1:${port}`);
+
+      await expect(
+        client.waitForCompletion('conversation-1', {
+          maxWaitMs: 10,
+          pollIntervalMs: 1,
+        }),
+      ).resolves.toMatchObject({
+        conversationId: '11111111-1111-4111-8111-111111111111',
+        status: 'completed',
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
   });
 });

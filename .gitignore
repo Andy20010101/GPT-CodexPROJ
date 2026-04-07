@@ -8,8 +8,20 @@ services/chatgpt-web-bridge/artifacts/*.json
 services/chatgpt-web-bridge/artifacts/*.md
 services/chatgpt-web-bridge/artifacts/*.tmp
 !services/chatgpt-web-bridge/artifacts/.gitkeep
+services/chatgpt-web-bridge/src/artifacts/diagnostics/
+services/chatgpt-web-bridge/src/artifacts/health/
+services/chatgpt-web-bridge/src/artifacts/manifests/
+services/chatgpt-web-bridge/src/artifacts/markdown/
+services/chatgpt-web-bridge/src/artifacts/structured-review/
 
 apps/orchestrator/artifacts/runs/
 apps/orchestrator/artifacts/workspace-runtime/
 apps/orchestrator/artifacts/runtime/
 !apps/orchestrator/artifacts/.gitkeep
+
+tmp/e2e-targets/
+tmp/orchestrator-validation-1/artifacts/
+tmp/orchestrator-validation-1/planning/
+tmp/orchestrator-validation-2/
+tmp/orchestrator-validation-3/
+tmp/orchestrator-validation-4/

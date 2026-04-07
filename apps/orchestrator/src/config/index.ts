@@ -55,7 +55,7 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
     bridgeBrowserUrl: process.env.BRIDGE_BROWSER_URL ?? 'https://chatgpt.com/',
     bridgeProjectName: process.env.BRIDGE_PROJECT_NAME ?? 'Default',
     ...(process.env.REVIEW_MODEL_HINT ? { reviewModelHint: process.env.REVIEW_MODEL_HINT } : {}),
-    reviewMaxWaitMs: parseInteger(process.env.REVIEW_MAX_WAIT_MS, 180000),
+    reviewMaxWaitMs: parseInteger(process.env.REVIEW_MAX_WAIT_MS, 900000),
     planningModelHint: process.env.PLANNING_MODEL_HINT ?? 'pro',
     planningMaxWaitMs: parseInteger(process.env.PLANNING_MAX_WAIT_MS, 3_000_000),
     planningPollIntervalMs: parseInteger(process.env.PLANNING_POLL_INTERVAL_MS, 5000),

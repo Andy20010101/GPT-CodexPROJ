@@ -20,6 +20,40 @@ Here is the review.
     });
   });
 
+  it('extracts a structured review from a JSON-prefixed inline object', () => {
+    const extractor = new StructuredOutputExtractor();
+    const payload = extractor.extract(`
+Review result: incomplete.
+JSON{"status":"incomplete","summary":"Missing evidence","findings":[],"missingTests":[],"architectureConcerns":[],"recommendedActions":[]}
+`);
+
+    expect(payload).toEqual({
+      status: 'incomplete',
+      summary: 'Missing evidence',
+      findings: [],
+      missingTests: [],
+      architectureConcerns: [],
+      recommendedActions: [],
+    });
+  });
+
+  it('extracts a structured review from a raw json object after prose', () => {
+    const extractor = new StructuredOutputExtractor();
+    const payload = extractor.extract(`
+Review result: approved.
+{"status":"approved","summary":"Looks good","findings":[],"missingTests":[],"architectureConcerns":[],"recommendedActions":[]}
+`);
+
+    expect(payload).toEqual({
+      status: 'approved',
+      summary: 'Looks good',
+      findings: [],
+      missingTests: [],
+      architectureConcerns: [],
+      recommendedActions: [],
+    });
+  });
+
   it('fails clearly when no structured block exists', () => {
     const extractor = new StructuredOutputExtractor();
 

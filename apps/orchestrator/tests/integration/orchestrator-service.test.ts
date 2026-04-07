@@ -409,4 +409,52 @@ describe('OrchestratorService integration', () => {
       OrchestratorError,
     );
   });
+
+  it('allows rework execution after a passing red gate even if a later red gate snapshot is failed', async () => {
+    const artifactDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'orchestrator-integration-rework-red-'),
+    );
+    const { orchestrator, runId, task } = await bootstrapRun(artifactDir);
+
+    await orchestrator.attachTestPlan(runId, task.taskId, [
+      {
+        id: 'test-1',
+        description: 'Write the red test first',
+        expectedRedSignal: 'red',
+        expectedGreenSignal: 'green',
+      },
+    ]);
+    await orchestrator.markTestsRed(runId, task.taskId);
+    await orchestrator.evaluateGate({
+      runId,
+      taskId: task.taskId,
+      gateType: 'red_test_gate',
+      evaluator: 'integration-test',
+    });
+    await orchestrator.markImplementationStarted(runId, task.taskId);
+
+    const evidenceRepository = new FileEvidenceRepository(artifactDir);
+    await evidenceRepository.appendGateResult({
+      gateId: randomUUID(),
+      runId,
+      taskId: task.taskId,
+      gateType: 'red_test_gate',
+      stage: 'task_execution',
+      passed: false,
+      timestamp: '2026-04-02T10:11:00.000Z',
+      evaluator: 'integration-test',
+      reasons: ['Task has not reached tests_red.'],
+      evidenceIds: [],
+      metadata: {},
+    });
+
+    const request = await orchestrator.createExecutionRequest({
+      runId,
+      taskId: task.taskId,
+      workspacePath: path.join(artifactDir, 'workspace'),
+    });
+
+    expect(request.taskId).toBe(task.taskId);
+    expect(request.workspacePath).toBe(path.join(artifactDir, 'workspace'));
+  });
 });

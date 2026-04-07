@@ -55,6 +55,10 @@ export class WorkerService {
       switch (job.kind) {
         case 'task_execution':
           return this.processTaskExecution(job);
+        case 'task_review_request':
+          return this.processTaskReviewRequest(job);
+        case 'task_review_finalize':
+          return this.processTaskReviewFinalize(job);
         case 'task_review':
           return this.processTaskReview(job);
         case 'release_review':
@@ -156,7 +160,7 @@ export class WorkerService {
       return this.runQueueService.enqueueJob({
         runId: run.runId,
         taskId: task.taskId,
-        kind: 'task_review',
+        kind: 'task_review_request',
         maxAttempts: job.maxAttempts,
         priority: 'high',
         metadata: {
@@ -284,22 +288,191 @@ export class WorkerService {
         },
       });
     }
+    try {
+      const requested = await this.orchestratorService.requestTaskExecutionReview({
+        runId: job.runId,
+        taskId: job.taskId,
+        executionId,
+        producer: 'worker-service',
+        metadata: {
+          jobId: job.jobId,
+        },
+        attempt: job.attempt,
+        requestJobId: job.jobId,
+      });
+      const finalized = await this.orchestratorService.finalizeTaskExecutionReview({
+        runId: job.runId,
+        taskId: job.taskId,
+        executionId,
+        reviewId: requested.request.reviewId,
+        producer: 'worker-service',
+        metadata: {
+          jobId: job.jobId,
+        },
+        attempt: job.attempt,
+        finalizeJobId: job.jobId,
+      });
+      if (finalized.status === 'pending') {
+        return this.handleReviewPending(job, finalized);
+      }
+      return this.completeTaskReviewJob(job, finalized, [...requested.evidence, ...finalized.evidence]);
+    } catch (error) {
+      return this.handleReviewJobError(job, error, {
+        executionId,
+      });
+    }
+  }
 
-    const review = await this.orchestratorService.reviewTaskExecution({
-      runId: job.runId,
-      taskId: job.taskId,
-      executionId,
-      producer: 'worker-service',
-      metadata: {
+  private async processTaskReviewRequest(job: JobRecord): Promise<JobRecord> {
+    const cancelledBeforeStart = await this.cancelIfRequested(job);
+    if (cancelledBeforeStart) {
+      return cancelledBeforeStart;
+    }
+    if (!job.taskId) {
+      return this.runQueueService.markFailed({
         jobId: job.jobId,
-      },
-    });
-    const relatedEvidenceIds = review.evidence.map((entry) => entry.evidenceId);
+        error: {
+          code: 'TASK_NOT_FOUND',
+          message: `Task review request job ${job.jobId} does not reference a task.`,
+        },
+      });
+    }
+    const executionId = readString(job.metadata.executionId);
+    if (!executionId) {
+      return this.runQueueService.markFailed({
+        jobId: job.jobId,
+        error: {
+          code: 'EXECUTION_NOT_FOUND',
+          message: `Task review request job ${job.jobId} does not include an executionId.`,
+        },
+      });
+    }
+
+    try {
+      const requested = await this.orchestratorService.requestTaskExecutionReview({
+        runId: job.runId,
+        taskId: job.taskId,
+        executionId,
+        producer: 'worker-service',
+        metadata: {
+          jobId: job.jobId,
+        },
+        attempt: job.attempt,
+        requestJobId: job.jobId,
+      });
+      const relatedEvidenceIds = requested.evidence.map((entry) => entry.evidenceId);
+      const cancelledAfterRequest = await this.cancelIfRequested(job);
+      if (cancelledAfterRequest) {
+        return cancelledAfterRequest;
+      }
+      await this.runQueueService.markSucceeded({
+        jobId: job.jobId,
+        relatedEvidenceIds,
+        metadata: {
+          executionId,
+          reviewId: requested.request.reviewId,
+          conversationId: requested.runtimeState.conversationId,
+          runtimeStatus: requested.runtimeState.status,
+          workspaceId: readString(job.metadata.workspaceId),
+        },
+      });
+      if (requested.runtimeState.status === 'review_applied') {
+        return this.runQueueService.getJob(job.jobId);
+      }
+      return this.runQueueService.enqueueJob({
+        runId: job.runId,
+        taskId: job.taskId,
+        kind: 'task_review_finalize',
+        maxAttempts: job.maxAttempts,
+        priority: 'high',
+        metadata: {
+          executionId,
+          reviewId: requested.request.reviewId,
+          workspaceId: readString(job.metadata.workspaceId),
+        },
+      });
+    } catch (error) {
+      return this.handleReviewJobError(job, error, {
+        executionId,
+      });
+    }
+  }
+
+  private async processTaskReviewFinalize(job: JobRecord): Promise<JobRecord> {
+    const cancelledBeforeStart = await this.cancelIfRequested(job);
+    if (cancelledBeforeStart) {
+      return cancelledBeforeStart;
+    }
+    if (!job.taskId) {
+      return this.runQueueService.markFailed({
+        jobId: job.jobId,
+        error: {
+          code: 'TASK_NOT_FOUND',
+          message: `Task review finalize job ${job.jobId} does not reference a task.`,
+        },
+      });
+    }
+    const executionId = readString(job.metadata.executionId);
+    if (!executionId) {
+      return this.runQueueService.markFailed({
+        jobId: job.jobId,
+        error: {
+          code: 'EXECUTION_NOT_FOUND',
+          message: `Task review finalize job ${job.jobId} does not include an executionId.`,
+        },
+      });
+    }
+    const reviewId = readString(job.metadata.reviewId);
+    if (!reviewId) {
+      return this.runQueueService.markFailed({
+        jobId: job.jobId,
+        error: {
+          code: 'REVIEW_REQUEST_NOT_FOUND',
+          message: `Task review finalize job ${job.jobId} does not include a reviewId.`,
+        },
+      });
+    }
+
+    try {
+      const finalized = await this.orchestratorService.finalizeTaskExecutionReview({
+        runId: job.runId,
+        taskId: job.taskId,
+        executionId,
+        reviewId,
+        producer: 'worker-service',
+        metadata: {
+          jobId: job.jobId,
+        },
+        attempt: job.attempt,
+        finalizeJobId: job.jobId,
+      });
+      if (finalized.status === 'pending') {
+        return this.handleReviewPending(job, finalized);
+      }
+      return this.completeTaskReviewJob(job, finalized, finalized.evidence);
+    } catch (error) {
+      return this.handleReviewJobError(job, error, {
+        executionId,
+        reviewId,
+      });
+    }
+  }
+
+  private async completeTaskReviewJob(
+    job: JobRecord,
+    review: Exclude<
+      Awaited<ReturnType<OrchestratorService['finalizeTaskExecutionReview']>>,
+      { status: 'pending' }
+    >,
+    evidence: readonly { evidenceId: string }[],
+  ): Promise<JobRecord> {
+    const relatedEvidenceIds = evidence.map((entry) => entry.evidenceId);
     const workspaceId = readString(review.executionResult.metadata.workspaceId);
     const cancelledAfterReview = await this.cancelIfRequested(job);
     if (cancelledAfterReview) {
       return cancelledAfterReview;
     }
+
     if (review.result.status === 'approved') {
       if (workspaceId) {
         const workspace = await this.orchestratorService.describeWorkspaceRuntime(
@@ -311,14 +484,13 @@ export class WorkerService {
           reviewStatus: 'approved',
         });
       }
-      const acceptedTask = await this.orchestratorService.acceptTask(job.runId, job.taskId);
       return this.runQueueService.markSucceeded({
         jobId: job.jobId,
         relatedEvidenceIds,
         metadata: {
           reviewId: review.result.reviewId,
           gateId: review.gateResult.gateId,
-          taskStatus: acceptedTask.status,
+          taskStatus: review.task.status,
         },
       });
     }
@@ -335,7 +507,7 @@ export class WorkerService {
       if (review.result.status === 'changes_requested' || review.result.status === 'rejected') {
         const snapshot = await this.debugSnapshotService.capture({
           runId: job.runId,
-          taskId: job.taskId,
+          taskId: job.taskId!,
           executionResult: review.executionResult,
           workspace,
           reason: `Review ${review.result.reviewId} returned ${review.result.status}.`,
@@ -345,7 +517,7 @@ export class WorkerService {
         });
         const rollback = await this.rollbackService.plan({
           runId: job.runId,
-          taskId: job.taskId,
+          taskId: job.taskId!,
           executionResult: review.executionResult,
           workspace,
           reason: `Review ${review.result.reviewId} requested changes or rejected the task.`,
@@ -358,6 +530,7 @@ export class WorkerService {
         review.result.metadata.snapshotId = snapshot.snapshotId;
       }
     }
+
     const { disposition } = await this.jobDispositionService.forReviewFailure({
       job,
       result: review.result,
@@ -405,6 +578,122 @@ export class WorkerService {
       metadata: {
         reviewId: review.result.reviewId,
       },
+    });
+  }
+
+  private async handleReviewPending(
+    job: JobRecord,
+    pending: Extract<
+      Awaited<ReturnType<OrchestratorService['finalizeTaskExecutionReview']>>,
+      { status: 'pending' }
+    >,
+  ): Promise<JobRecord> {
+    const { disposition } = await this.jobDispositionService.forJobError({
+      job,
+      error: pending.error,
+      source: 'worker-service',
+    });
+    const error = buildJobError(pending.error.code, disposition.reason, {
+      reviewId: pending.request.reviewId,
+      conversationId: pending.runtimeState.conversationId,
+      runtimeStatus: pending.runtimeState.status,
+      details: pending.error.details,
+    });
+    if (disposition.disposition === 'retriable') {
+      return this.retryService.retryJob({
+        jobId: job.jobId,
+        policy: this.config.retryPolicy,
+        error,
+        metadata: {
+          reviewId: pending.request.reviewId,
+          conversationId: pending.runtimeState.conversationId,
+          runtimeStatus: pending.runtimeState.status,
+        },
+      });
+    }
+    if (disposition.disposition === 'blocked') {
+      return this.runQueueService.markBlocked({
+        jobId: job.jobId,
+        error,
+        metadata: {
+          reviewId: pending.request.reviewId,
+          conversationId: pending.runtimeState.conversationId,
+          runtimeStatus: pending.runtimeState.status,
+        },
+      });
+    }
+    if (disposition.disposition === 'manual_attention_required') {
+      return this.runQueueService.markManualAttentionRequired({
+        jobId: job.jobId,
+        error,
+        metadata: {
+          reviewId: pending.request.reviewId,
+          conversationId: pending.runtimeState.conversationId,
+          runtimeStatus: pending.runtimeState.status,
+        },
+      });
+    }
+    return this.runQueueService.markFailed({
+      jobId: job.jobId,
+      error,
+      metadata: {
+        reviewId: pending.request.reviewId,
+        conversationId: pending.runtimeState.conversationId,
+        runtimeStatus: pending.runtimeState.status,
+      },
+    });
+  }
+
+  private async handleReviewJobError(
+    job: JobRecord,
+    error: unknown,
+    metadata?: Record<string, unknown> | undefined,
+  ): Promise<JobRecord> {
+    const normalizedError = normalizeJobError(error);
+    const { disposition } = await this.jobDispositionService.forJobError({
+      job,
+      error: normalizedError,
+      source: 'worker-service',
+    });
+    const mergedMetadata = {
+      ...(metadata ?? {}),
+      ...(normalizedError.details && typeof normalizedError.details === 'object'
+        ? (normalizedError.details as Record<string, unknown>)
+        : {}),
+    };
+    if (disposition.disposition === 'retriable') {
+      return this.retryService.retryJob({
+        jobId: job.jobId,
+        policy: this.config.retryPolicy,
+        error: normalizedError,
+        metadata: mergedMetadata,
+      });
+    }
+    if (disposition.disposition === 'blocked') {
+      return this.runQueueService.markBlocked({
+        jobId: job.jobId,
+        error: normalizedError,
+        metadata: mergedMetadata,
+      });
+    }
+    if (disposition.disposition === 'manual_attention_required') {
+      return this.runQueueService.markManualAttentionRequired({
+        jobId: job.jobId,
+        error: normalizedError,
+        metadata: mergedMetadata,
+      });
+    }
+    if (disposition.disposition === 'cancelled') {
+      return this.runQueueService.markCancelled({
+        jobId: job.jobId,
+        error: normalizedError,
+        metadata: mergedMetadata,
+      });
+    }
+    return this.runQueueService.markFailed({
+      jobId: job.jobId,
+      error: normalizedError,
+      metadata: mergedMetadata,
     });
   }
 
