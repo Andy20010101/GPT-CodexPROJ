@@ -27,6 +27,7 @@ Use `.env.example` as the baseline local configuration surface. Only enable the 
 ## Repository Guides
 
 - [CONTRIBUTING.md](/home/administrator/code/review-then-codex-system/CONTRIBUTING.md) for development workflow and validation expectations
+- [RELEASING.md](/home/administrator/code/review-then-codex-system/RELEASING.md) for versioning, tags, and GitHub release procedure
 - [SECURITY.md](/home/administrator/code/review-then-codex-system/SECURITY.md) for disclosure and sensitive-surface handling
 - [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md) for the shortest project explanation
 - [SYSTEM_OVERVIEW.md](/home/administrator/code/review-then-codex-system/docs/architecture/SYSTEM_OVERVIEW.md) for the plane model and lifecycle
