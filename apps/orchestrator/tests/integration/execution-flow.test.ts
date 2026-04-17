@@ -349,7 +349,7 @@ describe('execution flow integration', () => {
       executorType: 'command',
       command: {
         command: 'bash',
-        args: ['-lc', 'printf "tests ok"'],
+        args: ['-lc', 'printf "vitest ok"'],
         purpose: 'test',
         shell: false,
         env: {},
@@ -365,7 +365,7 @@ describe('execution flow integration', () => {
       executorType: 'command',
       command: {
         command: 'bash',
-        args: ['-lc', 'printf "tests ok"'],
+        args: ['-lc', 'printf "vitest ok"'],
         purpose: 'test',
         shell: false,
         env: {},
@@ -501,7 +501,7 @@ describe('execution flow integration', () => {
       executorType: 'command',
       command: {
         command: 'bash',
-        args: ['-lc', 'printf "tests ok"'],
+        args: ['-lc', 'printf "vitest ok"'],
         purpose: 'test',
         shell: false,
         env: {},

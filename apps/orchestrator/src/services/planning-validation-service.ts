@@ -73,7 +73,7 @@ export class PlanningValidationService {
         proofMode: mode,
       },
     });
-    const requirementFinalized = await this.requireCompleted(
+    const requirementFinalized = this.requireCompleted(
       await this.orchestratorService.finalizeRequirementFreeze({
         runId: run.runId,
         producer: 'planning-validation-service',
@@ -100,7 +100,7 @@ export class PlanningValidationService {
         proofMode: mode,
       },
     });
-    const architectureFinalized = await this.requireCompleted(
+    const architectureFinalized = this.requireCompleted(
       await this.orchestratorService.finalizeArchitectureFreeze({
         runId: run.runId,
         producer: 'planning-validation-service',
@@ -127,7 +127,7 @@ export class PlanningValidationService {
         proofMode: mode,
       },
     });
-    const taskGraphFinalized = await this.requireCompleted(
+    const taskGraphFinalized = this.requireCompleted(
       await this.orchestratorService.finalizeTaskGraphGeneration({
         runId: run.runId,
         producer: 'planning-validation-service',
@@ -273,10 +273,10 @@ export class PlanningValidationService {
     };
   }
 
-  private async requireCompleted<T extends { status: 'pending' | 'completed' }>(
+  private requireCompleted<T extends { status: 'pending' | 'completed' }>(
     result: T,
     phase: string,
-  ): Promise<Extract<T, { status: 'completed' }>> {
+  ): Extract<T, { status: 'completed' }> {
     if (result.status === 'completed') {
       return result as Extract<T, { status: 'completed' }>;
     }

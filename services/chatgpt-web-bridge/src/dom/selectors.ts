@@ -18,6 +18,11 @@ export const ChatGPTSelectors = {
     input: ['#prompt-textarea', 'textarea[placeholder*="Message"]'] as const,
     sendButton: ['[data-testid="send-button"]', 'button[aria-label="Send prompt"]'] as const,
     stopButton: ['[data-testid="stop-button"]'] as const,
+    retryButton: [
+      'button[aria-label*="Retry"]:not(.__composer-pill-remove)',
+      'button[aria-label*="retry"]:not(.__composer-pill-remove)',
+      'button[aria-label*="重试"]:not(.__composer-pill-remove)',
+    ] as const,
     addFileButton: [
       '[data-testid="composer-plus-btn"]',
       'button[aria-label*="Add files"]',

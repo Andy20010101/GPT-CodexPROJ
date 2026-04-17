@@ -99,7 +99,7 @@ The service is designed for extension, but the current scope is deliberately con
 - session and conversation registries are in memory only
 - browser integration targets a logged-in ChatGPT page and does not use an official API
 - route-level tests use a mock adapter instead of opening a real browser
-- the orchestrator is implemented only as a first control-plane skeleton, not yet as a full workflow runtime
+- the orchestrator remains a bounded local runtime rather than a distributed or HA workflow engine
 
 ## Opt-In Real Smoke Harness
 

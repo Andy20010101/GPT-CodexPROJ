@@ -53,4 +53,43 @@ describe('WorktreeService', () => {
       code: 'ENOENT',
     });
   });
+
+  it('overlays allowed source files, including untracked files, onto the workspace', async () => {
+    const repoDir = await createGitRepo();
+    await fs.mkdir(path.join(repoDir, 'scripts'), { recursive: true });
+    await fs.writeFile(path.join(repoDir, 'README.md'), '# repo changed\n', 'utf8');
+    await fs.writeFile(path.join(repoDir, 'scripts', 'self-improvement-env.ts'), 'export {};\n', 'utf8');
+    await fs.writeFile(path.join(repoDir, 'ignored.txt'), 'ignore me\n', 'utf8');
+
+    const worktreeRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'worktree-service-overlay-'));
+    const workspacePath = path.join(worktreeRoot, 'task-worktree');
+    const service = new WorktreeService();
+
+    await service.prepareWorkspace({
+      baseRepoPath: repoDir,
+      workspacePath,
+    });
+    const summary = await service.syncSourceOverlay({
+      baseRepoPath: repoDir,
+      workspacePath,
+      includePaths: ['README.md', 'scripts/self-improvement-env.ts'],
+    });
+
+    await expect(fs.readFile(path.join(workspacePath, 'README.md'), 'utf8')).resolves.toBe(
+      '# repo changed\n',
+    );
+    await expect(
+      fs.readFile(path.join(workspacePath, 'scripts', 'self-improvement-env.ts'), 'utf8'),
+    ).resolves.toBe('export {};\n');
+    await expect(fs.stat(path.join(workspacePath, 'ignored.txt'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(summary.copiedPaths).toEqual(['README.md', 'scripts/self-improvement-env.ts']);
+    expect(summary.deletedPaths).toEqual([]);
+
+    await service.cleanupWorkspace({
+      baseRepoPath: repoDir,
+      workspacePath,
+    });
+  });
 });

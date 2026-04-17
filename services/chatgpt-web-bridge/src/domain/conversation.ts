@@ -1,4 +1,5 @@
 import type {
+  ConversationStatus,
   ConversationSnapshot,
   SessionSummary,
 } from '@review-then-codex/shared-contracts/chatgpt';
@@ -32,6 +33,13 @@ export class Conversation {
       maxWaitMs,
       pollIntervalMs,
       stablePolls,
+    });
+  }
+
+  public async getStatus(): Promise<ConversationStatus> {
+    return this.adapter.getConversationStatus({
+      session: this.session,
+      conversationId: this.conversationId,
     });
   }
 

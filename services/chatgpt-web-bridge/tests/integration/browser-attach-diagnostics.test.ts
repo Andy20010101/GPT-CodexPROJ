@@ -2,9 +2,13 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import type { ConversationSnapshot, SessionSummary } from '@review-then-codex/shared-contracts/chatgpt';
+import type {
+  ConversationSnapshot,
+  ConversationStatus,
+  SessionSummary,
+} from '@review-then-codex/shared-contracts/chatgpt';
 
 import {
   BrowserAttachDiagnosticResponseSchema,
@@ -76,6 +80,10 @@ class FakeAdapter implements ChatGPTAdapter {
   }
 
   public getConversationSnapshot(_input: AdapterSnapshotInput): Promise<ConversationSnapshot> {
+    throw new Error('not implemented');
+  }
+
+  public getConversationStatus(_input: AdapterSnapshotInput): Promise<ConversationStatus> {
     throw new Error('not implemented');
   }
 }

@@ -19,6 +19,8 @@ export const BridgeErrorCodeSchema = z.enum([
   'SESSION_RESUME_FAILED',
   'BRIDGE_RECOVERY_FAILED',
   'STRUCTURED_OUTPUT_NOT_FOUND',
+  'CHATGPT_ATTACHMENT_UPLOAD_FAILED',
+  'CHATGPT_ATTACHMENT_INJECTION_FAILED',
   'VALIDATION_ERROR',
   'INTERNAL_ERROR',
 ]);
@@ -87,6 +89,23 @@ export const ConversationSnapshotSchema = z.object({
 });
 
 export type ConversationSnapshot = z.infer<typeof ConversationSnapshotSchema>;
+
+export const ConversationStatusSchema = z.object({
+  conversationId: ConversationIdSchema,
+  sessionId: SessionIdSchema,
+  projectName: z.string().min(1),
+  model: z.string().min(1).optional(),
+  status: z.enum(['running', 'completed', 'failed']),
+  source: z.enum(['adapter_status', 'memory_snapshot']),
+  pageUrl: z.string().url().optional(),
+  assistantMessageCount: z.number().int().min(0),
+  lastMessageRole: z.enum(['assistant', 'user', 'none']),
+  lastAssistantMessage: z.string().optional(),
+  retryVisible: z.boolean().optional(),
+  updatedAt: z.string().datetime(),
+});
+
+export type ConversationStatus = z.infer<typeof ConversationStatusSchema>;
 
 export const HealthDataSchema = z.object({
   service: z.literal('chatgpt-web-bridge'),
@@ -190,6 +209,7 @@ export const WaitConversationRequestSchema = z.object({
 export const WaitConversationResponseSchema = successEnvelope(ConversationSnapshotSchema);
 export type WaitConversationRequest = z.infer<typeof WaitConversationRequestSchema>;
 
+export const GetConversationStatusResponseSchema = successEnvelope(ConversationStatusSchema);
 export const GetSnapshotResponseSchema = successEnvelope(ConversationSnapshotSchema);
 
 export const MarkdownExportRequestSchema = z.object({
@@ -237,7 +257,15 @@ export const ResumeSessionResponseSchema = successEnvelope(
   }),
 );
 
-export const RecoverConversationRequestSchema = z.object({});
+export const RecoverConversationRequestSchema = z.object({
+  sessionId: SessionIdSchema.optional(),
+  browserUrl: z.string().url().optional(),
+  startupUrl: z.string().url().optional(),
+  pageUrl: z.string().url().optional(),
+  projectName: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  inputFiles: z.array(z.string()).optional(),
+});
 export type RecoverConversationRequest = z.infer<typeof RecoverConversationRequestSchema>;
 
 export const RecoverConversationResponseSchema = successEnvelope(

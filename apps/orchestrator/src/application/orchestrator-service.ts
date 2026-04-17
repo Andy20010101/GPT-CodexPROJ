@@ -6,7 +6,6 @@ import type {
   ExecutionRequest,
   GateResult,
   GateType,
-  PlanningPhase,
   PlanningRuntimeState,
   PlanningSufficiencyDecision,
   RequirementFreeze,
@@ -39,7 +38,6 @@ import {
   ReviewService,
   type ReviewDispatch,
   type ReviewFinalizeCompleted,
-  type ReviewFinalizeDispatch,
   type ReviewFinalizePending,
   type ReviewRequestDispatch,
 } from '../services/review-service';
@@ -548,13 +546,27 @@ export class OrchestratorService {
     metadata?: Record<string, unknown> | undefined;
   }): Promise<GateResult> {
     const run = await this.runRepository.getRun(input.runId);
-    const requirementFreeze = await this.runRepository.getRequirementFreeze(input.runId);
-    const architectureFreeze = await this.runRepository.getArchitectureFreeze(input.runId);
+    const requirementFreeze = needsRequirementFreeze(input.gateType)
+      ? await this.runRepository.getRequirementFreeze(input.runId)
+      : undefined;
+    const architectureFreeze = needsArchitectureFreeze(input.gateType)
+      ? await this.runRepository.getArchitectureFreeze(input.runId)
+      : undefined;
+    const task =
+      input.taskId && needsTaskContext(input.gateType)
+        ? await this.taskRepository.getTask(input.runId, input.taskId)
+        : null;
+    const tasks =
+      !input.taskId && needsRunTaskContext(input.gateType)
+        ? await this.taskRepository.listTasks(input.runId)
+        : undefined;
     const evidence = input.taskId
-      ? await this.evidenceRepository.listEvidenceForTask(input.runId, input.taskId)
-      : await this.evidenceRepository.listEvidenceForRun(input.runId);
-    const task = input.taskId ? await this.taskRepository.getTask(input.runId, input.taskId) : null;
-    const tasks = input.taskId ? undefined : await this.taskRepository.listTasks(input.runId);
+      ? needsTaskEvidence(input.gateType)
+        ? await this.evidenceRepository.listEvidenceForTask(input.runId, input.taskId)
+        : []
+      : needsRunEvidence(input.gateType)
+        ? await this.evidenceRepository.listEvidenceForRun(input.runId)
+        : [];
 
     const result = this.gateEvaluator.evaluate({
       run,
@@ -710,6 +722,15 @@ export class OrchestratorService {
     workspaceId: string,
   ): Promise<WorkspaceRuntime> {
     return this.workspaceRuntimeService.cleanupWorkspace(runId, workspaceId);
+  }
+
+  public async syncWorkspaceRuntime(input: {
+    runId: string;
+    workspaceId: string;
+    baseRepoPath: string;
+    includePaths: readonly string[];
+  }): Promise<WorkspaceRuntime> {
+    return this.workspaceRuntimeService.syncWorkspace(input);
   }
 
   public async describeWorkspaceRuntime(
@@ -937,7 +958,10 @@ export class OrchestratorService {
     let gateResult: GateResult;
     let task: TaskEnvelope;
 
-    if (existingGate) {
+    const canReuseExistingGate =
+      existingGate?.metadata.reviewStatus === input.review.result.status;
+
+    if (existingGate && canReuseExistingGate) {
       gateResult = existingGate;
       task = await this.taskRepository.getTask(input.run.runId, input.task.taskId);
     } else {
@@ -1057,5 +1081,32 @@ export class OrchestratorService {
         runId,
       },
     );
+  }
+}
+
+function needsRequirementFreeze(gateType: GateType): boolean {
+  return gateType === 'requirement_gate';
+}
+
+function needsArchitectureFreeze(gateType: GateType): boolean {
+  return gateType === 'architecture_gate';
+}
+
+function needsTaskContext(gateType: GateType): boolean {
+  return gateType === 'red_test_gate' || gateType === 'review_gate' || gateType === 'acceptance_gate';
+}
+
+function needsRunTaskContext(gateType: GateType): boolean {
+  return gateType === 'acceptance_gate';
+}
+
+function needsTaskEvidence(gateType: GateType): boolean {
+  return gateType === 'review_gate' || gateType === 'acceptance_gate';
+}
+
+function needsRunEvidence(gateType: GateType): boolean {
+  switch (gateType) {
+    default:
+      return false;
   }
 }

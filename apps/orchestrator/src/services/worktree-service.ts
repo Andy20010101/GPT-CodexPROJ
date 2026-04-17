@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 
 import { WorkspaceRuntimeModeSchema, type WorkspaceRuntimeMode } from '../contracts';
 import { OrchestratorError } from '../utils/error';
+import { resolveGitExecutable } from '../utils/git-executable';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,6 +17,11 @@ export type WorkspaceDescriptor = {
   branchName?: string | undefined;
 };
 
+export type WorkspaceOverlaySummary = {
+  copiedPaths: string[];
+  deletedPaths: string[];
+};
+
 export interface GitProcessRunner {
   run(input: { args: readonly string[]; cwd: string }): Promise<{ stdout: string; stderr: string }>;
 }
@@ -25,7 +31,7 @@ export class ExecFileGitProcessRunner implements GitProcessRunner {
     args: readonly string[];
     cwd: string;
   }): Promise<{ stdout: string; stderr: string }> {
-    const result = await execFileAsync('git', [...input.args], {
+    const result = await execFileAsync(resolveGitExecutable(), [...input.args], {
       cwd: input.cwd,
       encoding: 'utf8',
       maxBuffer: 10 * 1024 * 1024,
@@ -126,6 +132,73 @@ export class WorktreeService {
     };
   }
 
+  public async syncSourceOverlay(input: {
+    baseRepoPath: string;
+    workspacePath: string;
+    includePaths: readonly string[];
+  }): Promise<WorkspaceOverlaySummary> {
+    if (input.includePaths.length === 0) {
+      return {
+        copiedPaths: [],
+        deletedPaths: [],
+      };
+    }
+
+    const baseRepoPath = (
+      await this.runGit(input.baseRepoPath, ['rev-parse', '--show-toplevel'])
+    ).stdout.trim();
+    const normalizedPatterns = input.includePaths.map((value) => normalizeRepoRelativePath(value));
+    const copiedPaths = new Set<string>();
+    const deletedPaths = new Set<string>();
+    const exactPaths = normalizedPatterns.filter((value) => !hasGlobPattern(value));
+    const globPatterns = normalizedPatterns.filter(hasGlobPattern);
+
+    for (const relativePath of exactPaths) {
+      const sourcePath = path.join(baseRepoPath, relativePath);
+      const targetPath = path.join(input.workspacePath, relativePath);
+
+      if (await pathExists(sourcePath)) {
+        await copyPath(sourcePath, targetPath);
+        copiedPaths.add(relativePath);
+        continue;
+      }
+
+      if (await pathExists(targetPath)) {
+        await fs.rm(targetPath, { force: true, recursive: true });
+        deletedPaths.add(relativePath);
+      }
+    }
+
+    if (globPatterns.length > 0) {
+      const trackedAndUntracked = (
+        await this.runGit(baseRepoPath, ['ls-files', '--cached', '--others', '--exclude-standard'])
+      ).stdout
+        .split('\n')
+        .map((value) => normalizeRepoRelativePath(value))
+        .filter((value) => value.length > 0);
+
+      for (const relativePath of trackedAndUntracked) {
+        if (!matchesAnyPattern(relativePath, globPatterns)) {
+          continue;
+        }
+
+        const sourcePath = path.join(baseRepoPath, relativePath);
+        if (!(await pathExists(sourcePath))) {
+          continue;
+        }
+
+        const targetPath = path.join(input.workspacePath, relativePath);
+        await copyPath(sourcePath, targetPath);
+        copiedPaths.add(relativePath);
+      }
+    }
+
+    return {
+      copiedPaths: [...copiedPaths].sort(),
+      deletedPaths: [...deletedPaths].sort(),
+    };
+  }
+
   private async runGit(
     cwd: string,
     args: readonly string[],
@@ -135,4 +208,80 @@ export class WorktreeService {
       cwd,
     });
   }
+}
+
+function normalizeRepoRelativePath(value: string): string {
+  return value.replaceAll('\\', '/').replace(/^\.?\//, '').trim();
+}
+
+function hasGlobPattern(value: string): boolean {
+  return value.includes('*');
+}
+
+function matchesAnyPattern(candidatePath: string, patterns: readonly string[]): boolean {
+  return patterns.some((pattern) => globToRegExp(pattern).test(candidatePath));
+}
+
+function globToRegExp(pattern: string): RegExp {
+  let escaped = '';
+
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index];
+    if (character === '*') {
+      const isGlobStar = pattern[index + 1] === '*';
+      escaped += isGlobStar ? '.*' : '[^/]*';
+      if (isGlobStar) {
+        index += 1;
+      }
+      continue;
+    }
+
+    switch (character) {
+      case '.':
+      case '+':
+      case '?':
+      case '^':
+      case '$':
+      case '{':
+      case '}':
+      case '(':
+      case ')':
+      case '|':
+      case '[':
+      case ']':
+      case '\\':
+        escaped += `\\${character}`;
+        break;
+      default:
+        escaped += character;
+        break;
+    }
+  }
+
+  return new RegExp(`^${escaped}$`);
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await fs.stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function copyPath(sourcePath: string, targetPath: string): Promise<void> {
+  const stat = await fs.stat(sourcePath);
+  await fs.mkdir(path.dirname(targetPath), { recursive: true });
+
+  if (stat.isDirectory()) {
+    await fs.cp(sourcePath, targetPath, {
+      recursive: true,
+      force: true,
+    });
+    return;
+  }
+
+  await fs.copyFile(sourcePath, targetPath);
+  await fs.chmod(targetPath, stat.mode);
 }

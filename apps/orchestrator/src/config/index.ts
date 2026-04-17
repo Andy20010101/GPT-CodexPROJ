@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 import type {
@@ -21,10 +22,14 @@ export type OrchestratorConfig = {
   planningMaxWaitMs: number;
   planningPollIntervalMs: number;
   planningStablePolls: number;
+  planningBridgeRequestTimeoutMs: number;
   codexRunnerMode: 'stub' | 'cli';
   codexCliBin: string;
   codexCliArgs: string[];
   codexCliTimeoutMs: number;
+  codexCliUsePty: boolean;
+  codexCliMirrorOutput: boolean;
+  codexCliPtyScriptBin: string;
   workspaceRuntimeBaseDir: string;
   workspaceSourceRepoPath: string;
   defaultExecutorType: ExecutorType;
@@ -52,7 +57,7 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
     apiHost: process.env.ORCHESTRATOR_API_HOST ?? '127.0.0.1',
     apiPort: parseInteger(process.env.ORCHESTRATOR_API_PORT, 3200),
     bridgeBaseUrl: process.env.BRIDGE_BASE_URL ?? 'http://127.0.0.1:3100',
-    bridgeBrowserUrl: process.env.BRIDGE_BROWSER_URL ?? 'https://chatgpt.com/',
+    bridgeBrowserUrl: resolveBridgeBrowserUrl(process.env),
     bridgeProjectName: process.env.BRIDGE_PROJECT_NAME ?? 'Default',
     ...(process.env.REVIEW_MODEL_HINT ? { reviewModelHint: process.env.REVIEW_MODEL_HINT } : {}),
     reviewMaxWaitMs: parseInteger(process.env.REVIEW_MAX_WAIT_MS, 900000),
@@ -60,10 +65,20 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
     planningMaxWaitMs: parseInteger(process.env.PLANNING_MAX_WAIT_MS, 3_000_000),
     planningPollIntervalMs: parseInteger(process.env.PLANNING_POLL_INTERVAL_MS, 5000),
     planningStablePolls: parseInteger(process.env.PLANNING_STABLE_POLLS, 3),
+    planningBridgeRequestTimeoutMs: parseInteger(
+      process.env.PLANNING_BRIDGE_REQUEST_TIMEOUT_MS,
+      180_000,
+    ),
     codexRunnerMode: process.env.CODEX_RUNNER_MODE === 'cli' ? 'cli' : 'stub',
     codexCliBin: process.env.CODEX_CLI_BIN ?? 'codex',
     codexCliArgs: parseArgString(process.env.CODEX_CLI_ARGS),
-    codexCliTimeoutMs: parseInteger(process.env.CODEX_CLI_TIMEOUT_MS, 600000),
+    codexCliTimeoutMs: parseInteger(process.env.CODEX_CLI_TIMEOUT_MS, 1_800_000),
+    codexCliUsePty: parseBoolean(process.env.CODEX_CLI_USE_PTY, Boolean(process.stdout.isTTY)),
+    codexCliMirrorOutput: parseBoolean(
+      process.env.CODEX_CLI_MIRROR_OUTPUT,
+      Boolean(process.stdout.isTTY),
+    ),
+    codexCliPtyScriptBin: process.env.CODEX_CLI_PTY_SCRIPT_BIN ?? '/usr/bin/script',
     workspaceRuntimeBaseDir:
       process.env.WORKSPACE_RUNTIME_BASE_DIR ?? path.join(artifactDir, 'workspace-runtime'),
     workspaceSourceRepoPath:
@@ -121,6 +136,30 @@ export function loadOrchestratorConfig(): OrchestratorConfig {
   };
 }
 
+function resolveBridgeBrowserUrl(env: NodeJS.ProcessEnv): string {
+  const authorityPath = env.SELF_IMPROVEMENT_ENV_STATE_PATH;
+  if (authorityPath) {
+    const authorityUrl = readBrowserEndpointFromAuthorityFile(authorityPath);
+    if (authorityUrl) {
+      return authorityUrl;
+    }
+  }
+
+  return env.BRIDGE_BROWSER_URL ?? 'https://chatgpt.com/';
+}
+
+function readBrowserEndpointFromAuthorityFile(filePath: string): string | null {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw) as {
+      browser?: { endpoint?: unknown };
+    };
+    return typeof parsed.browser?.endpoint === 'string' ? parsed.browser.endpoint : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseArgString(value: string | undefined): string[] {
   if (!value) {
     return [];
@@ -139,6 +178,27 @@ function parseInteger(value: string | undefined, fallback: number): number {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (!value) {
+    return fallback;
+  }
+
+  switch (value.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+    case 'on':
+      return true;
+    case '0':
+    case 'false':
+    case 'no':
+    case 'off':
+      return false;
+    default:
+      return fallback;
+  }
 }
 
 function parseExecutorType(value: string | undefined): ExecutorType {

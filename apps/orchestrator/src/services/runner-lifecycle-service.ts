@@ -27,6 +27,9 @@ export class RunnerLifecycleService {
     env?: Record<string, string> | undefined;
     shell?: boolean | undefined;
     timeoutMs: number;
+    usePty?: boolean | undefined;
+    mirrorOutput?: boolean | undefined;
+    ptyScriptBin?: string | undefined;
     producer: string;
     metadata?: Record<string, unknown> | undefined;
     onSettled?: (() => Promise<void> | void) | undefined;
@@ -42,6 +45,9 @@ export class RunnerLifecycleService {
         ...(input.stdin ? { stdin: input.stdin } : {}),
         ...(input.env ? { env: input.env } : {}),
         ...(input.shell !== undefined ? { shell: input.shell } : {}),
+        ...(input.usePty !== undefined ? { usePty: input.usePty } : {}),
+        ...(input.mirrorOutput !== undefined ? { mirrorOutput: input.mirrorOutput } : {}),
+        ...(input.ptyScriptBin ? { ptyScriptBin: input.ptyScriptBin } : {}),
         timeoutMs: input.timeoutMs,
         metadata: input.metadata,
       });

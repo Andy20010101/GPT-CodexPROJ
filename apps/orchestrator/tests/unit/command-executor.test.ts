@@ -123,4 +123,29 @@ describe('CommandExecutor', () => {
       await fs.rm(workspacePath, { force: true, recursive: true });
     }
   });
+
+  it('does not inherit parent Codex thread env when running commands', async () => {
+    const originalThreadId = process.env.CODEX_THREAD_ID;
+    process.env.CODEX_THREAD_ID = 'outer-thread';
+    const executor = new CommandExecutor();
+
+    try {
+      const result = await executor.execute(
+        buildRequest({
+          command: 'bash',
+          args: ['-lc', 'printf "%s|%s" "${CODEX_THREAD_ID:-unset}" "${EXPLICIT_MARKER:-missing}"'],
+          purpose: 'generic',
+        }),
+      );
+
+      expect(result.status).toBe('succeeded');
+      expect(result.stdout).toBe('unset|missing');
+    } finally {
+      if (originalThreadId === undefined) {
+        delete process.env.CODEX_THREAD_ID;
+      } else {
+        process.env.CODEX_THREAD_ID = originalThreadId;
+      }
+    }
+  });
 });

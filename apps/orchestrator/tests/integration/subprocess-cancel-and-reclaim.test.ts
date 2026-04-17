@@ -5,6 +5,7 @@ import {
   bootstrapRuntimeBundle,
   createArtifactDir,
   createBridgeClient,
+  waitForCondition,
 } from '../helpers/runtime-fixtures';
 
 describe('subprocess cancel and reclaim integration', () => {
@@ -35,12 +36,17 @@ describe('subprocess cancel and reclaim integration', () => {
       requestedBy: 'tester',
     });
     await bundle.daemonRuntimeService.tick();
+    await waitForCondition(async () => {
+      const job = await bundle.runQueueService.getJob(queued.job.jobId);
+      const process = await bundle.runnerLifecycleService.getLatestProcessForJob(queued.job.jobId);
+      return job.status === 'running' && process !== null;
+    }, 5000);
     await bundle.cancellationService.cancelJob({
       jobId: queued.job.jobId,
       requestedBy: 'tester',
       reason: 'cancel subprocess',
     });
-    await waitFor(async () => {
+    await waitForCondition(async () => {
       const job = await bundle.runQueueService.getJob(queued.job.jobId);
       return job.status === 'cancelled';
     }, 15000);
@@ -52,14 +58,3 @@ describe('subprocess cancel and reclaim integration', () => {
     expect(['terminated', 'killed']).toContain(process?.status);
   }, 20000);
 });
-
-async function waitFor(check: () => Promise<boolean>, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await check()) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`Timed out after ${timeoutMs}ms`);
-}

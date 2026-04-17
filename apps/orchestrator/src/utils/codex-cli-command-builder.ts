@@ -17,7 +17,7 @@ export type CodexCliCommand = {
 
 const CODEX_RESPONSE_SCHEMA = {
   type: 'object',
-  additionalProperties: true,
+  additionalProperties: false,
   required: ['status', 'summary', 'testResults'],
   properties: {
     status: {
@@ -31,7 +31,7 @@ const CODEX_RESPONSE_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        additionalProperties: true,
+        additionalProperties: false,
         required: ['suite', 'status', 'passed', 'failed', 'skipped'],
         properties: {
           suite: { type: 'string' },
@@ -44,10 +44,6 @@ const CODEX_RESPONSE_SCHEMA = {
           skipped: { type: 'integer', minimum: 0 },
         },
       },
-    },
-    metadata: {
-      type: 'object',
-      additionalProperties: true,
     },
   },
 } as const;

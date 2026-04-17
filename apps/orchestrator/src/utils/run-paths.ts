@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import type { SelfImprovementEnvRunKind } from '../contracts/self-improvement-env';
 import { planningPhaseToDirectory, type PlanningPhase } from '../contracts/planning-phase';
 
 export function getRunsRoot(artifactDir: string): string {
@@ -10,6 +11,48 @@ export function getRuntimeRoot(artifactDir: string): string {
   return path.join(artifactDir, 'runtime');
 }
 
+export function getSelfImprovementEnvRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'self-improvement-env');
+}
+
+export function getSelfImprovementGovernorRoot(artifactDir: string): string {
+  return path.join(getRuntimeRoot(artifactDir), 'self-improvement-governor');
+}
+
+export function getSelfImprovementEnvStateFile(artifactDir: string): string {
+  return path.join(getSelfImprovementEnvRoot(artifactDir), 'env-state.json');
+}
+
+export function getSelfImprovementCampaignStateFile(
+  artifactDir: string,
+  campaignId: string,
+): string {
+  return path.join(getSelfImprovementGovernorRoot(artifactDir), 'campaigns', `${campaignId}.json`);
+}
+
+export function getSelfImprovementEnvLogFile(
+  artifactDir: string,
+  service: 'orchestrator' | 'bridge',
+): string {
+  return path.join(getSelfImprovementEnvRoot(artifactDir), `${service}.log`);
+}
+
+export function getBootstrapEnvRoot(
+  artifactDir: string,
+  runId: string,
+  runKind: SelfImprovementEnvRunKind,
+): string {
+  return path.join(getRunRoot(artifactDir, runId), 'bootstrap', runKind);
+}
+
+export function getBootstrapEnvStateFile(
+  artifactDir: string,
+  runId: string,
+  runKind: SelfImprovementEnvRunKind,
+): string {
+  return path.join(getBootstrapEnvRoot(artifactDir, runId, runKind), 'env-state.json');
+}
+
 export function getRunRoot(artifactDir: string, runId: string): string {
   return path.join(getRunsRoot(artifactDir), runId);
 }
@@ -18,11 +61,39 @@ export function getRunFile(artifactDir: string, runId: string): string {
   return path.join(getRunRoot(artifactDir, runId), 'run.json');
 }
 
-export function getPlanningRoot(
-  artifactDir: string,
-  runId: string,
-  phase: PlanningPhase,
-): string {
+export function getRunAnalysisBundleRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'analysis-bundle');
+}
+
+export function getRunAnalysisBundleManifestFile(artifactDir: string, runId: string): string {
+  return path.join(getRunAnalysisBundleRoot(artifactDir, runId), 'manifest.json');
+}
+
+export function getRunWatcherRoot(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'watcher');
+}
+
+export function getRunWatcherLogFile(artifactDir: string, runId: string): string {
+  return path.join(getRunWatcherRoot(artifactDir, runId), 'watcher.log');
+}
+
+export function getRunWatcherLatestJsonFile(artifactDir: string, runId: string): string {
+  return path.join(getRunWatcherRoot(artifactDir, runId), 'latest.json');
+}
+
+export function getRunWatcherLatestMarkdownFile(artifactDir: string, runId: string): string {
+  return path.join(getRunWatcherRoot(artifactDir, runId), 'latest.md');
+}
+
+export function getRunWatcherPidFile(artifactDir: string, runId: string): string {
+  return path.join(getRunWatcherRoot(artifactDir, runId), 'watcher.pid');
+}
+
+export function getRunSelfImprovementGoalFile(artifactDir: string, runId: string): string {
+  return path.join(getRunRoot(artifactDir, runId), 'self-improvement-goal.json');
+}
+
+export function getPlanningRoot(artifactDir: string, runId: string, phase: PlanningPhase): string {
   return path.join(getRunRoot(artifactDir, runId), planningPhaseToDirectory(phase));
 }
 
@@ -66,6 +137,30 @@ export function getPlanningMaterializedResultFile(
   return path.join(getPlanningRoot(artifactDir, runId, phase), 'materialized-result.json');
 }
 
+export function getPlanningApplyRemediationInputFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'apply-remediation-input.json');
+}
+
+export function getPlanningApplyRemediationOutputFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'apply-remediation-output.json');
+}
+
+export function getPlanningApplyRetryResultFile(
+  artifactDir: string,
+  runId: string,
+  phase: PlanningPhase,
+): string {
+  return path.join(getPlanningRoot(artifactDir, runId, phase), 'apply-retry-result.json');
+}
+
 export function getPlanningModelRoutingDecisionFile(
   artifactDir: string,
   runId: string,
@@ -103,6 +198,14 @@ export function getExecutionResultFile(
   executionId: string,
 ): string {
   return path.join(getExecutionRoot(artifactDir, runId, executionId), 'result.json');
+}
+
+export function getExecutionPatchConvergenceFile(
+  artifactDir: string,
+  runId: string,
+  executionId: string,
+): string {
+  return path.join(getExecutionRoot(artifactDir, runId, executionId), 'patch-convergence.json');
 }
 
 export function getReviewRoot(artifactDir: string, runId: string, reviewId: string): string {

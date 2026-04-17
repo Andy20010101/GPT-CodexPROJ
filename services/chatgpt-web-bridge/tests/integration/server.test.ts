@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   BridgeHealthResponseSchema,
+  GetConversationStatusResponseSchema,
   DriftIncidentsResponseSchema,
   MarkdownExportResponseSchema,
   OpenSessionResponseSchema,
@@ -16,6 +17,7 @@ import {
   StartConversationResponseSchema,
   StructuredReviewExtractResponseSchema,
   type ConversationSnapshot,
+  type ConversationStatus,
   type SessionSummary,
 } from '@review-then-codex/shared-contracts/chatgpt';
 
@@ -113,6 +115,27 @@ class FakeAdapter implements ChatGPTAdapter {
       return Promise.reject(new Error('missing snapshot'));
     }
     return Promise.resolve(snapshot);
+  }
+
+  public getConversationStatus(input: AdapterSnapshotInput): Promise<ConversationStatus> {
+    const snapshot = this.snapshots.get(input.conversationId);
+    if (!snapshot) {
+      return Promise.reject(new Error('missing snapshot'));
+    }
+
+    return Promise.resolve({
+      conversationId: snapshot.conversationId,
+      sessionId: snapshot.sessionId,
+      projectName: snapshot.projectName,
+      model: snapshot.model,
+      status: snapshot.status,
+      source: 'adapter_status',
+      pageUrl: snapshot.pageUrl,
+      assistantMessageCount: snapshot.messages.filter((message) => message.role === 'assistant').length,
+      lastMessageRole: snapshot.messages.at(-1)?.role === 'assistant' ? 'assistant' : 'user',
+      lastAssistantMessage: snapshot.lastAssistantMessage,
+      updatedAt: snapshot.updatedAt,
+    });
   }
 
   private createSnapshot(input: {
@@ -261,6 +284,13 @@ describe('chatgpt-web-bridge routes', () => {
       url: `/api/conversations/${conversationId}/snapshot`,
     });
     expect(snapshotResponse.statusCode).toBe(200);
+
+    const statusResponse = await app.inject({
+      method: 'GET',
+      url: `/api/conversations/${conversationId}/status`,
+    });
+    expect(statusResponse.statusCode).toBe(200);
+    GetConversationStatusResponseSchema.parse(statusResponse.json());
 
     const recoverResponse = await app.inject({
       method: 'POST',

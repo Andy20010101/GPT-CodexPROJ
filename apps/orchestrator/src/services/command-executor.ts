@@ -10,6 +10,8 @@ import {
 } from '../contracts';
 import { createEmptyPatchSummary } from '../utils/patch-parser';
 import { normalizeCommandResult, type RawCommandResult } from '../utils/command-result-normalizer';
+import { resolveGitExecutable } from '../utils/git-executable';
+import { buildChildProcessEnv } from '../utils/subprocess-env';
 import type { ExecutionExecutor } from './executor-registry';
 import { RunnerLifecycleService } from './runner-lifecycle-service';
 
@@ -39,10 +41,7 @@ export class SpawnCommandRunner implements CommandRunner {
     return new Promise((resolve, reject) => {
       const child = spawn(input.command, [...input.args], {
         cwd: input.cwd,
-        env: {
-          ...process.env,
-          ...input.env,
-        },
+        env: buildChildProcessEnv(process.env, input.env),
         shell: input.shell,
       });
 
@@ -74,8 +73,10 @@ export class GitWorkspacePatchCollector implements WorkspacePatchCollector {
     patch?: string | undefined;
     notes?: readonly string[] | undefined;
   }> {
+    const gitBin = resolveGitExecutable();
+
     try {
-      await execFileAsync('git', ['rev-parse', '--show-toplevel'], {
+      await execFileAsync(gitBin, ['rev-parse', '--show-toplevel'], {
         cwd: input.workspacePath,
         encoding: 'utf8',
         maxBuffer: 10 * 1024 * 1024,
@@ -87,13 +88,13 @@ export class GitWorkspacePatchCollector implements WorkspacePatchCollector {
     }
 
     try {
-      await execFileAsync('git', ['add', '-N', '--all', '.'], {
+      await execFileAsync(gitBin, ['add', '-N', '--all', '.'], {
         cwd: input.workspacePath,
         encoding: 'utf8',
         maxBuffer: 10 * 1024 * 1024,
       });
       const result = await execFileAsync(
-        'git',
+        gitBin,
         ['diff', '--no-ext-diff', '--binary', 'HEAD', '--', '.'],
         {
           cwd: input.workspacePath,

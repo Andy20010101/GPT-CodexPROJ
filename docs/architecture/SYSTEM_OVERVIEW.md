@@ -16,7 +16,7 @@ The intended end-to-end flow is:
 
 ### Control Plane
 
-The future `apps/orchestrator` layer will own:
+The `apps/orchestrator` layer owns:
 
 - task lifecycle and state transitions
 - freeze gates
@@ -24,7 +24,7 @@ The future `apps/orchestrator` layer will own:
 - execution scheduling
 - acceptance summaries
 
-This repository only includes its initial shape and contract placeholders.
+The current implementation already includes a file-backed workflow runtime, daemon controls, recovery, and release-review orchestration. It is not a distributed scheduler or HA control plane yet.
 
 ### Review Plane
 
@@ -41,11 +41,11 @@ The `services/chatgpt-web-bridge` layer owns browser-backed review operations:
 
 ### Execution Plane
 
-The execution plane will be implemented later by coding agents. It should consume reviewed outputs, produce code changes, and return evidence back to the control plane.
+The execution plane is already present as a replaceable executor layer. Today it can use `CommandExecutor`, `NoopExecutor`, or `CodexExecutor` backed by either `CodexCliRunner` or `StubCodexRunner`. Remote/cloud execution remains future work.
 
 ## Orchestrator to Bridge Interaction
 
-The future orchestrator should treat the bridge as a service boundary rather than a code library that reaches into browser internals. The interaction model is:
+The orchestrator treats the bridge as a service boundary rather than a code library that reaches into browser internals. The interaction model is:
 
 1. Open or reserve a browser session.
 2. Select the target project and optional model.
@@ -56,8 +56,9 @@ The future orchestrator should treat the bridge as a service boundary rather tha
 
 ## Current Implementation Boundary
 
-Today the repository implements the Review Plane service and the shared contract surface around it:
+Today the repository implements all three planes inside a bounded local/runtime-first shape:
 
 - `packages/shared-contracts/chatgpt` defines the Zod-first request and response contracts.
 - `services/chatgpt-web-bridge` implements the Fastify API, session lease, export pipeline, and mock-friendly adapter boundary.
-- `apps/orchestrator` now implements the first control-plane skeleton for freezes, task loops, evidence, and gates without pretending to be a full workflow runtime.
+- `apps/orchestrator` implements freezes, task loops, evidence, gates, workflow runtime services, daemon controls, cancellation, recovery, and release acceptance without pretending to be a distributed workflow engine.
+- the execution layer supports local command execution, dry runs, and local Codex CLI execution through replaceable adapters.

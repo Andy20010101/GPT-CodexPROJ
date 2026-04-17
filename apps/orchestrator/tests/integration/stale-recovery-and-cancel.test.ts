@@ -8,6 +8,7 @@ import {
   createArtifactDir,
   createBridgeClient,
   createControllableCodexRunner,
+  waitForCondition,
 } from '../helpers/runtime-fixtures';
 
 describe('stale recovery and cancel integration', () => {
@@ -42,6 +43,7 @@ describe('stale recovery and cancel integration', () => {
       runtimeBundle: bundle,
     });
     await bundle.daemonRuntimeService.tick();
+    await waitForCondition(async () => runner.callCount() === 1, 5000);
 
     const cancellationResponse = await app.inject({
       method: 'POST',

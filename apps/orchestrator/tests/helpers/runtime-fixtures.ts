@@ -486,6 +486,91 @@ function classifyConversationKind(
   return 'task';
 }
 
+function normalizePatchForReviewFixture(patch: string): string {
+  const normalized = patch.replace(/\r\n/g, '\n').trimEnd();
+  const blocks: string[][] = [];
+  let current: string[] | undefined;
+
+  for (const line of normalized.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      if (current) {
+        blocks.push(current);
+      }
+      current = [line];
+      continue;
+    }
+
+    if (current) {
+      current.push(line);
+    }
+  }
+
+  if (current) {
+    blocks.push(current);
+  }
+
+  if (blocks.length === 0) {
+    return patch;
+  }
+
+  return blocks.map((block) => normalizePatchBlock(block)).join('\n');
+}
+
+function normalizePatchBlock(block: readonly string[]): string {
+  const [header, ...body] = block;
+  if (!header) {
+    return block.join('\n');
+  }
+  if (body.some((line) => /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/u.test(line))) {
+    return block.join('\n');
+  }
+
+  const file = /^diff --git a\/(.+?) b\/(.+)$/u.exec(header)?.[2] ?? 'file.ts';
+  const payload = body.filter((line) => {
+    if (
+      line.startsWith('index ') ||
+      line.startsWith('--- ') ||
+      line.startsWith('+++ ') ||
+      line.startsWith('@@ ')
+    ) {
+      return false;
+    }
+
+    return (
+      line.startsWith(' ') ||
+      line.startsWith('+') ||
+      line.startsWith('-') ||
+      line.startsWith('\\ No newline at end of file')
+    );
+  });
+  const reviewablePayload = payload.length > 0 ? payload : ['+fixture change'];
+  const newLineCount = Math.max(
+    1,
+    reviewablePayload.filter(
+      (line) => !line.startsWith('-') && line !== '\\ No newline at end of file',
+    ).length,
+  );
+
+  return [
+    header,
+    `--- a/${file}`,
+    `+++ b/${file}`,
+    `@@ -0,0 +1,${newLineCount} @@`,
+    ...reviewablePayload,
+  ].join('\n');
+}
+
+function normalizeCodexRunnerResponse(response: CodexRunnerResponse): CodexRunnerResponse {
+  if (!response.patch) {
+    return response;
+  }
+
+  return {
+    ...response,
+    patch: normalizePatchForReviewFixture(response.patch),
+  };
+}
+
 export function createCodexRunnerSequence(
   sequence: Array<CodexRunnerResponse | Error>,
 ): CodexRunner {
@@ -501,7 +586,7 @@ export function createCodexRunnerSequence(
       if (next instanceof Error) {
         throw next;
       }
-      return next;
+      return normalizeCodexRunnerResponse(next);
     },
   };
 }
@@ -533,7 +618,7 @@ export function createControllableCodexRunner(initialResponse: CodexRunnerRespon
       return calls.length;
     },
     resolve(response: CodexRunnerResponse = initialResponse): void {
-      pending?.resolve(response);
+      pending?.resolve(normalizeCodexRunnerResponse(response));
       pending = undefined;
     },
     reject(error: Error): void {
@@ -545,6 +630,21 @@ export function createControllableCodexRunner(initialResponse: CodexRunnerRespon
 
 export async function createArtifactDir(prefix: string): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
+}
+
+export async function waitForCondition(
+  check: () => boolean | Promise<boolean>,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await check()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
 export async function bootstrapRuntimeBundle(input: {

@@ -23,7 +23,6 @@ export type WindowsBrowserAttachTopology = {
   readonly remoteDebuggingPorts: readonly number[];
 };
 
-type ExecFileImplementation = typeof execFileAsync;
 type NarrowExecFileImplementation = (
   file: string,
   args: readonly string[],

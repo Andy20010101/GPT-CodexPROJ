@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -16,6 +17,7 @@ import {
   WindowsBrowserAttachDiscoveryService,
   type WindowsBrowserAttachTopology,
 } from './windows-browser-attach-discovery-service';
+import { BrowserAuthorityService } from './browser-authority-service';
 
 type DiscoveryEnv = Record<string, string | undefined>;
 
@@ -51,6 +53,19 @@ export class BrowserEndpointDiscoveryService {
     private readonly windowsAttachDiscovery: () => Promise<WindowsBrowserAttachTopology> = () =>
       new WindowsBrowserAttachDiscoveryService().discover(),
     private readonly now: () => string = () => new Date().toISOString(),
+    private readonly readAuthorityFile: (filePath: string) => Promise<string | null> = async (
+      filePath,
+    ) => {
+      try {
+        return await fs.readFile(filePath, 'utf8');
+      } catch {
+        return null;
+      }
+    },
+    private readonly browserAuthorityService: BrowserAuthorityService = new BrowserAuthorityService(
+      env,
+      readAuthorityFile,
+    ),
   ) {}
 
   public async discover(input?: {
@@ -110,6 +125,15 @@ export class BrowserEndpointDiscoveryService {
         input.browserUrl,
         'request_input',
         'Requested browserUrl legacy alias was already a DevTools-compatible endpoint.',
+      );
+    }
+
+    const authorityBrowserEndpoint = await this.browserAuthorityService.readAuthorityBrowserEndpoint();
+    if (authorityBrowserEndpoint) {
+      pushCandidate(
+        authorityBrowserEndpoint,
+        'env_state_browser_authority',
+        'Discovered from SELF_IMPROVEMENT_ENV_STATE_PATH browser authority.',
       );
     }
 

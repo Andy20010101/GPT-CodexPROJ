@@ -103,6 +103,27 @@ export class WorkspaceRuntimeService {
     });
   }
 
+  public async syncWorkspace(input: {
+    runId: string;
+    workspaceId: string;
+    baseRepoPath: string;
+    includePaths: readonly string[];
+  }): Promise<WorkspaceRuntime> {
+    const record = await this.workspaceRepository.getWorkspace(input.runId, input.workspaceId);
+    await this.worktreeService.syncSourceOverlay({
+      baseRepoPath: input.baseRepoPath,
+      workspacePath: record.workspacePath,
+      includePaths: input.includePaths,
+    });
+
+    const updatedRecord = WorkspaceRuntimeSchema.parse({
+      ...record,
+      updatedAt: new Date().toISOString(),
+    });
+    await this.workspaceRepository.saveWorkspace(updatedRecord);
+    return updatedRecord;
+  }
+
   public async getWorkspace(runId: string, workspaceId: string): Promise<WorkspaceRuntime> {
     return this.workspaceRepository.getWorkspace(runId, workspaceId);
   }

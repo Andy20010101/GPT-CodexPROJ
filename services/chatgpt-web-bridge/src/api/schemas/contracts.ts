@@ -2,6 +2,7 @@ export {
   BridgeHealthResponseSchema,
   ConversationPathParamsSchema,
   DriftIncidentsResponseSchema,
+  GetConversationStatusResponseSchema,
   GetSnapshotResponseSchema,
   HealthResponseSchema,
   MarkdownExportRequestSchema,

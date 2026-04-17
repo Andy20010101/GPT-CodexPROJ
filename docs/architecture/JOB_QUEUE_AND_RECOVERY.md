@@ -9,10 +9,11 @@ Each runtime job is stored as a `JobRecord`. The current model includes:
 - `jobId`
 - `runId`
 - optional `taskId`
-- `kind`: `task_execution`, `task_review`, or `release_review`
-- `status`: `queued`, `running`, `succeeded`, `failed`, `retriable`, `blocked`, or `cancelled`
+- `kind`: `task_execution`, `task_review_request`, `task_review_finalize`, `task_review`, or `release_review`
+- `status`: `queued`, `running`, `succeeded`, `failed`, `retriable`, `blocked`, `cancelled`, or `manual_attention_required`
 - `attempt`
 - `maxAttempts`
+- `priority`
 - `createdAt`
 - `startedAt`
 - `finishedAt`
@@ -74,6 +75,8 @@ Retry decisions are themselves written to the evidence ledger as `retry_decision
 The current recovery rules are:
 
 - `running` jobs without `finishedAt` are treated as interrupted work
+- interrupted process handles are reconciled before the job is retried or failed
+- interrupted worker leases are released before the job is retried or failed
 - interrupted jobs are requeued if retry policy allows
 - interrupted jobs become `failed` if retry budget is exhausted
 - `queued` and `retriable` jobs are restored into queue state if the process-local queue was lost
@@ -96,9 +99,9 @@ It does not yet provide exactly-once delivery. A recovered job may be retried af
 The queue and recovery layer still needs:
 
 - stronger idempotency around external executors
-- cancellation semantics
-- lease ownership for multiple workers
+- exactly-once delivery under arbitrary restarts
+- stronger cross-daemon ownership guarantees than single-process file-backed leases
 - richer retry policies by job kind or error class
 - dead-letter handling beyond simple `failed`
 
-Those are next-step runtime concerns, but the current structure already gives the project a durable and testable queue/recovery foundation.
+Cancellation requests, worker leases, and stale-job reclaim now exist as dedicated layers around the queue. The remaining gaps are about stronger delivery guarantees and multi-daemon coordination, not the absence of those primitives.

@@ -272,6 +272,9 @@ export function createOrchestratorRuntimeBundle(
             cliArgs: config.codexCliArgs,
             modelHint: config.reviewModelHint,
             timeoutMs: config.codexCliTimeoutMs,
+            usePty: config.codexCliUsePty,
+            mirrorOutput: config.codexCliMirrorOutput,
+            ptyScriptBin: config.codexCliPtyScriptBin,
           },
           undefined,
           undefined,
@@ -310,6 +313,7 @@ export function createOrchestratorRuntimeBundle(
     {
       browserUrl: config.bridgeBrowserUrl,
       projectName: config.bridgeProjectName,
+      requestTimeoutMs: config.planningBridgeRequestTimeoutMs,
     },
   );
   const reviewGateService = new ReviewGateService(
@@ -482,9 +486,12 @@ export function createOrchestratorRuntimeBundle(
   const recoveryService = new RecoveryService(
     runRepository,
     jobRepository,
+    processRepository,
     queueRepository,
+    workerRepository,
     runQueueService,
     retryService,
+    workerLeaseService,
     evidenceLedgerService,
     runnerResumeService,
   );

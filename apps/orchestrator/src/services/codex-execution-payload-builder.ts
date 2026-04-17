@@ -1,5 +1,7 @@
 import type { ExecutionRequest } from '../contracts';
 
+const MAX_PROMPT_ARCHITECTURE_CONSTRAINTS = 8;
+
 export type CodexExecutionPayload = {
   executionId: string;
   runId: string;
@@ -21,6 +23,7 @@ export type CodexExecutionPayload = {
 
 export class CodexExecutionPayloadBuilder {
   public build(request: ExecutionRequest): CodexExecutionPayload {
+    const architectureConstraints = summarizeArchitectureConstraints(request.architectureConstraints);
     const sections = {
       title: request.title,
       objective: request.objective,
@@ -39,7 +42,7 @@ export class CodexExecutionPayloadBuilder {
           `${item.id}: ${item.description}; red="${item.expectedRedSignal}"; green="${item.expectedGreenSignal}"`,
       ),
       implementationNotes: request.implementationNotes,
-      architectureConstraints: request.architectureConstraints,
+      architectureConstraints: architectureConstraints.visible,
     } as const;
 
     const prompt = [
@@ -59,6 +62,16 @@ export class CodexExecutionPayloadBuilder {
       ...sections.allowedFiles.map((line) => `- allow: ${line}`),
       ...sections.disallowedFiles.map((line) => `- deny: ${line}`),
       '',
+      '## Execution Guardrails',
+      `- You are already inside the isolated task workspace at: ${request.workspacePath}`,
+      '- Start by inspecting only the allowed files listed above.',
+      '- Do not search parent directories or unrelated repo areas to rediscover context.',
+      '- Treat deny patterns as hard boundaries; do not read or edit them.',
+      '- Do not add import/require statements that reference deny patterns, even for type-only access or read-only inspection.',
+      '- If a required allowed file is missing, fail fast and report the missing path instead of broadening the search.',
+      '- Prefer verifying whether the current allowed-file implementation already satisfies the acceptance criteria before making new edits.',
+      '- Keep commands and verification targeted to the allowed files and attached test plan only.',
+      '',
       '## Acceptance Criteria',
       ...sections.acceptanceCriteria.map((line) => `- ${line}`),
       '',
@@ -73,9 +86,15 @@ export class CodexExecutionPayloadBuilder {
         : ['- No additional implementation notes.']),
       '',
       '## Architecture Constraints',
+      '- File boundaries and task scope above override any broader architectural context in this summary.',
       ...(sections.architectureConstraints.length > 0
         ? sections.architectureConstraints.map((line) => `- ${line}`)
         : ['- No extra architecture constraints were provided.']),
+      ...(architectureConstraints.omittedCount > 0
+        ? [
+            `- ${architectureConstraints.omittedCount} additional architecture constraints were omitted from this prompt for focus; do not infer broader write scope from them.`,
+          ]
+        : []),
       '',
       '## Required Output',
       '- Return a concise execution summary.',
@@ -98,4 +117,18 @@ export class CodexExecutionPayloadBuilder {
       },
     };
   }
+}
+
+function summarizeArchitectureConstraints(
+  constraints: readonly string[],
+): {
+  visible: readonly string[];
+  omittedCount: number;
+} {
+  const unique = [...new Set(constraints)];
+  const visible = unique.slice(0, MAX_PROMPT_ARCHITECTURE_CONSTRAINTS);
+  return {
+    visible,
+    omittedCount: Math.max(0, unique.length - visible.length),
+  };
 }

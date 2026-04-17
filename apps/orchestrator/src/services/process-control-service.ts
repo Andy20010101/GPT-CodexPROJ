@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 
 import {
@@ -10,6 +12,8 @@ import {
 import { FileProcessRepository } from '../storage/file-process-repository';
 import { FileRunRepository } from '../storage/file-run-repository';
 import { OrchestratorError } from '../utils/error';
+import { buildPtySpawnPlan } from '../utils/pty-command';
+import { buildChildProcessEnv } from '../utils/subprocess-env';
 import { EvidenceLedgerService } from './evidence-ledger-service';
 
 type ActiveProcess = {
@@ -18,10 +22,13 @@ type ActiveProcess = {
   stdout: string;
   stderr: string;
   finished: boolean;
+  activityObserved: boolean;
+  lastActivityAt: string;
   resolve: (value: ManagedProcessResult) => void;
   reject: (reason?: unknown) => void;
   timeout?: NodeJS.Timeout | undefined;
   forceKillTimer?: NodeJS.Timeout | undefined;
+  stallCheckTimer?: NodeJS.Timeout | undefined;
   terminationRequested?: RunnerCancellation | undefined;
 };
 
@@ -62,6 +69,9 @@ export class ProcessControlService {
     env?: Record<string, string> | undefined;
     shell?: boolean | undefined;
     timeoutMs: number;
+    usePty?: boolean | undefined;
+    mirrorOutput?: boolean | undefined;
+    ptyScriptBin?: string | undefined;
     metadata?: Record<string, unknown> | undefined;
   }): Promise<ManagedProcessResult> {
     const startedAt = new Date().toISOString();
@@ -81,13 +91,16 @@ export class ProcessControlService {
     return new Promise<ManagedProcessResult>((resolve, reject) => {
       let child: ChildProcessWithoutNullStreams;
       try {
-        child = spawn(input.command, [...input.args], {
+        const spawnPlan = buildPtySpawnPlan({
+          command: input.command,
+          args: input.args,
+          usePty: input.usePty,
+          scriptBin: input.ptyScriptBin,
+        });
+        child = spawn(spawnPlan.command, [...spawnPlan.args], {
           cwd: input.workspacePath,
-          env: {
-            ...process.env,
-            ...(input.env ?? {}),
-          },
-          shell: input.shell ?? false,
+          env: buildChildProcessEnv(process.env, input.env ?? {}),
+          shell: input.usePty ? spawnPlan.shell : (input.shell ?? false),
           stdio: ['pipe', 'pipe', 'pipe'],
         });
       } catch (error) {
@@ -104,6 +117,8 @@ export class ProcessControlService {
         stdout: '',
         stderr: '',
         finished: false,
+        activityObserved: false,
+        lastActivityAt: startedAt,
         resolve,
         reject,
       };
@@ -115,13 +130,32 @@ export class ProcessControlService {
       child.stderr.setEncoding('utf8');
       child.stdout.on('data', (chunk: string) => {
         active.stdout += chunk;
+        this.recordActivity(active, 'stdout');
+        if (input.mirrorOutput) {
+          process.stdout.write(chunk);
+        }
       });
       child.stderr.on('data', (chunk: string) => {
         active.stderr += chunk;
+        this.recordActivity(active, 'stderr');
+        if (input.mirrorOutput) {
+          process.stderr.write(chunk);
+        }
       });
       child.on('error', (error) => {
         if (active.finished) {
           return;
+        }
+        active.finished = true;
+        this.activeProcesses.delete(input.jobId);
+        if (active.timeout) {
+          clearTimeout(active.timeout);
+        }
+        if (active.forceKillTimer) {
+          clearTimeout(active.forceKillTimer);
+        }
+        if (active.stallCheckTimer) {
+          clearInterval(active.stallCheckTimer);
         }
         void this.persistFailureToStart(active.handle, error).then(reject);
       });
@@ -136,6 +170,9 @@ export class ProcessControlService {
         }
         if (active.forceKillTimer) {
           clearTimeout(active.forceKillTimer);
+        }
+        if (active.stallCheckTimer) {
+          clearInterval(active.stallCheckTimer);
         }
         const durationMs = Date.now() - new Date(startedAt).getTime();
         const outcome =
@@ -199,6 +236,17 @@ export class ProcessControlService {
           reason: 'timeout',
         });
       }, input.timeoutMs);
+
+      const stallTimeoutMs = readPositiveInteger(input.metadata?.stallTimeoutMs);
+      if (stallTimeoutMs) {
+        const outputPath = readString(input.metadata?.outputPath);
+        active.stallCheckTimer = setInterval(() => {
+          void this.checkForStalledProcess(active, {
+            outputPath,
+            stallTimeoutMs,
+          });
+        }, Math.max(250, Math.min(5_000, Math.floor(stallTimeoutMs / 4))));
+      }
     });
   }
 
@@ -325,4 +373,125 @@ export class ProcessControlService {
     });
     return path;
   }
+
+  private recordActivity(active: ActiveProcess, source: string, timestamp: string = new Date().toISOString()): void {
+    const previous = readString(active.handle.metadata.lastActivitySource);
+    active.activityObserved = true;
+    active.lastActivityAt = timestamp;
+    active.handle = ProcessHandleSchema.parse({
+      ...active.handle,
+      metadata: {
+        ...active.handle.metadata,
+        lastActivityAt: timestamp,
+        lastActivitySource: source,
+        ...(previous ? { previousActivitySource: previous } : {}),
+      },
+    });
+  }
+
+  private async checkForStalledProcess(
+    active: ActiveProcess,
+    input: {
+      outputPath?: string | undefined;
+      stallTimeoutMs: number;
+    },
+  ): Promise<void> {
+    if (active.finished || active.terminationRequested) {
+      return;
+    }
+
+    await this.observeActivityFile(active, input.outputPath, 'structured-output');
+
+    let sessionLogPath = readString(active.handle.metadata.sessionLogPath);
+    if (!sessionLogPath && typeof active.handle.pid === 'number') {
+      sessionLogPath = await resolveCodexSessionLogPath(active.handle.pid);
+      if (sessionLogPath) {
+        active.handle = ProcessHandleSchema.parse({
+          ...active.handle,
+          metadata: {
+            ...active.handle.metadata,
+            sessionLogPath,
+          },
+        });
+      }
+    }
+    await this.observeActivityFile(active, sessionLogPath, 'session-log');
+
+    const lastActivityMs = Date.parse(active.lastActivityAt);
+    if (!Number.isFinite(lastActivityMs) || lastActivityMs + input.stallTimeoutMs > Date.now()) {
+      return;
+    }
+
+    const stalledAt = new Date().toISOString();
+    active.handle = ProcessHandleSchema.parse({
+      ...active.handle,
+      metadata: {
+        ...active.handle.metadata,
+        timeout: true,
+        stallDetectedAt: stalledAt,
+        stallTimeoutMs: input.stallTimeoutMs,
+      },
+    });
+    await this.requestTermination({
+      jobId: active.handle.jobId,
+      reason: 'stall-timeout',
+      requestedBy: 'process-control-service',
+    });
+  }
+
+  private async observeActivityFile(
+    active: ActiveProcess,
+    filePath: string | undefined,
+    source: string,
+  ): Promise<void> {
+    if (!filePath) {
+      return;
+    }
+
+    const observedAt = await readFileTimestamp(filePath);
+    if (!observedAt) {
+      return;
+    }
+    if (Date.parse(observedAt) <= Date.parse(active.lastActivityAt)) {
+      return;
+    }
+    this.recordActivity(active, source, observedAt);
+  }
+}
+
+async function resolveCodexSessionLogPath(pid: number): Promise<string | undefined> {
+  try {
+    const fdRoot = `/proc/${pid}/fd`;
+    const entries = await fs.readdir(fdRoot);
+    for (const entry of entries) {
+      try {
+        const linkTarget = await fs.readlink(path.join(fdRoot, entry));
+        if (linkTarget.includes(`${path.sep}.codex${path.sep}sessions${path.sep}`) && linkTarget.endsWith('.jsonl')) {
+          return linkTarget;
+        }
+      } catch {
+        // Ignore individual fd races while the process is running.
+      }
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+async function readFileTimestamp(filePath: string): Promise<string | undefined> {
+  try {
+    const stats = await fs.stat(filePath);
+    return stats.mtime.toISOString();
+  } catch {
+    return undefined;
+  }
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

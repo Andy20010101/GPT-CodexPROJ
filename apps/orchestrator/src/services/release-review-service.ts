@@ -12,6 +12,12 @@ import { FileEvidenceRepository } from '../storage/file-evidence-repository';
 import { FileExecutionRepository } from '../storage/file-execution-repository';
 import { FileReleaseRepository } from '../storage/file-release-repository';
 import { FileTaskRepository } from '../storage/file-task-repository';
+import {
+  buildAnalysisBundlePromptLines,
+  mergeMetadataWithAnalysisBundle,
+  readAnalysisBundleInputFiles,
+  resolveRunAnalysisBundle,
+} from '../utils/analysis-bundle';
 import { BridgeClient, BridgeClientError } from './bridge-client';
 import { EvidenceLedgerService } from './evidence-ledger-service';
 
@@ -43,7 +49,14 @@ export class ReleaseReviewService {
     producer: string;
     metadata?: Record<string, unknown> | undefined;
   }): Promise<ReleaseReviewDispatch> {
-    const request = await this.buildRequest(input.run, input.metadata);
+    const analysisBundle = await resolveRunAnalysisBundle(
+      this.evidenceRepository.getArtifactDir(),
+      input.run.runId,
+    );
+    const request = await this.buildRequest(
+      input.run,
+      mergeMetadataWithAnalysisBundle(input.metadata, analysisBundle),
+    );
     const savedRequest = await this.releaseRepository.saveRequest(request);
     const evidence: EvidenceManifest[] = [];
 
@@ -85,7 +98,7 @@ export class ReleaseReviewService {
         projectName: this.config.projectName,
         ...(this.config.modelHint ? { model: this.config.modelHint } : {}),
         prompt,
-        inputFiles: [],
+        inputFiles: readAnalysisBundleInputFiles(request.metadata),
       });
       conversationId = conversation.conversationId;
       await this.bridgeClient.waitForCompletion(conversation.conversationId, {
@@ -103,7 +116,7 @@ export class ReleaseReviewService {
         if (maybeBridgeError?.code === 'STRUCTURED_OUTPUT_NOT_FOUND') {
           await this.bridgeClient.sendMessage(conversation.conversationId, {
             message: remediationPrompt,
-            inputFiles: [],
+            inputFiles: readAnalysisBundleInputFiles(request.metadata),
           });
           await this.bridgeClient.waitForCompletion(conversation.conversationId, {
             maxWaitMs: this.config.maxWaitMs,
@@ -341,6 +354,8 @@ function buildReleaseReviewPrompt(request: ReleaseReviewRequest): string {
     ...(request.outstandingLimitations.length > 0
       ? request.outstandingLimitations.map((item) => `- ${item}`)
       : ['- No additional limitations were recorded.']),
+    '',
+    ...buildAnalysisBundlePromptLines(request.metadata),
     '',
     '## Required Response Format',
     'First provide a short human-readable release review summary.',

@@ -29,17 +29,26 @@ function parseArgs(argv: readonly string[]): ScriptOptions {
       continue;
     }
     if (arg === '--browser-url') {
-      options.browserUrl = argv[index + 1];
+      const browserUrl = argv[index + 1];
+      if (browserUrl !== undefined) {
+        options.browserUrl = browserUrl;
+      }
       index += 1;
       continue;
     }
     if (arg === '--browser-endpoint') {
-      options.browserEndpoint = argv[index + 1];
+      const browserEndpoint = argv[index + 1];
+      if (browserEndpoint !== undefined) {
+        options.browserEndpoint = browserEndpoint;
+      }
       index += 1;
       continue;
     }
     if (arg === '--startup-url') {
-      options.startupUrl = argv[index + 1];
+      const startupUrl = argv[index + 1];
+      if (startupUrl !== undefined) {
+        options.startupUrl = startupUrl;
+      }
       index += 1;
       continue;
     }

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import type { ExecutionCommand, JobError, JobRecord, RetryPolicy } from '../contracts';
-import { ExecutionCommandSchema } from '../contracts';
+import type { ExecutionCommand, ExecutorType, JobError, JobRecord, RetryPolicy } from '../contracts';
+import { ExecutionCommandSchema, ExecutorTypeSchema } from '../contracts';
 import { areTaskDependenciesSatisfied } from '../utils/dependency-resolver';
 import { OrchestratorError } from '../utils/error';
 import { OrchestratorService } from '../application/orchestrator-service';
@@ -100,6 +100,7 @@ export class WorkerService {
       });
     }
 
+    const executorType = readExecutorType(job.metadata.executorType) ?? task.executorType ?? 'codex';
     const reusableWorkspace =
       job.attempt > 1
         ? await this.retainedWorkspaceService.findReusableWorkspace(run.runId, task.taskId)
@@ -109,7 +110,7 @@ export class WorkerService {
       (await this.orchestratorService.prepareWorkspaceRuntime({
         runId: run.runId,
         taskId: task.taskId,
-        executorType: task.executorType ?? 'codex',
+        executorType,
         baseRepoPath: this.config.workspaceSourceRepoPath,
         metadata: {
           jobId: job.jobId,
@@ -121,13 +122,19 @@ export class WorkerService {
       });
     }
     await this.workspaceCleanupService.markActive(run.runId, workspace.workspaceId);
+    await this.orchestratorService.syncWorkspaceRuntime({
+      runId: run.runId,
+      workspaceId: workspace.workspaceId,
+      baseRepoPath: this.config.workspaceSourceRepoPath,
+      includePaths: task.allowedFiles,
+    });
     const command = readExecutionCommand(job.metadata.command ?? task.metadata.command);
     const execution = await this.orchestratorService.executeTask({
       runId: run.runId,
       taskId: task.taskId,
       producer: 'worker-service',
       workspaceId: workspace.workspaceId,
-      executorType: task.executorType,
+      executorType,
       ...(command ? { command } : {}),
       metadata: {
         jobId: job.jobId,
@@ -588,6 +595,38 @@ export class WorkerService {
       { status: 'pending' }
     >,
   ): Promise<JobRecord> {
+    if (
+      job.kind === 'task_review_finalize' &&
+      job.taskId &&
+      pending.runtimeState.status === 'review_requested'
+    ) {
+      const executionId = readString(job.metadata.executionId);
+      if (executionId) {
+        await this.runQueueService.markSucceeded({
+          jobId: job.jobId,
+          metadata: {
+            reviewId: pending.request.reviewId,
+            conversationId: pending.runtimeState.conversationId,
+            runtimeStatus: pending.runtimeState.status,
+            redeliveryRequired: true,
+          },
+        });
+        return this.runQueueService.enqueueJob({
+          runId: job.runId,
+          taskId: job.taskId,
+          kind: 'task_review_request',
+          maxAttempts: job.maxAttempts,
+          priority: 'high',
+          metadata: {
+            executionId,
+            reviewId: pending.request.reviewId,
+            workspaceId: readString(job.metadata.workspaceId),
+            previousConversationId: pending.runtimeState.conversationId,
+          },
+        });
+      }
+    }
+
     const { disposition } = await this.jobDispositionService.forJobError({
       job,
       error: pending.error,
@@ -650,17 +689,28 @@ export class WorkerService {
     metadata?: Record<string, unknown> | undefined,
   ): Promise<JobRecord> {
     const normalizedError = normalizeJobError(error);
-    const { disposition } = await this.jobDispositionService.forJobError({
-      job,
-      error: normalizedError,
-      source: 'worker-service',
-    });
     const mergedMetadata = {
       ...(metadata ?? {}),
       ...(normalizedError.details && typeof normalizedError.details === 'object'
         ? (normalizedError.details as Record<string, unknown>)
         : {}),
     };
+    if (shouldRetryReviewBrowserCrash(job, normalizedError)) {
+      if (job.kind === 'task_review_request' && !this.retryService.canRetry(job)) {
+        return this.redeliverReviewRequestAfterBrowserCrash(job, normalizedError, mergedMetadata);
+      }
+      return this.retryService.retryJob({
+        jobId: job.jobId,
+        policy: this.config.retryPolicy,
+        error: normalizedError,
+        metadata: mergedMetadata,
+      });
+    }
+    const { disposition } = await this.jobDispositionService.forJobError({
+      job,
+      error: normalizedError,
+      source: 'worker-service',
+    });
     if (disposition.disposition === 'retriable') {
       return this.retryService.retryJob({
         jobId: job.jobId,
@@ -694,6 +744,44 @@ export class WorkerService {
       jobId: job.jobId,
       error: normalizedError,
       metadata: mergedMetadata,
+    });
+  }
+
+  private async redeliverReviewRequestAfterBrowserCrash(
+    job: JobRecord,
+    error: JobError,
+    metadata: Record<string, unknown>,
+  ): Promise<JobRecord> {
+    const executionId = readString(job.metadata.executionId);
+    if (!job.taskId || !executionId) {
+      return this.runQueueService.markFailed({
+        jobId: job.jobId,
+        error,
+        metadata,
+      });
+    }
+
+    await this.runQueueService.markFailed({
+      jobId: job.jobId,
+      error,
+      metadata: {
+        ...metadata,
+        browserCrashRedelivery: true,
+      },
+    });
+    return this.runQueueService.enqueueJob({
+      runId: job.runId,
+      taskId: job.taskId,
+      kind: 'task_review_request',
+      maxAttempts: job.maxAttempts,
+      priority: 'high',
+      metadata: {
+        executionId,
+        reviewId: readString(job.metadata.reviewId),
+        workspaceId: readString(job.metadata.workspaceId),
+        previousConversationId: readString(job.metadata.conversationId),
+        browserCrashRedeliveryFrom: job.jobId,
+      },
     });
   }
 
@@ -890,6 +978,27 @@ function normalizeJobError(error: unknown): JobError {
   };
 }
 
+function shouldRetryReviewBrowserCrash(job: JobRecord, error: JobError): boolean {
+  if (
+    job.kind !== 'task_review_request' &&
+    job.kind !== 'task_review_finalize' &&
+    job.kind !== 'task_review'
+  ) {
+    return false;
+  }
+
+  if (error.code !== 'WORKER_JOB_FAILED') {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('target crashed') ||
+    message.includes('session closed') ||
+    message.includes('execution context was destroyed')
+  );
+}
+
 function buildJobError(code: unknown, message: string, details?: unknown): JobError {
   return {
     code: typeof code === 'string' && code.length > 0 ? code : 'JOB_FAILED',
@@ -904,5 +1013,10 @@ function readString(value: unknown): string | undefined {
 
 function readExecutionCommand(value: unknown): ExecutionCommand | undefined {
   const parsed = ExecutionCommandSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function readExecutorType(value: unknown): ExecutorType | undefined {
+  const parsed = ExecutorTypeSchema.safeParse(value);
   return parsed.success ? parsed.data : undefined;
 }

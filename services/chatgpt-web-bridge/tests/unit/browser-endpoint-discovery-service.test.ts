@@ -6,6 +6,7 @@ describe('BrowserEndpointDiscoveryService', () => {
   it('merges env candidates, localhost candidates, and host ip candidates', async () => {
     const service = new BrowserEndpointDiscoveryService(
       {
+        SELF_IMPROVEMENT_ENV_STATE_PATH: '/tmp/env-state.json',
         BRIDGE_BROWSER_URL: 'http://127.0.0.1:9222',
         BRIDGE_BROWSER_URL_CANDIDATES:
           'http://localhost:9333/json/version,https://chatgpt.com/',
@@ -39,6 +40,12 @@ describe('BrowserEndpointDiscoveryService', () => {
         remoteDebuggingPorts: [9224],
       }),
       () => '2026-04-03T08:00:00.000Z',
+      async () =>
+        JSON.stringify({
+          browser: {
+            endpoint: 'http://172.18.144.1:9224',
+          },
+        }),
     );
 
     const discovery = await service.discover({
@@ -48,6 +55,7 @@ describe('BrowserEndpointDiscoveryService', () => {
     expect(discovery.requestedBrowserUrl).toBe('http://172.22.224.1:9444/json/version');
     expect(discovery.candidates.map((candidate) => candidate.endpoint)).toEqual([
       'http://172.22.224.1:9444',
+      'http://172.18.144.1:9224',
       'http://127.0.0.1:9222',
       'http://localhost:9333',
       'http://127.0.0.1:9224',
@@ -61,6 +69,7 @@ describe('BrowserEndpointDiscoveryService', () => {
     ]);
     expect(discovery.candidates.map((candidate) => candidate.source)).toEqual([
       'request_input',
+      'env_state_browser_authority',
       'env_browser_url',
       'env_browser_url_candidates',
       'windows_browser_process',

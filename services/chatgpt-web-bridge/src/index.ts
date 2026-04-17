@@ -12,6 +12,7 @@ import { BrowserAttachPreflightGuard } from './guards/browser-attach-preflight-g
 import { SessionResumeGuard } from './guards/session-resume-guard';
 import { buildServer } from './server';
 import { BrowserAttachDiagnosticsService } from './services/browser-attach-diagnostics-service';
+import { BrowserAuthorityService } from './services/browser-authority-service';
 import { BrowserEndpointDiscoveryService } from './services/browser-endpoint-discovery-service';
 import { BridgeHealthService } from './services/bridge-health-service';
 import { ConversationService } from './services/conversation-service';
@@ -24,6 +25,7 @@ export async function startServer(): Promise<void> {
   const adapter = new PuppeteerChatGPTAdapter(new BrowserManager(new PageFactory()));
   const bridgeHealthService = new BridgeHealthService(config.artifactDir);
   const sessionResumeGuard = new SessionResumeGuard(adapter, bridgeHealthService);
+  const browserAuthorityService = new BrowserAuthorityService();
   const exportService = new ExportService(
     config.artifactDir,
     new MarkdownExporter(),
@@ -43,7 +45,8 @@ export async function startServer(): Promise<void> {
     logger,
     bridgeHealthService,
     sessionResumeGuard,
-    new BrowserAttachPreflightGuard(browserAttachDiagnosticsService),
+    new BrowserAttachPreflightGuard(browserAttachDiagnosticsService, browserAuthorityService),
+    browserAuthorityService,
   );
   const app = buildServer({
     conversationService,

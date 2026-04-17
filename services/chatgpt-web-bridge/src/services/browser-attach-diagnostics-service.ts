@@ -59,6 +59,10 @@ async function writeJson(filePath: string, value: unknown): Promise<void> {
   await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
+function parseJsonValue(raw: string): unknown {
+  return JSON.parse(raw) as unknown;
+}
+
 function dedupeRecommendations(
   recommendations: readonly BrowserAttachRecommendation[],
 ): BrowserAttachRecommendation[] {
@@ -255,7 +259,7 @@ async function defaultProbeWindowsLocalSource(
 
     let versionBodyParseOk = false;
     try {
-      const parsedVersionBody = JSON.parse(versionPayload.body ?? '{}');
+      const parsedVersionBody = parseJsonValue(versionPayload.body ?? '{}');
       versionBodyParseOk = parsedVersionBody !== null && !Array.isArray(parsedVersionBody);
     } catch {
       versionBodyParseOk = false;
@@ -297,7 +301,7 @@ async function defaultProbeWindowsLocalSource(
 
     let listBodyParseOk = false;
     try {
-      const parsedListBody = JSON.parse(listPayload.body ?? '[]');
+      const parsedListBody = parseJsonValue(listPayload.body ?? '[]');
       listBodyParseOk = Array.isArray(parsedListBody);
     } catch {
       listBodyParseOk = false;

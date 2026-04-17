@@ -4,6 +4,7 @@ import {
   ApiFailureSchema,
   BridgeHealthResponseSchema,
   DriftIncidentsResponseSchema,
+  GetConversationStatusResponseSchema,
   MarkdownExportResponseSchema,
   MessageConversationResponseSchema,
   OpenSessionResponseSchema,
@@ -16,6 +17,7 @@ import {
   GetSnapshotResponseSchema,
   type BridgeDriftIncident,
   type BridgeHealthSummary,
+  type ConversationStatus,
   type MarkdownExportRequest,
   type MessageConversationRequest,
   type OpenSessionRequest,
@@ -39,6 +41,40 @@ type BridgeHttpResponse = {
   payload: unknown;
 };
 
+function sleep(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
+}
+
+function hasReplyStarted(status: ConversationStatus): boolean {
+  return (
+    status.status === 'running' ||
+    status.assistantMessageCount > 0 ||
+    status.lastMessageRole === 'assistant'
+  );
+}
+
+function hasAssistantReply(status: ConversationStatus): boolean {
+  return (
+    status.assistantMessageCount > 0 ||
+    status.lastMessageRole === 'assistant' ||
+    (typeof status.lastAssistantMessage === 'string' && status.lastAssistantMessage.length > 0)
+  );
+}
+
+const RETRY_VISIBLE_STALL_POLLS = 3;
+const RETRY_VISIBLE_COMPLETION_GRACE_MS = 90_000;
+
+function resolveStatusObservedAtMs(updatedAt: string | undefined): number {
+  const parsed = updatedAt ? Date.parse(updatedAt) : Number.NaN;
+  if (!Number.isFinite(parsed)) {
+    return Date.now();
+  }
+
+  return Math.min(parsed, Date.now());
+}
+
 export class BridgeClientError extends Error {
   public readonly code: string;
   public readonly statusCode: number;
@@ -55,13 +91,19 @@ export class BridgeClientError extends Error {
 export interface BridgeClient {
   getBridgeHealth(): Promise<BridgeHealthSummary>;
   listDriftIncidents(): Promise<BridgeDriftIncident[]>;
-  openSession(input: OpenSessionRequest): Promise<SessionSummary>;
+  openSession(input: OpenSessionRequest, options?: { timeoutMs?: number }): Promise<SessionSummary>;
   resumeSession(
     sessionId: string,
     input: ResumeSessionRequest,
   ): Promise<{ session: SessionSummary; health: BridgeHealthSummary }>;
-  selectProject(input: SelectProjectRequest): Promise<SessionSummary>;
-  startConversation(input: StartConversationRequest): Promise<ConversationSnapshot>;
+  selectProject(
+    input: SelectProjectRequest,
+    options?: { timeoutMs?: number },
+  ): Promise<SessionSummary>;
+  startConversation(
+    input: StartConversationRequest,
+    options?: { timeoutMs?: number },
+  ): Promise<ConversationSnapshot>;
   sendMessage(
     conversationId: string,
     input: MessageConversationRequest,
@@ -71,6 +113,7 @@ export interface BridgeClient {
     input: RecoverConversationRequest,
   ): Promise<{ snapshot: ConversationSnapshot; health: BridgeHealthSummary }>;
   getSnapshot(conversationId: string): Promise<ConversationSnapshot>;
+  getConversationStatus?(conversationId: string): Promise<ConversationStatus>;
   waitForCompletion(
     conversationId: string,
     input: WaitConversationRequest,
@@ -106,11 +149,15 @@ export class HttpBridgeClient implements BridgeClient {
     return data.incidents;
   }
 
-  public async openSession(input: OpenSessionRequest): Promise<SessionSummary> {
+  public async openSession(
+    input: OpenSessionRequest,
+    options?: { timeoutMs?: number },
+  ): Promise<SessionSummary> {
     return this.requestData('/api/sessions/open', {
       method: 'POST',
       body: input,
       responseSchema: OpenSessionResponseSchema,
+      ...(options?.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
     });
   }
 
@@ -125,19 +172,27 @@ export class HttpBridgeClient implements BridgeClient {
     });
   }
 
-  public async selectProject(input: SelectProjectRequest): Promise<SessionSummary> {
+  public async selectProject(
+    input: SelectProjectRequest,
+    options?: { timeoutMs?: number },
+  ): Promise<SessionSummary> {
     return this.requestData('/api/projects/select', {
       method: 'POST',
       body: input,
       responseSchema: SelectProjectResponseSchema,
+      ...(options?.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
     });
   }
 
-  public async startConversation(input: StartConversationRequest): Promise<ConversationSnapshot> {
+  public async startConversation(
+    input: StartConversationRequest,
+    options?: { timeoutMs?: number },
+  ): Promise<ConversationSnapshot> {
     return this.requestData('/api/conversations/start', {
       method: 'POST',
       body: input,
       responseSchema: StartConversationResponseSchema,
+      ...(options?.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
     });
   }
 
@@ -170,10 +225,10 @@ export class HttpBridgeClient implements BridgeClient {
     });
   }
 
-  public async getConversationStatus(conversationId: string): Promise<ConversationSnapshot> {
+  public async getConversationStatus(conversationId: string): Promise<ConversationStatus> {
     return this.requestData(`/api/conversations/${conversationId}/status`, {
       method: 'GET',
-      responseSchema: GetSnapshotResponseSchema,
+      responseSchema: GetConversationStatusResponseSchema,
     });
   }
 
@@ -181,10 +236,171 @@ export class HttpBridgeClient implements BridgeClient {
     conversationId: string,
     input: WaitConversationRequest,
   ): Promise<ConversationSnapshot> {
+    const deadline = Date.now() + (input.maxWaitMs ?? 120_000);
+    const interval = input.pollIntervalMs ?? 1_000;
+    const stablePolls = input.stablePolls ?? 2;
+
+    let lastCompletionSignature = '';
+    let stableReads = 0;
+    let replyStarted = false;
+    let lastRunningSignature = '';
+    let stalledRunningReads = 0;
+    let lastStableAssistantRunningSignature = '';
+    let stalledStableAssistantRunningReads = 0;
+    let stableAssistantRunningObservedAtMs = 0;
+    let lastRetryVisibleCompletionSignature = '';
+    let stalledRetryVisibleCompletionReads = 0;
+    let retryVisibleCompletionObservedAtMs = 0;
+
+    while (Date.now() <= deadline) {
+      const status = await this.getConversationStatus(conversationId);
+      if (status.status === 'failed') {
+        throw new BridgeClientError(
+          'CONVERSATION_UNAVAILABLE',
+          'Conversation generation failed and requires retry.',
+          503,
+          {
+            conversationId,
+            pageUrl: status.pageUrl,
+            lastAssistantMessage: status.lastAssistantMessage,
+          },
+        );
+      }
+      replyStarted ||= hasReplyStarted(status);
+
+      if (replyStarted && status.status === 'running' && status.retryVisible) {
+        const runningSignature = JSON.stringify({
+          status: status.status,
+          assistantMessageCount: status.assistantMessageCount,
+          lastAssistantMessage: status.lastAssistantMessage ?? '',
+          lastMessageRole: status.lastMessageRole,
+          retryVisible: true,
+        });
+
+        if (runningSignature === lastRunningSignature) {
+          stalledRunningReads += 1;
+        } else {
+          lastRunningSignature = runningSignature;
+          stalledRunningReads = 1;
+        }
+
+        if (stalledRunningReads >= RETRY_VISIBLE_STALL_POLLS) {
+          throw new BridgeClientError(
+            'CONVERSATION_UNAVAILABLE',
+            'Conversation appears stalled while ChatGPT is offering a retry action.',
+            503,
+            {
+              conversationId,
+              pageUrl: status.pageUrl,
+              lastAssistantMessage: status.lastAssistantMessage,
+              retryVisible: true,
+            },
+          );
+        }
+      } else {
+        lastRunningSignature = '';
+        stalledRunningReads = 0;
+      }
+
+      if (replyStarted && status.status === 'running' && !status.retryVisible && hasAssistantReply(status)) {
+        const stableAssistantRunningSignature = JSON.stringify({
+          status: status.status,
+          assistantMessageCount: status.assistantMessageCount,
+          lastAssistantMessage: status.lastAssistantMessage ?? '',
+          lastMessageRole: status.lastMessageRole,
+          retryVisible: false,
+        });
+
+        if (stableAssistantRunningSignature === lastStableAssistantRunningSignature) {
+          stalledStableAssistantRunningReads += 1;
+        } else {
+          lastStableAssistantRunningSignature = stableAssistantRunningSignature;
+          stalledStableAssistantRunningReads = 1;
+          stableAssistantRunningObservedAtMs = resolveStatusObservedAtMs(status.updatedAt);
+        }
+
+        if (
+          stalledStableAssistantRunningReads >= RETRY_VISIBLE_STALL_POLLS &&
+          Date.now() - stableAssistantRunningObservedAtMs >= RETRY_VISIBLE_COMPLETION_GRACE_MS
+        ) {
+          return this.getSnapshot(conversationId);
+        }
+      } else {
+        lastStableAssistantRunningSignature = '';
+        stalledStableAssistantRunningReads = 0;
+        stableAssistantRunningObservedAtMs = 0;
+      }
+
+      if (status.status === 'completed' && status.retryVisible && !hasAssistantReply(status)) {
+        const retryVisibleCompletionSignature = JSON.stringify({
+          status: status.status,
+          assistantMessageCount: status.assistantMessageCount,
+          lastAssistantMessage: status.lastAssistantMessage ?? '',
+          lastMessageRole: status.lastMessageRole,
+          retryVisible: true,
+        });
+
+        if (retryVisibleCompletionSignature === lastRetryVisibleCompletionSignature) {
+          stalledRetryVisibleCompletionReads += 1;
+        } else {
+          lastRetryVisibleCompletionSignature = retryVisibleCompletionSignature;
+          stalledRetryVisibleCompletionReads = 1;
+          retryVisibleCompletionObservedAtMs = resolveStatusObservedAtMs(status.updatedAt);
+        }
+
+        if (
+          stalledRetryVisibleCompletionReads >= RETRY_VISIBLE_STALL_POLLS &&
+          Date.now() - retryVisibleCompletionObservedAtMs >= RETRY_VISIBLE_COMPLETION_GRACE_MS
+        ) {
+          throw new BridgeClientError(
+            'CONVERSATION_UNAVAILABLE',
+            'Conversation completed without an assistant reply while ChatGPT is offering a retry action.',
+            503,
+            {
+              conversationId,
+              pageUrl: status.pageUrl,
+              lastAssistantMessage: status.lastAssistantMessage,
+              retryVisible: true,
+            },
+          );
+        }
+      } else {
+        lastRetryVisibleCompletionSignature = '';
+        stalledRetryVisibleCompletionReads = 0;
+        retryVisibleCompletionObservedAtMs = 0;
+      }
+
+      if (replyStarted && status.status === 'completed') {
+        const completionSignature = JSON.stringify({
+          status: status.status,
+          assistantMessageCount: status.assistantMessageCount,
+          lastAssistantMessage: status.lastAssistantMessage ?? '',
+          lastMessageRole: status.lastMessageRole,
+        });
+
+        if (completionSignature === lastCompletionSignature) {
+          stableReads += 1;
+        } else {
+          lastCompletionSignature = completionSignature;
+          stableReads = 1;
+        }
+
+        if (stableReads >= stablePolls) {
+          return this.getSnapshot(conversationId);
+        }
+      } else {
+        lastCompletionSignature = '';
+        stableReads = 0;
+      }
+
+      await sleep(interval);
+    }
+
     return this.requestData(`/api/conversations/${conversationId}/wait`, {
       method: 'POST',
       body: input,
       responseSchema: WaitConversationResponseSchema,
+      timeoutMs: (input.maxWaitMs ?? 120_000) + 30_000,
     });
   }
 
@@ -216,6 +432,7 @@ export class HttpBridgeClient implements BridgeClient {
       method: 'GET' | 'POST';
       body?: unknown;
       responseSchema: ZodTypeAny;
+      timeoutMs?: number;
     },
   ): Promise<T> {
     const response =
@@ -261,6 +478,7 @@ export class HttpBridgeClient implements BridgeClient {
       method: 'GET' | 'POST';
       body?: unknown;
       responseSchema: ZodTypeAny;
+      timeoutMs?: number;
     },
   ): Promise<BridgeHttpResponse> {
     let response: Response;
@@ -294,11 +512,12 @@ export class HttpBridgeClient implements BridgeClient {
       method: 'GET' | 'POST';
       body?: unknown;
       responseSchema: ZodTypeAny;
+      timeoutMs?: number;
     },
   ): Promise<BridgeHttpResponse> {
     const target = new URL(pathname, this.baseUrl);
     const body = options.body ? JSON.stringify(options.body) : undefined;
-    const timeoutMs = resolveTimeoutMs(options.body);
+    const timeoutMs = resolveTimeoutMs(options.body, options.timeoutMs);
 
     return new Promise<BridgeHttpResponse>((resolve, reject) => {
       const transport = target.protocol === 'https:' ? https : http;
@@ -313,13 +532,14 @@ export class HttpBridgeClient implements BridgeClient {
         },
         (response) => {
           const chunks: Buffer[] = [];
-          response.on('data', (chunk) => {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          response.on('data', (chunk: Buffer | string) => {
+            const normalizedChunk = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
+            chunks.push(normalizedChunk);
           });
           response.on('end', () => {
             const rawPayload = Buffer.concat(chunks).toString('utf8');
             try {
-              const payload = rawPayload.length > 0 ? JSON.parse(rawPayload) : null;
+              const payload = rawPayload.length > 0 ? parseJsonPayload(rawPayload) : null;
               resolve({
                 ok: (response.statusCode ?? 500) >= 200 && (response.statusCode ?? 500) < 300,
                 status: response.statusCode ?? 500,
@@ -370,13 +590,22 @@ export class HttpBridgeClient implements BridgeClient {
       method: 'GET' | 'POST';
       body?: unknown;
       responseSchema: ResponseSchema;
+      timeoutMs?: number;
     },
   ): Promise<z.output<ResponseSchema>['data']> {
     return this.request<z.output<ResponseSchema>['data']>(pathname, options);
   }
 }
 
-function resolveTimeoutMs(body: unknown): number {
+function resolveTimeoutMs(body: unknown, explicitTimeoutMs?: number): number {
+  if (
+    typeof explicitTimeoutMs === 'number' &&
+    Number.isFinite(explicitTimeoutMs) &&
+    explicitTimeoutMs > 0
+  ) {
+    return explicitTimeoutMs;
+  }
+
   if (body && typeof body === 'object' && 'maxWaitMs' in body) {
     const maxWaitMs = (body as { maxWaitMs?: unknown }).maxWaitMs;
     if (typeof maxWaitMs === 'number' && Number.isFinite(maxWaitMs) && maxWaitMs > 0) {
@@ -385,4 +614,8 @@ function resolveTimeoutMs(body: unknown): number {
   }
 
   return 60_000;
+}
+
+function parseJsonPayload(rawPayload: string): unknown {
+  return JSON.parse(rawPayload) as unknown;
 }

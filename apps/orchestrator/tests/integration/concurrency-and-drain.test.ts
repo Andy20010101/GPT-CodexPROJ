@@ -6,6 +6,7 @@ import {
   createArtifactDir,
   createBridgeClient,
   createControllableCodexRunner,
+  waitForCondition,
 } from '../helpers/runtime-fixtures';
 
 describe('concurrency and drain integration', () => {
@@ -44,6 +45,7 @@ describe('concurrency and drain integration', () => {
     });
 
     await bundle.daemonRuntimeService.tick();
+    await waitForCondition(async () => runner.callCount() === 1, 5000);
 
     const jobsAfterFirstTick = await bundle.runQueueService.listJobsForRun(runId);
     expect(jobsAfterFirstTick.filter((job) => job.status === 'running')).toHaveLength(1);

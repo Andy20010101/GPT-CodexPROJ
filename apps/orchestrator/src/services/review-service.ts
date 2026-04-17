@@ -5,6 +5,8 @@ import type {
   EvidenceManifest,
   ExecutionArtifact,
   ExecutionResult,
+  PatchConvergenceRecord,
+  PatchFingerprint,
   ReviewEvidence,
   ReviewRequest,
   ReviewResult,
@@ -13,20 +15,31 @@ import type {
   TaskEnvelope,
 } from '../contracts';
 import {
+  PatchConvergenceRecordSchema,
+  PatchFingerprintSchema,
   ReviewEvidenceSchema,
   ReviewRequestSchema,
   ReviewRuntimeStateSchema,
 } from '../contracts';
 import type { RunRecord } from '../domain/run';
+import { assessTestEvidence, comparePatchFingerprints, fingerprintPatch } from '../domain/execution';
 import { FileReviewRepository } from '../storage/file-review-repository';
 import { OrchestratorError } from '../utils/error';
+import { writeJsonFile } from '../utils/file-store';
+import { parsePatchSummary } from '../utils/patch-parser';
 import { normalizeReviewResult } from '../utils/review-result-normalizer';
 import {
+  getExecutionPatchConvergenceFile,
   getReviewRequestFile,
   getReviewResultFile,
   getReviewRoot,
   getReviewRuntimeStateFile,
 } from '../utils/run-paths';
+import {
+  mergeMetadataWithAnalysisBundle,
+  readAnalysisBundleInputFiles,
+  resolveRunAnalysisBundle,
+} from '../utils/analysis-bundle';
 import { BridgeClient, BridgeClientError } from './bridge-client';
 import { EvidenceLedgerService } from './evidence-ledger-service';
 import { ReviewPayloadBuilder } from './review-payload-builder';
@@ -73,6 +86,8 @@ type BridgeErrorShape = {
   details?: unknown;
 };
 
+const REPEATED_PATCH_CONVERGENCE_THRESHOLD = 2;
+
 export class ReviewService {
   public constructor(
     private readonly bridgeClient: BridgeClient,
@@ -100,16 +115,42 @@ export class ReviewService {
     requestJobId?: string | undefined;
   }): Promise<ReviewRequestDispatch> {
     const artifactDir = this.reviewRepository.getArtifactDir();
-    const existingRequest = await this.reviewRepository.findRequestByExecution({
+    const analysisBundle = await resolveRunAnalysisBundle(artifactDir, input.run.runId);
+    const latestRequest = await this.reviewRepository.findRequestByExecution({
       runId: input.run.runId,
       taskId: input.task.taskId,
       executionId: input.executionResult.executionId,
       reviewType: input.reviewType ?? 'task_review',
     });
-    const request = existingRequest ?? this.buildRequest(input);
+    const latestRuntimeState = latestRequest
+      ? await this.reviewRepository.getRuntimeState(input.run.runId, latestRequest.reviewId)
+      : null;
+    const latestResult = latestRequest
+      ? await this.reviewRepository.getResult(input.run.runId, latestRequest.reviewId)
+      : null;
+    const rerunIncompleteReview =
+      latestRuntimeState?.status === 'review_applied' && latestResult?.status === 'incomplete';
+    const existingRequest = rerunIncompleteReview ? null : latestRequest;
+    const requestMetadata = mergeMetadataWithAnalysisBundle(
+      {
+        ...(input.metadata ?? {}),
+        ...(rerunIncompleteReview && latestRequest ? { previousReviewId: latestRequest.reviewId } : {}),
+      },
+      analysisBundle,
+    );
+    const request =
+      existingRequest ??
+      (await this.buildRequest({
+        ...input,
+        metadata: requestMetadata,
+      }));
     const reviewDir = getReviewRoot(artifactDir, request.runId, request.reviewId);
     const requestPath = getReviewRequestFile(artifactDir, request.runId, request.reviewId);
-    const runtimeStatePath = getReviewRuntimeStateFile(artifactDir, request.runId, request.reviewId);
+    const runtimeStatePath = getReviewRuntimeStateFile(
+      artifactDir,
+      request.runId,
+      request.reviewId,
+    );
     const evidence: EvidenceManifest[] = [];
 
     if (!existingRequest) {
@@ -126,12 +167,17 @@ export class ReviewService {
           summary: `Prepared ${request.reviewType} request for execution ${request.executionId}`,
           metadata: {
             reviewId: request.reviewId,
+            testEvidenceGrade: request.testEvidence.grade,
+            testEvidenceStrength: request.testEvidence.strength,
           },
         }),
       );
     }
 
-    const currentState = await this.reviewRepository.getRuntimeState(request.runId, request.reviewId);
+    const currentState = await this.reviewRepository.getRuntimeState(
+      request.runId,
+      request.reviewId,
+    );
     if (
       currentState &&
       currentState.conversationId &&
@@ -154,13 +200,17 @@ export class ReviewService {
       previous: currentState,
       status: 'review_requested',
       attempt: input.attempt ?? currentState?.attempt ?? 1,
+      browserUrl: this.config.browserUrl,
       requestJobId: input.requestJobId ?? currentState?.requestJobId,
       metadata: {
         ...(currentState?.metadata ?? {}),
         ...(input.metadata ?? {}),
+        ...mergeMetadataWithAnalysisBundle(undefined, analysisBundle),
         browserUrl: this.config.browserUrl,
         projectName: this.config.projectName,
       },
+      remediationAttempted: false,
+      recoveryAttempted: false,
     });
 
     try {
@@ -178,7 +228,9 @@ export class ReviewService {
         projectName: this.config.projectName,
         ...(this.config.modelHint ? { model: this.config.modelHint } : {}),
         prompt: payload.prompt,
-        inputFiles: [],
+        inputFiles: readReviewInputFiles(request.metadata),
+      }, {
+        timeoutMs: this.config.maxWaitMs,
       });
       const waitingState = await this.persistRuntimeState({
         request,
@@ -196,6 +248,8 @@ export class ReviewService {
           ...seededState.metadata,
           ...(input.metadata ?? {}),
         },
+        remediationAttempted: false,
+        recoveryAttempted: false,
         clearLastError: true,
       });
 
@@ -213,17 +267,19 @@ export class ReviewService {
         previous: seededState,
         status: 'review_requested',
         attempt: input.attempt ?? seededState.attempt,
+        browserUrl: this.config.browserUrl,
         requestJobId: input.requestJobId ?? seededState.requestJobId,
         metadata: {
           ...seededState.metadata,
           ...(input.metadata ?? {}),
         },
-        lastError:
-          this.toBridgeError(error) ?? {
-            code: 'REVIEW_REQUEST_FAILED',
-            message: error instanceof Error ? error.message : 'Review request failed',
-            details: error,
-          },
+        remediationAttempted: false,
+        recoveryAttempted: false,
+        lastError: this.toBridgeError(error) ?? {
+          code: 'REVIEW_REQUEST_FAILED',
+          message: error instanceof Error ? error.message : 'Review request failed',
+          details: error,
+        },
       });
       throw error;
     }
@@ -254,11 +310,18 @@ export class ReviewService {
     }
 
     const reviewDir = getReviewRoot(artifactDir, request.runId, request.reviewId);
-    const runtimeStatePath = getReviewRuntimeStateFile(artifactDir, request.runId, request.reviewId);
+    const runtimeStatePath = getReviewRuntimeStateFile(
+      artifactDir,
+      request.runId,
+      request.reviewId,
+    );
     const existingResult = await this.reviewRepository.getResult(request.runId, request.reviewId);
     let runtimeState = await this.requireRuntimeState(request);
 
-    if (existingResult) {
+    const retryingIncompleteResult =
+      existingResult?.status === 'incomplete' && Boolean(runtimeState.conversationId);
+
+    if (existingResult && !retryingIncompleteResult) {
       return {
         status: 'completed',
         evidence: [],
@@ -493,10 +556,7 @@ export class ReviewService {
           bridgeMarkdown.artifactPath,
           bridgeMarkdown.manifestPath,
           ...(extracted.structuredReview
-            ? [
-                extracted.structuredReview.artifactPath,
-                extracted.structuredReview.manifestPath,
-              ]
+            ? [extracted.structuredReview.artifactPath, extracted.structuredReview.manifestPath]
             : []),
         ],
         evidence,
@@ -566,7 +626,7 @@ export class ReviewService {
     };
   }
 
-  private buildRequest(input: {
+  private async buildRequest(input: {
     run: RunRecord;
     task: TaskEnvelope;
     executionResult: ExecutionResult;
@@ -574,14 +634,66 @@ export class ReviewService {
     architectureFreeze?: ArchitectureFreeze | null | undefined;
     relatedEvidenceIds?: readonly string[] | undefined;
     metadata?: Record<string, unknown> | undefined;
-  }): ReviewRequest {
-    const patchArtifactContent = this.extractExecutionArtifactContent(
-      input.executionResult.artifacts,
-      'patch',
-    );
+  }): Promise<ReviewRequest> {
+    const patchEvidence = this.normalizePatchEvidence(input.executionResult);
+    const testEvidence = assessTestEvidence(input.executionResult.testResults);
+    if (patchEvidence.changedFiles.length === 0) {
+      this.throwReviewEvidenceIncomplete(
+        'changed_files_missing',
+        'Review evidence did not materialize any changed files before dispatch.',
+        {
+          executionId: input.executionResult.executionId,
+          patchArtifactPresent: Boolean(patchEvidence.patchArtifactContent),
+          declaredChangedFiles: normalizeFileList(input.executionResult.patchSummary.changedFiles),
+        },
+      );
+    }
+    if (input.executionResult.testResults.length === 0) {
+      this.throwReviewEvidenceIncomplete(
+        'test_results_missing',
+        'Review evidence does not include any test results before dispatch.',
+        {
+          executionId: input.executionResult.executionId,
+          changedFiles: patchEvidence.changedFiles,
+        },
+      );
+    }
+    if (patchEvidence.truncationReasons.length > 0) {
+      this.throwReviewEvidenceIncomplete(
+        'patch_artifact_truncated',
+        'Review evidence patch artifact is truncated or degraded and cannot support a trustworthy review dispatch.',
+        {
+          executionId: input.executionResult.executionId,
+          changedFiles: patchEvidence.changedFiles,
+          truncationReasons: patchEvidence.truncationReasons,
+        },
+      );
+    }
+    if (testEvidence.strength === 'weak') {
+      this.throwReviewEvidenceIncomplete(
+        'review_evidence_degraded',
+        'Review evidence only contains degraded validation signals before dispatch.',
+        {
+          executionId: input.executionResult.executionId,
+          changedFiles: patchEvidence.changedFiles,
+          degradedEvidenceKinds: ['test_evidence'],
+          testEvidenceGrade: testEvidence.grade,
+          testEvidenceStrength: testEvidence.strength,
+          testEvidenceSummary: testEvidence.summary,
+        },
+      );
+    }
     const testLogExcerpt =
       this.extractExecutionArtifactContent(input.executionResult.artifacts, 'test-log') ??
       this.extractExecutionArtifactContent(input.executionResult.artifacts, 'command-log');
+    const patchFingerprint = await this.assertPatchConvergence({
+      run: input.run,
+      task: input.task,
+      executionResult: input.executionResult,
+      reviewType: input.reviewType ?? 'task_review',
+      patchSummary: patchEvidence.patchSummary,
+      patchArtifactContent: patchEvidence.patchArtifactContent,
+    });
 
     return ReviewRequestSchema.parse({
       reviewId: randomUUID(),
@@ -595,25 +707,297 @@ export class ReviewService {
       allowedFiles: input.task.allowedFiles,
       disallowedFiles: input.task.disallowedFiles,
       acceptanceCriteria: input.task.acceptanceCriteria,
-      changedFiles: input.executionResult.patchSummary.changedFiles,
-      patchSummary: input.executionResult.patchSummary,
-      ...(patchArtifactContent ? { patchArtifactContent } : {}),
+      changedFiles: patchEvidence.changedFiles,
+      patchSummary: patchEvidence.patchSummary,
+      ...(patchEvidence.patchArtifactContent
+        ? { patchArtifactContent: patchEvidence.patchArtifactContent }
+        : {}),
       testResults: input.executionResult.testResults,
+      testEvidence,
       ...(testLogExcerpt ? { testLogExcerpt } : {}),
       executionSummary: input.executionResult.summary,
       architectureConstraints: buildArchitectureConstraints(input.architectureFreeze),
       relatedEvidenceIds: [...input.task.evidenceIds, ...(input.relatedEvidenceIds ?? [])],
-      metadata: input.metadata ?? {},
+      metadata: {
+        ...(input.metadata ?? {}),
+        ...(patchFingerprint ? { patchFingerprint } : {}),
+      },
       createdAt: new Date().toISOString(),
     });
+  }
+
+  private async assertPatchConvergence(input: {
+    run: RunRecord;
+    task: TaskEnvelope;
+    executionResult: ExecutionResult;
+    reviewType: ReviewType;
+    patchSummary: ExecutionResult['patchSummary'];
+    patchArtifactContent?: string | undefined;
+  }): Promise<PatchFingerprint | undefined> {
+    if (input.reviewType !== 'task_review' || !input.patchArtifactContent) {
+      return undefined;
+    }
+
+    const currentFingerprint = fingerprintPatch({
+      patchArtifactContent: input.patchArtifactContent,
+      patchSummary: input.patchSummary,
+    });
+    const history = await this.listLatestTaskReviewAttemptsByExecution(
+      input.run.runId,
+      input.task.taskId,
+    );
+    const matchedHistory: PatchConvergenceRecord['matchedHistory'] = [];
+
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+      const attempt = history[index];
+      if (!attempt) {
+        continue;
+      }
+      if (attempt.executionId === input.executionResult.executionId) {
+        continue;
+      }
+      if (attempt.reviewStatus !== 'changes_requested' && attempt.reviewStatus !== 'rejected') {
+        break;
+      }
+      if (!attempt.fingerprint) {
+        break;
+      }
+
+      const comparison = comparePatchFingerprints(currentFingerprint, attempt.fingerprint);
+      if (!comparison) {
+        break;
+      }
+
+      matchedHistory.push({
+        reviewId: attempt.reviewId,
+        executionId: attempt.executionId,
+        reviewStatus: attempt.reviewStatus,
+        comparison,
+        requestCreatedAt: attempt.requestCreatedAt,
+        reviewTimestamp: attempt.reviewTimestamp,
+        fingerprint: attempt.fingerprint,
+      });
+    }
+
+    if (matchedHistory.length + 1 < REPEATED_PATCH_CONVERGENCE_THRESHOLD) {
+      return currentFingerprint;
+    }
+
+    const record = PatchConvergenceRecordSchema.parse({
+      runId: input.run.runId,
+      taskId: input.task.taskId,
+      executionId: input.executionResult.executionId,
+      status: 'manual_attention_required',
+      reason: 'repeated_patch_convergence_failed',
+      threshold: REPEATED_PATCH_CONVERGENCE_THRESHOLD,
+      consecutiveRepeatCount: matchedHistory.length + 1,
+      detectedAt: new Date().toISOString(),
+      summary: buildPatchConvergenceSummary(input.executionResult.executionId, matchedHistory.length + 1),
+      currentFingerprint,
+      matchedHistory,
+    });
+    const convergenceArtifactPath = getExecutionPatchConvergenceFile(
+      this.reviewRepository.getArtifactDir(),
+      input.run.runId,
+      input.executionResult.executionId,
+    );
+    await writeJsonFile(convergenceArtifactPath, record);
+
+    throw new OrchestratorError(
+      'REVIEW_PATCH_CONVERGENCE_FAILED',
+      'Repeated identical or effectively identical patch detected after review feedback. Review dispatch is stopped and requires manual attention.',
+      {
+        failClosed: true,
+        manualAttentionRequired: true,
+        reason: 'repeated_patch_convergence',
+        convergenceArtifactPath,
+        threshold: REPEATED_PATCH_CONVERGENCE_THRESHOLD,
+        consecutiveRepeatCount: record.consecutiveRepeatCount,
+        currentFingerprint,
+        matchedHistory: record.matchedHistory,
+      },
+    );
   }
 
   private extractExecutionArtifactContent(
     artifacts: readonly ExecutionArtifact[],
     kind: ExecutionArtifact['kind'],
   ): string | undefined {
-    const artifact = artifacts.find((entry) => entry.kind === kind && entry.content?.trim());
+    const artifact = this.findExecutionArtifact(artifacts, kind);
     return artifact?.content?.trim() || undefined;
+  }
+
+  private findExecutionArtifact(
+    artifacts: readonly ExecutionArtifact[],
+    kind: ExecutionArtifact['kind'],
+  ): ExecutionArtifact | undefined {
+    return artifacts.find((entry) => entry.kind === kind && entry.content?.trim());
+  }
+
+  private normalizePatchEvidence(executionResult: ExecutionResult): {
+    changedFiles: string[];
+    patchSummary: ExecutionResult['patchSummary'];
+    patchArtifactContent?: string | undefined;
+    truncationReasons: string[];
+  } {
+    const patchArtifact = this.findExecutionArtifact(executionResult.artifacts, 'patch');
+    const patchArtifactContent = patchArtifact?.content?.trim() || undefined;
+    const summaryPatchFiles = extractExecutionSummaryPatchFiles(executionResult.summary);
+    const declaredChangedFiles = normalizeFileList(executionResult.patchSummary.changedFiles);
+
+    if (!patchArtifactContent) {
+      if (summaryPatchFiles.length > 0 || declaredChangedFiles.length > 0) {
+        this.throwReviewEvidenceIncomplete(
+          'patch_artifact_missing',
+          'Review evidence is missing the patch artifact required before dispatch.',
+          {
+            executionId: executionResult.executionId,
+            declaredChangedFiles,
+            summaryPatchFiles,
+          },
+        );
+      }
+
+      return {
+        changedFiles: declaredChangedFiles,
+        patchSummary: executionResult.patchSummary,
+        truncationReasons: [],
+      };
+    }
+
+    const patchSummary = parsePatchSummary(patchArtifactContent, {
+      patchPath: executionResult.patchSummary.patchPath,
+      notes: executionResult.patchSummary.notes,
+    });
+    const patchArtifactFiles = normalizeFileList(patchSummary.changedFiles);
+    const missingFiles = summaryPatchFiles.filter((file) => !patchArtifactFiles.includes(file));
+
+    if (missingFiles.length > 0) {
+      this.throwReviewEvidenceIncomplete(
+        'patch_artifact_incomplete',
+        'Review evidence patch artifact is incomplete and does not cover every changed file described by the execution result.',
+        {
+          executionId: executionResult.executionId,
+          missingFiles,
+          patchArtifactFiles,
+          declaredChangedFiles,
+          summaryPatchFiles,
+        },
+      );
+    }
+
+    return {
+      changedFiles: patchArtifactFiles,
+      patchSummary: {
+        ...patchSummary,
+        changedFiles: patchArtifactFiles,
+      },
+      patchArtifactContent,
+      truncationReasons: assessPatchArtifactTruncation({
+        content: patchArtifactContent,
+        metadata: patchArtifact?.metadata,
+        notes: executionResult.patchSummary.notes,
+      }),
+    };
+  }
+
+  private async listLatestTaskReviewAttemptsByExecution(
+    runId: string,
+    taskId: string,
+  ): Promise<
+    Array<{
+      executionId: string;
+      reviewId: string;
+      reviewStatus: ReviewResult['status'];
+      requestCreatedAt: string;
+      reviewTimestamp: string;
+      fingerprint?: PatchFingerprint | undefined;
+    }>
+  > {
+    const [requests, results] = await Promise.all([
+      this.reviewRepository.listRequestsForRun(runId),
+      this.reviewRepository.listResultsForRun(runId),
+    ]);
+    const resultsByReviewId = new Map(results.map((result) => [result.reviewId, result]));
+    const latestByExecutionId = new Map<
+      string,
+      {
+        executionId: string;
+        reviewId: string;
+        reviewStatus: ReviewResult['status'];
+        requestCreatedAt: string;
+        reviewTimestamp: string;
+        fingerprint?: PatchFingerprint | undefined;
+      }
+    >();
+
+    for (const request of requests) {
+      if (request.taskId !== taskId || request.reviewType !== 'task_review') {
+        continue;
+      }
+
+      const result = resultsByReviewId.get(request.reviewId);
+      if (!result) {
+        continue;
+      }
+
+      const candidate = {
+        executionId: request.executionId,
+        reviewId: request.reviewId,
+        reviewStatus: result.status,
+        requestCreatedAt: request.createdAt,
+        reviewTimestamp: result.timestamp,
+        fingerprint: this.readPatchFingerprintFromRequest(request),
+      };
+      const existing = latestByExecutionId.get(request.executionId);
+
+      if (!existing || candidate.reviewTimestamp.localeCompare(existing.reviewTimestamp) > 0) {
+        latestByExecutionId.set(request.executionId, candidate);
+      }
+    }
+
+    return [...latestByExecutionId.values()].sort((left, right) =>
+      left.reviewTimestamp.localeCompare(right.reviewTimestamp),
+    );
+  }
+
+  private readPatchFingerprintFromRequest(request: ReviewRequest): PatchFingerprint | undefined {
+    const metadataFingerprint = PatchFingerprintSchema.safeParse(request.metadata.patchFingerprint);
+    if (metadataFingerprint.success) {
+      return metadataFingerprint.data;
+    }
+
+    if (!request.patchArtifactContent) {
+      return undefined;
+    }
+
+    return fingerprintPatch({
+      patchArtifactContent: request.patchArtifactContent,
+      patchSummary: request.patchSummary,
+    });
+  }
+
+  private throwReviewEvidenceIncomplete(
+    reason:
+      | 'changed_files_missing'
+      | 'patch_artifact_missing'
+      | 'patch_artifact_incomplete'
+      | 'patch_artifact_truncated'
+      | 'test_results_missing'
+      | 'review_evidence_degraded',
+    message: string,
+    details: Record<string, unknown>,
+  ): never {
+    throw new OrchestratorError(
+      'REVIEW_EVIDENCE_INCOMPLETE',
+      `${message} Review dispatch is fail-closed and requires manual attention.`,
+      {
+        failClosed: true,
+        manualAttentionRequired: true,
+        reason,
+        ...details,
+      },
+    );
   }
 
   private async waitForConversationCompletion(input: {
@@ -660,6 +1044,32 @@ export class ReviewService {
         }),
       };
     } catch (error) {
+      const bridgeError = this.toBridgeError(error);
+      if (
+        bridgeError?.code === 'CONVERSATION_UNAVAILABLE' ||
+        (bridgeError?.code === 'CONVERSATION_NOT_FOUND' && input.previous.recoveryAttempted)
+      ) {
+        return this.returnPending({
+          request: input.request,
+          previous: input.previous,
+          status: 'review_requested',
+          attempt: input.attempt,
+          finalizeJobId: input.finalizeJobId,
+          metadata: {
+            ...input.previous.metadata,
+            ...(input.metadata ?? {}),
+          },
+          error: {
+            code: 'REVIEW_FINALIZE_RETRYABLE',
+            message:
+              bridgeError.code === 'CONVERSATION_NOT_FOUND'
+                ? 'Review conversation is no longer available and must be re-dispatched from a fresh conversation.'
+                : 'Review conversation failed on the ChatGPT page and must be re-dispatched from a fresh conversation.',
+            details: bridgeError.details,
+          },
+        });
+      }
+
       if (input.previous.recoveryAttempted) {
         return this.returnPending({
           request: input.request,
@@ -675,13 +1085,20 @@ export class ReviewService {
             code: 'REVIEW_FINALIZE_RETRYABLE',
             message:
               'Review conversation exists, but completion could not be confirmed yet. Retry finalization from the persisted conversation.',
-            details: this.toBridgeError(error) ?? error,
+            details: bridgeError ?? error,
           },
         });
       }
 
       try {
-        const recovered = await this.bridgeClient.recoverConversation(conversationId, {});
+        const recovered = await this.bridgeClient.recoverConversation(conversationId, {
+          sessionId: input.previous.sessionId,
+          browserUrl: input.previous.browserUrl,
+          pageUrl: input.previous.pageUrl,
+          projectName: input.previous.projectName,
+          model: input.previous.model,
+          inputFiles: readReviewInputFiles(input.request.metadata),
+        });
         if (recovered.snapshot.status === 'completed') {
           return {
             runtimeState: await this.persistRuntimeState({
@@ -701,6 +1118,31 @@ export class ReviewService {
               clearLastError: true,
             }),
           };
+        }
+
+        if (recovered.snapshot.status === 'failed') {
+          return this.returnPending({
+            request: input.request,
+            previous: input.previous,
+            status: 'review_requested',
+            attempt: input.attempt,
+            finalizeJobId: input.finalizeJobId,
+            metadata: {
+              ...input.previous.metadata,
+              ...(input.metadata ?? {}),
+              recoveryOutcome: 'REVIEW_RECOVERED_FROM_CONVERSATION',
+            },
+            recoveryAttempted: true,
+            error: {
+              code: 'REVIEW_FINALIZE_RETRYABLE',
+              message:
+                'Recovered review conversation is in a failed state and must be re-dispatched from a fresh conversation.',
+              details: {
+                recoveryStatus: recovered.snapshot.status,
+                pageUrl: recovered.snapshot.pageUrl,
+              },
+            },
+          });
         }
 
         return this.returnPending({
@@ -822,7 +1264,7 @@ export class ReviewService {
         try {
           await this.bridgeClient.sendMessage(conversationId, {
             message: input.remediationPrompt,
-            inputFiles: [],
+            inputFiles: readReviewInputFiles(input.request.metadata),
           });
 
           const waitingState = await this.persistRuntimeState({
@@ -1038,13 +1480,12 @@ export class ReviewService {
         input.result.runId,
         input.result.reviewId,
       ),
-      ...(input.markdownPath ?? input.result.bridgeArtifacts.markdownPath
+      ...((input.markdownPath ?? input.result.bridgeArtifacts.markdownPath)
         ? {
-            markdownPath:
-              input.markdownPath ?? input.result.bridgeArtifacts.markdownPath,
+            markdownPath: input.markdownPath ?? input.result.bridgeArtifacts.markdownPath,
           }
         : {}),
-      ...(input.structuredReviewPath ?? input.result.bridgeArtifacts.structuredReviewPath
+      ...((input.structuredReviewPath ?? input.result.bridgeArtifacts.structuredReviewPath)
         ? {
             structuredReviewPath:
               input.structuredReviewPath ?? input.result.bridgeArtifacts.structuredReviewPath,
@@ -1081,11 +1522,318 @@ function buildArchitectureConstraints(freeze: ArchitectureFreeze | null | undefi
   ];
 }
 
+function buildPatchConvergenceSummary(executionId: string, consecutiveRepeatCount: number): string {
+  return `Execution ${executionId} repeated the same review-failing patch ${consecutiveRepeatCount} time(s) in a row.`;
+}
+
+function extractExecutionSummaryPatchFiles(summary: string): string[] {
+  const markerIndex = summary.indexOf('Patch summary:');
+  if (markerIndex < 0) {
+    return [];
+  }
+
+  const section = summary.slice(markerIndex + 'Patch summary:'.length);
+  const files = new Set<string>();
+
+  for (const line of section.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    if (!trimmed.startsWith('- ')) {
+      if (files.size > 0) {
+        break;
+      }
+      continue;
+    }
+
+    for (const match of trimmed.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
+      const label = match[1];
+      const target = match[2];
+      if (!label || !target) {
+        continue;
+      }
+      const candidate = normalizeSummaryFileReference(label, target);
+      if (candidate) {
+        files.add(candidate);
+      }
+    }
+  }
+
+  return [...files];
+}
+
+function normalizeSummaryFileReference(label: string, target: string): string | null {
+  const normalizedLabel = normalizeRepoRelativePath(label);
+  if (normalizedLabel) {
+    return normalizedLabel;
+  }
+
+  const normalizedTarget =
+    target.replace(/^file:\/\//, '').replaceAll('\\', '/').split('#')[0] ?? '';
+  const markers = ['/apps/', '/scripts/', '/services/', '/packages/', '/tests/'];
+  for (const marker of markers) {
+    const markerIndex = normalizedTarget.lastIndexOf(marker);
+    if (markerIndex >= 0) {
+      return normalizeRepoRelativePath(normalizedTarget.slice(markerIndex + 1));
+    }
+  }
+
+  return null;
+}
+
+function normalizeFileList(files: readonly string[]): string[] {
+  return [...new Set(files.map((file) => normalizeRepoRelativePath(file)).filter((file) => file.length > 0))];
+}
+
+function normalizeRepoRelativePath(value: string): string {
+  const normalized = value
+    .replaceAll('\\', '/')
+    .trim()
+    .replace(/^\.?\//, '')
+    .replace(/^\/+/, '');
+
+  if (
+    normalized.length === 0 ||
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://')
+  ) {
+    return '';
+  }
+
+  return normalized;
+}
+
+function assessPatchArtifactTruncation(input: {
+  content: string;
+  metadata: Record<string, unknown> | undefined;
+  notes: readonly string[];
+}): string[] {
+  const reasons = new Set<string>();
+
+  if (isArtifactMetadataTruncated(input.metadata)) {
+    reasons.add('Patch artifact metadata marks the diff evidence as truncated.');
+  }
+
+  for (const note of input.notes) {
+    if (containsTruncationMarker(note)) {
+      reasons.add(`Patch summary note indicates truncation: ${note}`);
+    }
+  }
+
+  const explicitMarker = findExplicitPatchTruncationMarker(input.content);
+  if (explicitMarker) {
+    reasons.add(`Patch artifact ends with an explicit truncation marker: ${explicitMarker}`);
+  }
+
+  for (const file of findPatchBlocksWithoutReviewablePayload(input.content)) {
+    reasons.add(
+      `Patch artifact did not materialize a reviewable diff body for ${file}.`,
+    );
+  }
+
+  for (const file of findPatchBlocksWithDanglingHunkHeader(input.content)) {
+    reasons.add(`Patch artifact ended after a hunk header for ${file}.`);
+  }
+
+  return [...reasons];
+}
+
+function isArtifactMetadataTruncated(metadata: Record<string, unknown> | undefined): boolean {
+  if (!metadata) {
+    return false;
+  }
+
+  const truncationBooleanKeys = [
+    'truncated',
+    'isTruncated',
+    'wasTruncated',
+    'outputTruncated',
+    'patchTruncated',
+  ] as const;
+  for (const key of truncationBooleanKeys) {
+    if (metadata[key] === true) {
+      return true;
+    }
+  }
+
+  const truncationCountKeys = [
+    'truncatedBytes',
+    'truncatedLines',
+    'omittedBytes',
+    'omittedLines',
+  ] as const;
+  for (const key of truncationCountKeys) {
+    const value = metadata[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return true;
+    }
+  }
+
+  const statusKeys = ['status', 'artifactStatus', 'captureStatus'] as const;
+  for (const key of statusKeys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && containsTruncationMarker(value)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function containsTruncationMarker(value: string): boolean {
+  return /\btruncat(?:ed|ion)?\b|\bomitted\b|\belided\b|\bclipped\b/ui.test(value);
+}
+
+function findExplicitPatchTruncationMarker(content: string): string | null {
+  const lastMeaningfulLine = [...content.split('\n')]
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .at(-1);
+
+  if (!lastMeaningfulLine) {
+    return null;
+  }
+
+  if (
+    /^\.\.\.\s*(?:\[[^\]]*truncat[^\]]*\]|truncat(?:ed|ion)?|omitted|elided)/ui.test(
+      lastMeaningfulLine,
+    ) ||
+    /^\[[^\]]*truncat[^\]]*\]$/ui.test(lastMeaningfulLine)
+  ) {
+    return lastMeaningfulLine;
+  }
+
+  return null;
+}
+
+function findPatchBlocksWithoutReviewablePayload(content: string): string[] {
+  return collectPatchBlockDiagnostics(content)
+    .filter((block) => !block.hasReviewablePayload)
+    .map((block) => block.file);
+}
+
+function findPatchBlocksWithDanglingHunkHeader(content: string): string[] {
+  return collectPatchBlockDiagnostics(content)
+    .filter((block) => block.hasDanglingHunkHeader)
+    .map((block) => block.file);
+}
+
+function collectPatchBlockDiagnostics(content: string): Array<{
+  file: string;
+  hasReviewablePayload: boolean;
+  hasDanglingHunkHeader: boolean;
+}> {
+  const diagnostics: Array<{
+    file: string;
+    hasReviewablePayload: boolean;
+    hasDanglingHunkHeader: boolean;
+  }> = [];
+  let current:
+    | {
+        file: string;
+        hasReviewablePayload: boolean;
+        hasDanglingHunkHeader: boolean;
+      }
+    | undefined;
+
+  for (const line of content.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      if (current) {
+        diagnostics.push(current);
+      }
+      current = {
+        file: readPatchBlockFile(line),
+        hasReviewablePayload: false,
+        hasDanglingHunkHeader: false,
+      };
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    if (startsReviewableNonHunkPayload(line)) {
+      current.hasReviewablePayload = true;
+      current.hasDanglingHunkHeader = false;
+      continue;
+    }
+
+    if (line.startsWith('@@ ')) {
+      current.hasDanglingHunkHeader = true;
+      continue;
+    }
+
+    if (
+      current.hasDanglingHunkHeader &&
+      (line.startsWith(' ') ||
+        line.startsWith('+') ||
+        line.startsWith('-') ||
+        line.startsWith('\\ No newline at end of file'))
+    ) {
+      current.hasReviewablePayload = true;
+      current.hasDanglingHunkHeader = false;
+    }
+  }
+
+  if (current) {
+    diagnostics.push(current);
+  }
+
+  return diagnostics;
+}
+
+function readPatchBlockFile(line: string): string {
+  const match = /^diff --git a\/(.+?) b\/(.+)$/u.exec(line);
+  return match?.[2] ?? 'unknown file';
+}
+
+function startsReviewableNonHunkPayload(line: string): boolean {
+  return (
+    line === 'GIT binary patch' ||
+    line.startsWith('Binary files ') ||
+    line.startsWith('similarity index ') ||
+    line.startsWith('rename from ') ||
+    line.startsWith('rename to ') ||
+    line.startsWith('copy from ') ||
+    line.startsWith('copy to ') ||
+    line.startsWith('old mode ') ||
+    line.startsWith('new mode ') ||
+    line.startsWith('deleted file mode ') ||
+    line.startsWith('new file mode ')
+  );
+}
+
+function readReviewInputFiles(metadata: Record<string, unknown> | undefined): string[] {
+  const bundle = metadata?.analysisBundle;
+  if (bundle && typeof bundle === 'object') {
+    const rawFiles = (bundle as { files?: unknown }).files;
+    if (Array.isArray(rawFiles)) {
+      const filtered = rawFiles.flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return [];
+        }
+
+        const pathValue = (entry as { path?: unknown }).path;
+        const kindValue = (entry as { kind?: unknown }).kind;
+        if (typeof pathValue !== 'string' || pathValue.length === 0) {
+          return [];
+        }
+
+        return kindValue === 'source_zip' ? [] : [pathValue];
+      });
+      if (filtered.length > 0) {
+        return filtered;
+      }
+    }
+  }
+
+  return readAnalysisBundleInputFiles(metadata).filter((filePath) => !filePath.endsWith('.zip'));
+}
+
 function isPendingFinalize<T>(value: ReviewFinalizePending | T): value is ReviewFinalizePending {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'status' in value &&
-    value.status === 'pending'
+    typeof value === 'object' && value !== null && 'status' in value && value.status === 'pending'
   );
 }

@@ -23,6 +23,7 @@ module.exports = {
       parserOptions: {
         project: [
           './tsconfig.base.json',
+          './tsconfig.scripts.json',
           './services/*/tsconfig.json',
           './apps/*/tsconfig.json',
           './packages/*/tsconfig.json',
@@ -33,7 +34,14 @@ module.exports = {
     {
       files: ['**/*.test.ts', '**/*.spec.ts'],
       rules: {
+        '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-return': 'off',
+        '@typescript-eslint/no-var-requires': 'off',
+        '@typescript-eslint/require-await': 'off',
         '@typescript-eslint/unbound-method': 'off',
+        '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       },
     },
   ],

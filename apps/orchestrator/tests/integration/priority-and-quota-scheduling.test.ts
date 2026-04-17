@@ -8,6 +8,7 @@ import {
   createArtifactDir,
   createBridgeClient,
   createControllableCodexRunner,
+  waitForCondition,
 } from '../helpers/runtime-fixtures';
 
 describe('priority and quota scheduling integration', () => {
@@ -69,6 +70,7 @@ describe('priority and quota scheduling integration', () => {
 
     await bundle.daemonRuntimeService.start({ autoPolling: false, requestedBy: 'tester' });
     await bundle.daemonRuntimeService.tick();
+    await waitForCondition(async () => runner.callCount() === 2, 5000);
 
     const jobsRun1 = await bundle.runQueueService.listJobsForRun(runId);
     const jobsRun2 = await bundle.runQueueService.listJobsForRun(run2.runId);

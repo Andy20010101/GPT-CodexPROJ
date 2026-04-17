@@ -49,6 +49,15 @@ function buildRequest(): ExecutionRequest {
   });
 }
 
+function buildRequestWithOverrides(
+  overrides: Partial<ExecutionRequest> = {},
+): ExecutionRequest {
+  return ExecutionRequestSchema.parse({
+    ...buildRequest(),
+    ...overrides,
+  });
+}
+
 describe('CodexExecutionPayloadBuilder', () => {
   it('includes the key task boundaries in the generated payload', () => {
     const builder = new CodexExecutionPayloadBuilder();
@@ -60,6 +69,39 @@ describe('CodexExecutionPayloadBuilder', () => {
     expect(payload.prompt).toContain('deny: services/chatgpt-web-bridge/**');
     expect(payload.prompt).toContain('orchestrator -> execution adapter only');
     expect(payload.prompt).toContain('Return structured execution output');
+    expect(payload.prompt).toContain('Start by inspecting only the allowed files listed above.');
+    expect(payload.prompt).toContain(
+      'Do not add import/require statements that reference deny patterns',
+    );
+    expect(payload.prompt).toContain('fail fast and report the missing path');
+    expect(payload.prompt).toContain('already satisfies the acceptance criteria');
+  });
+
+  it('truncates long architecture-constraint sections in the prompt', () => {
+    const builder = new CodexExecutionPayloadBuilder();
+    const payload = builder.build(
+      buildRequestWithOverrides({
+        architectureConstraints: [
+          'constraint-1',
+          'constraint-2',
+          'constraint-3',
+          'constraint-4',
+          'constraint-5',
+          'constraint-6',
+          'constraint-7',
+          'constraint-8',
+          'constraint-9',
+          'constraint-10',
+        ],
+      }),
+    );
+
+    expect(payload.prompt).toContain('constraint-1');
+    expect(payload.prompt).toContain('constraint-8');
+    expect(payload.prompt).not.toContain('constraint-9');
+    expect(payload.prompt).toContain(
+      '2 additional architecture constraints were omitted from this prompt for focus',
+    );
   });
 });
 

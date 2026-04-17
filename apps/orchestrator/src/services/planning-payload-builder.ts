@@ -4,6 +4,7 @@ import type {
   PlanningRequest,
   RequirementFreeze,
 } from '../contracts';
+import { buildAnalysisBundlePromptLines } from '../utils/analysis-bundle';
 
 const JSON_REQUIREMENT = [
   'Return exactly one fenced JSON block.',
@@ -57,6 +58,7 @@ function buildRequirementPrompt(request: PlanningRequest): {
       '- Acceptance criteria must be objectively verifiable.',
       '- Keep the output concise but operational.',
       `Run ID: ${request.runId}`,
+      ...buildAnalysisBundlePromptLines(request.metadata),
       request.sourcePrompt
         ? `Original requirement prompt:\n${request.sourcePrompt}`
         : `Prompt:\n${request.prompt}`,
@@ -90,6 +92,7 @@ function buildArchitecturePrompt(
       '- Cover data flow or interface boundaries in module responsibilities and dependency rules.',
       '- Reflect the frozen requirements faithfully.',
       `Run ID: ${request.runId}`,
+      ...buildAnalysisBundlePromptLines(request.metadata),
       `Original planning prompt:\n${request.sourcePrompt ?? request.prompt}`,
       requirementFreeze
         ? `Requirement freeze:\n${JSON.stringify(requirementFreeze, null, 2)}`
@@ -136,6 +139,7 @@ function buildTaskGraphPrompt(
       '- Every task must have objective, acceptance criteria, test plan, and file boundaries.',
       '- Keep tasks scoped tightly enough for controlled execution.',
       `Run ID: ${request.runId}`,
+      ...buildAnalysisBundlePromptLines(request.metadata),
       `Original planning prompt:\n${request.sourcePrompt ?? request.prompt}`,
       requirementFreeze
         ? `Requirement freeze:\n${JSON.stringify(requirementFreeze, null, 2)}`

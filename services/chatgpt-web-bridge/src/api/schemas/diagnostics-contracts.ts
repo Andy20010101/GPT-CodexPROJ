@@ -4,6 +4,7 @@ import { successEnvelope } from '@review-then-codex/shared-contracts/chatgpt';
 
 export const BrowserEndpointCandidateSourceSchema = z.enum([
   'request_input',
+  'env_state_browser_authority',
   'env_browser_url',
   'env_browser_url_candidates',
   'env_connect_url',

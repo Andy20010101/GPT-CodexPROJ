@@ -4,6 +4,7 @@ import {
   BridgeHealthResponseSchema,
   ConversationPathParamsSchema,
   DriftIncidentsResponseSchema,
+  GetConversationStatusResponseSchema,
   GetSnapshotResponseSchema,
   MarkdownExportRequestSchema,
   MarkdownExportResponseSchema,
@@ -78,8 +79,8 @@ export function registerBridgeRoutes(
 
   app.get('/api/conversations/:id/status', async (request) => {
     const params = ConversationPathParamsSchema.parse(request.params);
-    const data = await conversationService.getSnapshot(params.id);
-    return GetSnapshotResponseSchema.parse({ ok: true, data });
+    const data = await conversationService.getConversationStatus(params.id);
+    return GetConversationStatusResponseSchema.parse({ ok: true, data });
   });
 
   app.get('/api/conversations/:id/snapshot', async (request) => {

@@ -1,9 +1,11 @@
 import { AppError } from '../types/error';
 import { BrowserAttachDiagnosticsService } from '../services/browser-attach-diagnostics-service';
+import { BrowserAuthorityService } from '../services/browser-authority-service';
 
 export class BrowserAttachPreflightGuard {
   public constructor(
     private readonly diagnosticsService: BrowserAttachDiagnosticsService,
+    private readonly browserAuthorityService: BrowserAuthorityService = new BrowserAuthorityService(),
   ) {}
 
   public async prepareSessionInput(input: {
@@ -14,6 +16,14 @@ export class BrowserAttachPreflightGuard {
     browserEndpoint: string;
     startupUrl?: string | undefined;
   }> {
+    const authority = await this.browserAuthorityService.resolve(input);
+    if (authority.source === 'request_input' && authority.browserEndpoint) {
+      return {
+        browserEndpoint: authority.browserEndpoint,
+        ...(authority.startupUrl ? { startupUrl: authority.startupUrl } : {}),
+      };
+    }
+
     const diagnostic = await this.diagnosticsService.runBrowserAttachDiagnostic({
       browserUrl: input.browserUrl,
       browserEndpoint: input.browserEndpoint,

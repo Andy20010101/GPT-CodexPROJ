@@ -317,8 +317,9 @@ function createSuccessfulCodexRunner(): CodexRunner {
         exitCode: 0,
         patch: [
           'diff --git a/apps/orchestrator/src/services/review-service.ts b/apps/orchestrator/src/services/review-service.ts',
+          '--- a/apps/orchestrator/src/services/review-service.ts',
           '+++ b/apps/orchestrator/src/services/review-service.ts',
-          '@@',
+          '@@ -0,0 +1 @@',
           '+// review loop integration',
         ].join('\n'),
         testResults: [

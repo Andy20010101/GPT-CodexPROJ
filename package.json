@@ -9,12 +9,18 @@
     "services/*"
   ],
   "scripts": {
+    "ci": "npm run typecheck && npm run test",
     "build": "npm run build --workspaces --if-present",
-    "lint": "eslint . --ext .ts",
+    "lint": "npm run lint:orchestrator && npm run lint:bridge && npm run lint:contracts && npm run lint:scripts",
+    "lint:orchestrator": "NODE_OPTIONS=--max-old-space-size=4096 eslint apps/orchestrator/src apps/orchestrator/tests --ext .ts",
+    "lint:bridge": "NODE_OPTIONS=--max-old-space-size=4096 eslint services/chatgpt-web-bridge/src services/chatgpt-web-bridge/tests --ext .ts",
+    "lint:contracts": "NODE_OPTIONS=--max-old-space-size=4096 eslint packages/shared-contracts/chatgpt --ext .ts",
+    "lint:scripts": "NODE_OPTIONS=--max-old-space-size=4096 eslint scripts --ext .ts",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json"
   },
   "engines": {
     "node": ">=18.18.0"

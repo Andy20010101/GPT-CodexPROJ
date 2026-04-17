@@ -1,4 +1,5 @@
 import type {
+  ConversationStatus,
   ConversationSnapshot,
   SessionSummary,
 } from '@review-then-codex/shared-contracts/chatgpt';
@@ -44,6 +45,8 @@ export type AdapterSnapshotInput = {
   readonly conversationId: string;
 };
 
+export type AdapterConversationStatusInput = AdapterSnapshotInput;
+
 export type SessionRecord = SessionSummary & {
   readonly startupUrl?: string | undefined;
 };
@@ -59,5 +62,6 @@ export interface ChatGPTAdapter {
   startConversation(input: AdapterStartConversationInput): Promise<ConversationSnapshot>;
   sendMessage(input: AdapterMessageInput): Promise<ConversationSnapshot>;
   waitForConversation(input: AdapterWaitInput): Promise<ConversationSnapshot>;
+  getConversationStatus(input: AdapterConversationStatusInput): Promise<ConversationStatus>;
   getConversationSnapshot(input: AdapterSnapshotInput): Promise<ConversationSnapshot>;
 }

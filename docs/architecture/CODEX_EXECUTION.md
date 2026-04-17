@@ -1,6 +1,6 @@
 # Codex Execution
 
-`CodexExecutor` is the current adapter boundary between the orchestrator and a future real Codex runtime.
+`CodexExecutor` is the current adapter boundary between the orchestrator, the local Codex CLI path, and any future Codex runtime.
 
 ## Input Shape
 
@@ -31,21 +31,21 @@ The current implementation is intentionally honest about its scope:
 - `CodexExecutor` is real code
 - `CodexExecutionPayloadBuilder` is reusable
 - `CodexRunner` is a mockable interface
+- `CodexCliRunner` is the real local CLI adapter
 - `StubCodexRunner` is the default local fallback
 
 What is not implemented yet:
 
-- a real Codex CLI adapter
 - a remote Codex API adapter
 - cloud workspace provisioning
 - streaming token or patch events
 
-## How To Replace The Stub Runner
+## How To Extend The Runner Boundary
 
-The next step is to implement a concrete `CodexRunner` that:
+The next step is to implement another concrete `CodexRunner` that:
 
 1. accepts the builder payload
 2. invokes the chosen Codex runtime
 3. returns `status`, `summary`, `patch`, `testResults`, `stdout`, `stderr`, and metadata
 
-That concrete runner can then be injected into `CodexExecutor` without changing `ExecutionService` or `OrchestratorService`.
+That runner can then be injected into `CodexExecutor` without changing `ExecutionService` or `OrchestratorService`.

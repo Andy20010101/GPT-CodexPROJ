@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AcceptanceCriterionSchema } from './requirement-freeze';
 import { PatchSummarySchema } from './patch-summary';
 import { TaskScopeSchema } from './task-envelope';
+import { TestEvidenceAssessmentSchema } from './test-evidence';
 import { TestResultSchema } from './test-result';
 
 export const ReviewTypeSchema = z.enum(['task_review', 'release_review']);
@@ -25,6 +26,7 @@ export const ReviewRequestSchema = z.object({
   patchSummary: PatchSummarySchema,
   patchArtifactContent: z.string().min(1).optional(),
   testResults: z.array(TestResultSchema).default([]),
+  testEvidence: TestEvidenceAssessmentSchema,
   testLogExcerpt: z.string().min(1).optional(),
   executionSummary: z.string().min(1),
   architectureConstraints: z.array(z.string().min(1)).default([]),

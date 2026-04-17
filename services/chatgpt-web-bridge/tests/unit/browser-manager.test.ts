@@ -13,9 +13,14 @@ vi.mock('puppeteer-core', () => ({
 }));
 
 describe('BrowserManager', () => {
-  it('rebinds the session to a fresh page before a new conversation starts', async () => {
+  it('allocates a dedicated page when the attached session does not own the page', async () => {
     const existingPage = {
       url: () => 'https://chatgpt.com/c/existing',
+      close: vi.fn(async () => undefined),
+      isClosed: vi.fn(() => false),
+    };
+    const dedicatedPage = {
+      url: () => 'https://chatgpt.com/',
       close: vi.fn(async () => undefined),
       isClosed: vi.fn(() => false),
     };
@@ -24,14 +29,21 @@ describe('BrowserManager', () => {
       close: vi.fn(async () => undefined),
       isClosed: vi.fn(() => false),
     };
-    const browser = {
-      pages: vi.fn(async () => [existingPage]),
-    };
+    const browser = {};
     connect.mockResolvedValue(browser);
 
     const pageFactory = {
-      bindChatGPTPage: vi.fn(async () => existingPage),
-      createFreshChatGPTPage: vi.fn(async () => freshPage),
+      bindChatGPTPage: vi.fn(async () => ({
+        page: existingPage,
+        ownsPage: false,
+      })),
+      resetChatGPTPage: vi.fn(async () => {
+        throw new Error('should not reset bridge-owned dedicated pages');
+      }),
+      createFreshChatGPTPage: vi
+        .fn()
+        .mockResolvedValueOnce(dedicatedPage)
+        .mockResolvedValueOnce(freshPage),
     };
 
     const manager = new BrowserManager(pageFactory as never);
@@ -41,16 +53,33 @@ describe('BrowserManager', () => {
       startupUrl: 'https://chatgpt.com/',
     });
 
-    expect(manager.getPage('session-1')).toBe(existingPage);
+    expect(connect).toHaveBeenCalledWith({
+      browserURL: 'http://127.0.0.1:9667',
+      protocolTimeout: 600_000,
+    });
+
+    expect(manager.getPage('session-1')).toBe(dedicatedPage);
 
     const rebound = await manager.prepareFreshConversationPage('session-1');
 
     expect(rebound).toBe(freshPage);
-    expect(pageFactory.createFreshChatGPTPage).toHaveBeenCalledWith(
+    expect(pageFactory.bindChatGPTPage).toHaveBeenCalledWith(browser, {
+      startupUrl: 'https://chatgpt.com/',
+      mode: 'attach',
+    });
+    expect(pageFactory.createFreshChatGPTPage).toHaveBeenNthCalledWith(
+      1,
       browser,
       'https://chatgpt.com/',
     );
+    expect(pageFactory.createFreshChatGPTPage).toHaveBeenNthCalledWith(
+      2,
+      browser,
+      'https://chatgpt.com/',
+    );
+    expect(pageFactory.resetChatGPTPage).not.toHaveBeenCalled();
     expect(manager.getPage('session-1')).toBe(freshPage);
+    expect(dedicatedPage.close).toHaveBeenCalledTimes(1);
     expect(existingPage.close).not.toHaveBeenCalled();
   });
 
@@ -66,13 +95,18 @@ describe('BrowserManager', () => {
       isClosed: vi.fn(() => false),
     };
     const browser = {
-      pages: vi.fn(async () => []),
     };
     connect.mockResolvedValue(browser);
 
     const pageFactory = {
-      bindChatGPTPage: vi.fn(async () => bridgeOwnedPage),
+      bindChatGPTPage: vi.fn(async () => ({
+        page: bridgeOwnedPage,
+        ownsPage: true,
+      })),
       createFreshChatGPTPage: vi.fn(async () => freshPage),
+      resetChatGPTPage: vi.fn(async () => {
+        throw new Error('should not reuse bridge-owned pages');
+      }),
     };
 
     const manager = new BrowserManager(pageFactory as never);
@@ -80,6 +114,11 @@ describe('BrowserManager', () => {
       sessionId: 'session-1',
       browserEndpoint: 'http://127.0.0.1:9667',
       startupUrl: 'https://chatgpt.com/',
+    });
+
+    expect(connect).toHaveBeenCalledWith({
+      browserURL: 'http://127.0.0.1:9667',
+      protocolTimeout: 600_000,
     });
 
     const rebound = await manager.prepareFreshConversationPage('session-1');
