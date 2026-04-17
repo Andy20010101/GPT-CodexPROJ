@@ -186,7 +186,7 @@ describe('ExecutionService', () => {
     const request = service.buildRequest({
       run,
       task,
-      workspacePath: '/home/administrator/code/review-then-codex-system',
+      workspacePath: '/home/administrator/code/GPT-CodexPROJ',
       architectureFreeze: {
         runId: run.runId,
         summary: 'Freeze',
@@ -226,7 +226,7 @@ describe('ExecutionService', () => {
       run,
       task,
       producer: 'tester',
-      workspacePath: '/home/administrator/code/review-then-codex-system',
+      workspacePath: '/home/administrator/code/GPT-CodexPROJ',
       onFailure: 'keep_implementing',
     });
 

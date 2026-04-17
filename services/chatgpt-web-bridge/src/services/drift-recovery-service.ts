@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   BridgeDriftIncident,
   BridgeHealthSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import { DriftDetector, type SelectorProbe } from '../dom/drift-detector';
 import { evaluatePageHealth } from '../dom/page-health-check';

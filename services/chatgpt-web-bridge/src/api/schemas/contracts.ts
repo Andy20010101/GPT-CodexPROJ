@@ -24,4 +24,4 @@ export {
   StructuredReviewExtractResponseSchema,
   WaitConversationRequestSchema,
   WaitConversationResponseSchema,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';

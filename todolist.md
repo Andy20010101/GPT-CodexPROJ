@@ -5,13 +5,13 @@ Updated: 2026-04-14
 ## Current Baseline
 
 - The latest formal real E2E run reached final acceptance:
-  `/home/administrator/code/review-then-codex-system/tmp/orchestrator-validation-4/artifacts/runs/7c50c8e0-b083-47a2-a785-1bf6da8a9f7e/run.json`
+  `/home/administrator/code/GPT-CodexPROJ/tmp/orchestrator-validation-4/artifacts/runs/7c50c8e0-b083-47a2-a785-1bf6da8a9f7e/run.json`
 - That run proved the end-to-end chain:
   `requirement freeze -> architecture freeze -> task graph -> task execution -> task review -> rework -> accepted -> release review -> run acceptance`
 - The validation harness no longer loops forever on the same patch. The stage renderer was updated in:
-  `/home/administrator/code/review-then-codex-system/tmp/orchestrator-validation-1/scripts/render-user-api-validation.mjs`
+  `/home/administrator/code/GPT-CodexPROJ/tmp/orchestrator-validation-1/scripts/render-user-api-validation.mjs`
 - A reusable local watcher now exists:
-  `/home/administrator/code/review-then-codex-system/scripts/watch-run-until-terminal.mjs`
+  `/home/administrator/code/GPT-CodexPROJ/scripts/watch-run-until-terminal.mjs`
 
 ## Operating Policy
 
@@ -146,7 +146,7 @@ Updated: 2026-04-14
 
 - [x] Add a first-class real self-improvement entrypoint.
   Goal: create one script that starts a bounded self-improvement run against this repository, instead of reusing the validation harness manually.
-  Suggested target: `/home/administrator/code/review-then-codex-system/scripts/run-real-self-improvement.ts`
+  Suggested target: `/home/administrator/code/GPT-CodexPROJ/scripts/run-real-self-improvement.ts`
   It should:
   - create a run with a narrow objective
   - attach a watcher output path from the start
@@ -267,7 +267,7 @@ Updated: 2026-04-14
 - [x] Add a dedicated doc for real self-improvement runs.
   Goal: document how to start one bounded self-improvement run safely, what success looks like, and when to stop.
   Suggested location:
-  `/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md`
+  `/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md`
 
 ## Suggested Order
 

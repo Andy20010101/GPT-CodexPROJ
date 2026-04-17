@@ -16,7 +16,7 @@ function buildRequest(): ExecutionRequest {
     runId: randomUUID(),
     taskId: randomUUID(),
     executorType: 'codex',
-    workspacePath: '/home/administrator/code/review-then-codex-system',
+    workspacePath: '/home/administrator/code/GPT-CodexPROJ',
     title: 'Implement execution plane',
     objective: 'Dispatch a task to a codex runner',
     scope: {

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import { HealthResponseSchema } from '@review-then-codex/shared-contracts/chatgpt';
+import { HealthResponseSchema } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 export function registerHealthRoute(app: FastifyInstance): void {
   app.get('/health', () => {

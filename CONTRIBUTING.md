@@ -35,8 +35,8 @@ Common commands:
 ```bash
 npm run lint
 npm run typecheck
-npm test --workspace @review-then-codex/orchestrator
-npm test --workspace @review-then-codex/chatgpt-web-bridge
+npm test --workspace @gpt-codexproj/orchestrator
+npm test --workspace @gpt-codexproj/chatgpt-web-bridge
 npm run ci
 ```
 

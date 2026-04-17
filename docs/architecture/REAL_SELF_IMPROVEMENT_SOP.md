@@ -8,7 +8,7 @@ Use it when a run has finished, a new chat thread is being opened, and the next 
 
 This is a runbook, not a redesign proposal. It is grounded in the accepted runs `c27a123f-6255-490a-b0b3-b2c6079d983a`, `0f55cde7-1053-4ca3-aeb3-21fe002d1383`, and `206eab47-6f19-4899-88ed-77ee50261012`.
 
-For preparing a brand-new project packet before the run starts, see [`PROJECT_PREPARATION_SOP.md`](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_SOP.md).
+For preparing a brand-new project packet before the run starts, see [`PROJECT_PREPARATION_SOP.md`](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_SOP.md).
 
 ## Supported Mode
 
@@ -102,7 +102,7 @@ Use the `Selected candidate` and `BRIDGE_BROWSER_URL=...` output as the authorit
 
 Run this checklist at the start of every new chat thread before starting the next real self-improvement run.
 
-- [ ] Work from `/home/administrator/code/review-then-codex-system`
+- [ ] Work from `/home/administrator/code/GPT-CodexPROJ`
 - [ ] Confirm the previous run is already terminal and will not be mutated further
 - [ ] Confirm the next run will be a fresh run; do not plan to reuse an old conversation or old review thread
 - [ ] Confirm the selected WSL-visible browser endpoint for this fresh run, using `http://172.18.144.1:9224` as the validated baseline unless diagnostics prove another endpoint

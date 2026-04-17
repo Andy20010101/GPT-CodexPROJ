@@ -1,4 +1,4 @@
-import type { ConversationSnapshot } from '@review-then-codex/shared-contracts/chatgpt';
+import type { ConversationSnapshot } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 export class MarkdownExporter {
   public render(snapshot: ConversationSnapshot): string {

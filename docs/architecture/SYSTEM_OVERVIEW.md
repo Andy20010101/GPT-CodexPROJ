@@ -1,6 +1,6 @@
 # System Overview
 
-`review-then-codex-system` is designed around explicit freezes and typed handoffs rather than a single agent directly doing everything.
+`GPT-CodexPROJ` is designed around explicit freezes and typed handoffs rather than a single agent directly doing everything.
 
 ## Lifecycle
 

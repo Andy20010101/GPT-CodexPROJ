@@ -6,7 +6,7 @@ Use it when you need to orient a new operator, explain the system boundary, or q
 
 ## Purpose
 
-`review-then-codex-system` exists to separate review-quality thinking from code execution while keeping both sides inside an auditable workflow.
+`GPT-CodexPROJ` exists to separate review-quality thinking from code execution while keeping both sides inside an auditable workflow.
 
 The project is designed to:
 

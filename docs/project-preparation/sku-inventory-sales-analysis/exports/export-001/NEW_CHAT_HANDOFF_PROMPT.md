@@ -1,25 +1,25 @@
 # New Chat Handoff Prompt
 
 ```text
-You are working in `/home/administrator/code/review-then-codex-system`.
+You are working in `/home/administrator/code/GPT-CodexPROJ`.
 
 Read these preparation docs first:
 
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_CLI.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_SOP.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_CLI.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_SOP.md`
 
 Then read the current packet for this preparation:
 
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/PROJECT_BRIEF.md`
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/MVP_SCOPE.md`
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/NON_GOALS.md`
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/SUCCESS_CRITERIA.md`
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/ARCHITECTURE_BOUNDARY.md`
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/INITIAL_WORKSTREAMS.md`
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/RISKS_AND_ASSUMPTIONS.md`
-- `/home/administrator/code/review-then-codex-system/docs/project-preparation/<project-slug>/packet/NEW_CHAT_HANDOFF_PROMPT.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/PROJECT_BRIEF.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/MVP_SCOPE.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/NON_GOALS.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/SUCCESS_CRITERIA.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/ARCHITECTURE_BOUNDARY.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/INITIAL_WORKSTREAMS.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/RISKS_AND_ASSUMPTIONS.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/project-preparation/<project-slug>/packet/NEW_CHAT_HANDOFF_PROMPT.md`
 
 Current State:
 - packet export: `<export id or status>`

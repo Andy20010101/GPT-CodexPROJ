@@ -12,12 +12,12 @@ import type {
   StartConversationRequest,
   StructuredReviewExtractRequest,
   WaitConversationRequest,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 import type {
   ConversationStatus,
   ConversationSnapshot,
   SessionSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 import type { Logger } from 'pino';
 
 import { Conversation } from '../domain/conversation';

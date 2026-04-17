@@ -12,7 +12,7 @@ It is not a redesign proposal. It defines:
 - whether the project needs an immediate refactor
 - what order future work should follow
 
-For the repeatable fresh-conversation operator procedure, see [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md).
+For the repeatable fresh-conversation operator procedure, see [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md).
 
 ## Current Status
 
@@ -138,7 +138,7 @@ The project should now explicitly define its supported mode as follows.
 
 - browser login state is operator-maintained
 - if the environment is outside the supported mode, the run should stop early with explicit diagnostics
-- PTY/non-PTY interchangeability is not part of the current support promise; follow the conservative runner discipline in [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md), which defaults to the last explicitly validated mode and prefers the known-good non-PTY path when PTY has not been revalidated
+- PTY/non-PTY interchangeability is not part of the current support promise; follow the conservative runner discipline in [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md), which defaults to the last explicitly validated mode and prefers the known-good non-PTY path when PTY has not been revalidated
 
 This is the current minimum complete product mode.
 

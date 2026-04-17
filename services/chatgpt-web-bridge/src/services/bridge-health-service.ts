@@ -6,7 +6,7 @@ import {
   BridgeHealthSummarySchema,
   type BridgeDriftIncident,
   type BridgeHealthSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 
 async function writeJson(filePath: string, value: unknown): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });

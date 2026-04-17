@@ -1,8 +1,8 @@
 {
-  "name": "review-then-codex-system",
+  "name": "gpt-codexproj",
   "version": "0.1.0",
   "private": true,
-  "description": "Architecture-first monorepo for Review Plane and Execution Plane collaboration.",
+  "description": "GPT-CodexPROJ: architecture-first monorepo for review, planning, and execution collaboration.",
   "workspaces": [
     "apps/*",
     "packages/*",
@@ -12,7 +12,9 @@
     "ci": "npm run typecheck && npm run test",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint:orchestrator && npm run lint:bridge && npm run lint:contracts && npm run lint:scripts",
-    "lint:orchestrator": "NODE_OPTIONS=--max-old-space-size=4096 eslint apps/orchestrator/src apps/orchestrator/tests --ext .ts",
+    "lint:orchestrator": "npm run lint:orchestrator:src && npm run lint:orchestrator:tests",
+    "lint:orchestrator:src": "NODE_OPTIONS=--max-old-space-size=4096 eslint apps/orchestrator/src --ext .ts",
+    "lint:orchestrator:tests": "NODE_OPTIONS=--max-old-space-size=4096 eslint apps/orchestrator/tests --ext .ts",
     "lint:bridge": "NODE_OPTIONS=--max-old-space-size=4096 eslint services/chatgpt-web-bridge/src services/chatgpt-web-bridge/tests --ext .ts",
     "lint:contracts": "NODE_OPTIONS=--max-old-space-size=4096 eslint packages/shared-contracts/chatgpt --ext .ts",
     "lint:scripts": "NODE_OPTIONS=--max-old-space-size=4096 eslint scripts --ext .ts",

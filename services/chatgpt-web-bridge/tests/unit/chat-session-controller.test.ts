@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { SessionSummary } from '@review-then-codex/shared-contracts/chatgpt';
+import type { SessionSummary } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import { ChatSessionController } from '../../src/services/chat-session-controller';
 

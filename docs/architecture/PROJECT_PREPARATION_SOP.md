@@ -3,19 +3,19 @@
 This SOP defines how an operator should actually run the preparation workflow for a new project or new initiative.
 
 This document is operational. It does not redefine workflow semantics. The authoritative rules live in:
-- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
-- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
-- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_CLI.md)
+- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
+- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
+- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_CLI.md)
 
 Supporting context:
-- [PROJECT_PREPARATION_HARNESS.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_HARNESS.md)
-- [PROJECT_PREPARATION_EXAMPLE.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_EXAMPLE.md)
-- [PROJECT_PREPARATION_TRIAL_RUNBOOK.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_TRIAL_RUNBOOK.md)
-- [PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md)
+- [PROJECT_PREPARATION_HARNESS.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_HARNESS.md)
+- [PROJECT_PREPARATION_EXAMPLE.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_EXAMPLE.md)
+- [PROJECT_PREPARATION_TRIAL_RUNBOOK.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_TRIAL_RUNBOOK.md)
+- [PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md)
 
 For downstream run behavior after preparation is complete, see:
-- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md)
-- [REAL_SELF_IMPROVEMENT_SOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md)
+- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md)
+- [REAL_SELF_IMPROVEMENT_SOP.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md)
 
 ## When To Use This SOP
 
@@ -62,7 +62,7 @@ Current packet-side template files already exist under:
 
 Process-side ledgers should follow the shapes defined in:
 
-[PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
+[PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
 
 ## Start Checklist
 
@@ -275,9 +275,9 @@ Until all commands exist, the operator should preserve the same workflow semanti
 
 When preparation is complete, the next thread or next run should receive:
 - the repo path
-- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
-- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
-- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_CLI.md)
+- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
+- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
+- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_CLI.md)
 - this SOP
 - the prepared packet directory
 - the exact next objective

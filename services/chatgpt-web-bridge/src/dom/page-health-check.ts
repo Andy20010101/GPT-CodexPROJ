@@ -1,4 +1,4 @@
-import type { BridgeHealthStatus } from '@review-then-codex/shared-contracts/chatgpt';
+import type { BridgeHealthStatus } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import type { SelectorRequirement } from './selectors';
 

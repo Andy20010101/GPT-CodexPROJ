@@ -3,19 +3,19 @@
 Use this when opening the next chat thread for platform self-improvement.
 
 ```text
-You are working in `/home/administrator/code/review-then-codex-system`.
+You are working in `/home/administrator/code/GPT-CodexPROJ`.
 
 This thread is for the improvement lane, not for general external project delivery.
 
 First read and follow these docs:
 
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/REVIEW_LOOP.md`
-- `/home/administrator/code/review-then-codex-system/todolist.md`
-- `/home/administrator/code/review-then-codex-system/handoff.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/REVIEW_LOOP.md`
+- `/home/administrator/code/GPT-CodexPROJ/todolist.md`
+- `/home/administrator/code/GPT-CodexPROJ/handoff.md`
 
 Current direction:
 
@@ -51,11 +51,11 @@ Important context:
 
 Inspect first:
 
-- `/home/administrator/code/review-then-codex-system/handoff.md`
-- `/home/administrator/code/review-then-codex-system/todolist.md`
-- `/home/administrator/code/review-then-codex-system/scripts/run-real-self-improvement.ts`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md`
+- `/home/administrator/code/GPT-CodexPROJ/handoff.md`
+- `/home/administrator/code/GPT-CodexPROJ/todolist.md`
+- `/home/administrator/code/GPT-CodexPROJ/scripts/run-real-self-improvement.ts`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md`
 - inspect additional files only after the next bounded item is chosen
 
 Working rules:

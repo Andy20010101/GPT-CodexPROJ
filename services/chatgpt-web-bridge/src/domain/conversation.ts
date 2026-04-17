@@ -2,7 +2,7 @@ import type {
   ConversationStatus,
   ConversationSnapshot,
   SessionSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import type { ChatGPTAdapter } from '../types/runtime';
 

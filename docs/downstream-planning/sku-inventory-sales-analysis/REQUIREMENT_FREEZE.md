@@ -44,5 +44,5 @@ V1 is frozen as a narrow API-first SKU analysis service sourced from ERP APIs on
 - Source-boundary integrity must show no hidden WMS, DB, Excel/CSV, or other-system sourcing in the v1 metric path.
 
 ## Supporting Files
-- [REQUIREMENT_FREEZE.json](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE.json)
-- [REQUIREMENT_FREEZE_ENGINEERING_PLAN.md](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE_ENGINEERING_PLAN.md)
+- [REQUIREMENT_FREEZE.json](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE.json)
+- [REQUIREMENT_FREEZE_ENGINEERING_PLAN.md](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE_ENGINEERING_PLAN.md)

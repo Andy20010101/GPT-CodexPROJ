@@ -19,15 +19,30 @@ module.exports = {
   ignorePatterns: ['dist', 'coverage', 'node_modules'],
   overrides: [
     {
-      files: ['**/*.ts'],
+      files: ['apps/orchestrator/**/*.ts'],
       parserOptions: {
-        project: [
-          './tsconfig.base.json',
-          './tsconfig.scripts.json',
-          './services/*/tsconfig.json',
-          './apps/*/tsconfig.json',
-          './packages/*/tsconfig.json',
-        ],
+        project: ['./apps/orchestrator/tsconfig.json'],
+        tsconfigRootDir: __dirname,
+      },
+    },
+    {
+      files: ['services/chatgpt-web-bridge/**/*.ts'],
+      parserOptions: {
+        project: ['./services/chatgpt-web-bridge/tsconfig.json'],
+        tsconfigRootDir: __dirname,
+      },
+    },
+    {
+      files: ['packages/shared-contracts/**/*.ts'],
+      parserOptions: {
+        project: ['./packages/shared-contracts/tsconfig.json'],
+        tsconfigRootDir: __dirname,
+      },
+    },
+    {
+      files: ['scripts/**/*.ts'],
+      parserOptions: {
+        project: ['./tsconfig.scripts.json'],
         tsconfigRootDir: __dirname,
       },
     },

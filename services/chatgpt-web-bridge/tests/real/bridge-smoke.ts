@@ -2,7 +2,7 @@ import {
   HealthResponseSchema,
   OpenSessionResponseSchema,
   SelectProjectResponseSchema,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 
 type JsonValue = Record<string, unknown>;
 

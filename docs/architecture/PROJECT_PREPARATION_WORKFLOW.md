@@ -7,11 +7,11 @@ Preparation is a process-first, packet-export-second workflow. It exists to help
 This document defines workflow semantics. It intentionally does not define full file templates, CLI syntax, or operator step-by-step procedure.
 
 Supporting documents:
-- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
-- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_CLI.md)
-- [PROJECT_PREPARATION_SOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_SOP.md)
-- [PROJECT_PREPARATION_HARNESS.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_HARNESS.md)
-- [PROJECT_PREPARATION_EXAMPLE.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_EXAMPLE.md)
+- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
+- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_CLI.md)
+- [PROJECT_PREPARATION_SOP.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_SOP.md)
+- [PROJECT_PREPARATION_HARNESS.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_HARNESS.md)
+- [PROJECT_PREPARATION_EXAMPLE.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_EXAMPLE.md)
 
 ## 1. Purpose and Positioning
 

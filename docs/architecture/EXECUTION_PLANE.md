@@ -1,6 +1,6 @@
 # Execution Plane
 
-The execution plane is the implementation-facing half of `review-then-codex-system`. It accepts frozen task envelopes from the control plane and returns structured execution results plus artifact references.
+The execution plane is the implementation-facing half of `GPT-CodexPROJ`. It accepts frozen task envelopes from the control plane and returns structured execution results plus artifact references.
 
 ## Responsibility Boundary
 

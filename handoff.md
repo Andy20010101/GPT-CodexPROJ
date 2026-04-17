@@ -13,12 +13,12 @@ The operating model is now:
 
 Read first:
 
-- [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md)
-- [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md)
-- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md)
-- [REAL_SELF_IMPROVEMENT_SOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md)
-- [REVIEW_LOOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/REVIEW_LOOP.md)
-- [todolist.md](/home/administrator/code/review-then-codex-system/todolist.md)
+- [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md)
+- [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md)
+- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md)
+- [REAL_SELF_IMPROVEMENT_SOP.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md)
+- [REVIEW_LOOP.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REVIEW_LOOP.md)
+- [todolist.md](/home/administrator/code/GPT-CodexPROJ/todolist.md)
 
 ## Current Direction
 
@@ -61,14 +61,14 @@ Already implemented and should not be redone blindly:
 
 ## Likely Files To Inspect First
 
-- [handoff.md](/home/administrator/code/review-then-codex-system/handoff.md)
-- [docs/architecture/SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md](/home/administrator/code/review-then-codex-system/docs/architecture/SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md)
-- [todolist.md](/home/administrator/code/review-then-codex-system/todolist.md)
-- [scripts/run-real-self-improvement.ts](/home/administrator/code/review-then-codex-system/scripts/run-real-self-improvement.ts)
-- [apps/orchestrator/src/services/run-acceptance-service.ts](/home/administrator/code/review-then-codex-system/apps/orchestrator/src/services/run-acceptance-service.ts)
-- [apps/orchestrator/src/services/orchestrator-summary.ts](/home/administrator/code/review-then-codex-system/apps/orchestrator/src/services/orchestrator-summary.ts)
-- [docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md)
-- [docs/architecture/REAL_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md)
+- [handoff.md](/home/administrator/code/GPT-CodexPROJ/handoff.md)
+- [docs/architecture/SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md)
+- [todolist.md](/home/administrator/code/GPT-CodexPROJ/todolist.md)
+- [scripts/run-real-self-improvement.ts](/home/administrator/code/GPT-CodexPROJ/scripts/run-real-self-improvement.ts)
+- [apps/orchestrator/src/services/run-acceptance-service.ts](/home/administrator/code/GPT-CodexPROJ/apps/orchestrator/src/services/run-acceptance-service.ts)
+- [apps/orchestrator/src/services/orchestrator-summary.ts](/home/administrator/code/GPT-CodexPROJ/apps/orchestrator/src/services/orchestrator-summary.ts)
+- [docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md)
+- [docs/architecture/REAL_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md)
 
 ## Working Rules
 
@@ -87,4 +87,4 @@ At minimum, run the most relevant targeted tests or command checks for the selec
 
 Use the ready-to-paste prompt in:
 
-- [SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md](/home/administrator/code/review-then-codex-system/docs/architecture/SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md)
+- [SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/SELF_IMPROVEMENT_NEW_CHAT_PROMPT.md)

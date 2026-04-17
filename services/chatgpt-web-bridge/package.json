@@ -1,5 +1,5 @@
 {
-  "name": "@review-then-codex/chatgpt-web-bridge",
+  "name": "@gpt-codexproj/chatgpt-web-bridge",
   "version": "0.1.0",
   "private": true,
   "description": "Service layer that bridges ChatGPT Web sessions into a typed HTTP API.",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@review-then-codex/shared-contracts": "file:../../packages/shared-contracts",
+    "@gpt-codexproj/shared-contracts": "file:../../packages/shared-contracts",
     "fastify": "^4.28.1",
     "pino": "^9.3.2",
     "puppeteer-core": "^24.9.0",

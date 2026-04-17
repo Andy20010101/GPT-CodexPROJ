@@ -1,6 +1,6 @@
 import { ZodError } from 'zod';
 
-import type { BridgeErrorCode } from '@review-then-codex/shared-contracts/chatgpt';
+import type { BridgeErrorCode } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 export class AppError extends Error {
   public readonly code: BridgeErrorCode;

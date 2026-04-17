@@ -252,7 +252,7 @@ describe('OrchestratorService integration', () => {
       {
         id: 'test-1',
         description: 'Write the red test first',
-        verificationCommand: 'npm test --workspace @review-then-codex/orchestrator',
+        verificationCommand: 'npm test --workspace @gpt-codexproj/orchestrator',
         expectedRedSignal: 'A failing test documents the missing behavior',
         expectedGreenSignal: 'The task loop transitions succeed',
       },

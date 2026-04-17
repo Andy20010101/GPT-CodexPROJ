@@ -3,17 +3,17 @@
 Use this prompt for the first implementation round of the process-first preparation workflow.
 
 ```text
-You are working in `/home/administrator/code/review-then-codex-system`.
+You are working in `/home/administrator/code/GPT-CodexPROJ`.
 
 This thread is only for preparation-layer design and documentation. Do not change runtime semantics.
 
 Read first:
 
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_SOP.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_HARNESS.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_SOP.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_HARNESS.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md`
 
 Current objective:
 
@@ -44,9 +44,9 @@ Minimum expected output:
 
 Likely files to edit:
 
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_SOP.md`
-- `/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_HARNESS.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_SOP.md`
+- `/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_HARNESS.md`
 
 Working rules:
 

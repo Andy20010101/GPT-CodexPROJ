@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
   ConversationSnapshot,
   SessionSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import { PuppeteerChatGPTAdapter } from '../../src/adapters/chatgpt-adapter';
 

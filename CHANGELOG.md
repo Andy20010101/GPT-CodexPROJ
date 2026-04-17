@@ -6,9 +6,11 @@ The format is based on Keep a Changelog, and this repository currently tracks ch
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- Nothing yet.
+- Project display name renamed to `GPT-CodexPROJ`
+- Root package name renamed to `gpt-codexproj`
+- Workspace scope renamed from `@review-then-codex/*` to `@gpt-codexproj/*`
 
 ## [0.1.0] - 2026-04-17
 

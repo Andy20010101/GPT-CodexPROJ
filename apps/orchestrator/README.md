@@ -1,6 +1,6 @@
 # Orchestrator Control Plane
 
-This package hosts the first control-plane skeleton for `review-then-codex-system`.
+This package hosts the first control-plane skeleton for `GPT-CodexPROJ`.
 
 Current scope:
 
@@ -31,25 +31,25 @@ The orchestrator now exposes both service boundaries and a first runtime shell, 
 Run orchestrator tests:
 
 ```bash
-npm test --workspace @review-then-codex/orchestrator
+npm test --workspace @gpt-codexproj/orchestrator
 ```
 
 Run type checks:
 
 ```bash
-npm run typecheck --workspace @review-then-codex/orchestrator
+npm run typecheck --workspace @gpt-codexproj/orchestrator
 ```
 
 Start the API:
 
 ```bash
-npm run dev --workspace @review-then-codex/orchestrator
+npm run dev --workspace @gpt-codexproj/orchestrator
 ```
 
 Start the daemon shell:
 
 ```bash
-npm run daemon --workspace @review-then-codex/orchestrator
+npm run daemon --workspace @gpt-codexproj/orchestrator
 ```
 
 Artifacts are written under `apps/orchestrator/artifacts/runs/<runId>/`.

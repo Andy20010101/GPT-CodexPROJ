@@ -1,15 +1,15 @@
 # Project Preparation CLI
 
 This document defines the current implemented command surface for the preparation workflow in
-[scripts/project-preparation.ts](/home/administrator/code/review-then-codex-system/scripts/project-preparation.ts:1).
+[scripts/project-preparation.ts](/home/administrator/code/GPT-CodexPROJ/scripts/project-preparation.ts:1).
 
 It describes command groups and state effects. It does not freeze long-term shell UX details beyond
 the commands that already exist in the repository.
 
 Use this document together with:
-- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
-- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
-- [PROJECT_PREPARATION_SOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_SOP.md)
+- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
+- [PROJECT_PREPARATION_TEMPLATES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_TEMPLATES.md)
+- [PROJECT_PREPARATION_SOP.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_SOP.md)
 
 ## CLI Scope
 

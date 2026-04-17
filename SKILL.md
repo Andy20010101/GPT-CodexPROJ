@@ -1,9 +1,9 @@
 ---
-name: review-then-codex-system
-description: Use when working inside the review-then-codex-system repository to preserve the three-plane architecture, choose the right docs and tests for orchestrator or bridge changes, follow the preparation workflow, and keep self-improvement changes inside the repository's bounded safety rules.
+name: gpt-codexproj
+description: Use when working inside the GPT-CodexPROJ repository to preserve the three-plane architecture, choose the right docs and tests for orchestrator or bridge changes, follow the preparation workflow, and keep self-improvement changes inside the repository's bounded safety rules.
 ---
 
-# Review Then Codex System
+# GPT-CodexPROJ
 
 Use this skill when the task touches this repository's code, docs, preparation workflow, or operator runbooks.
 
@@ -52,9 +52,9 @@ The bridge is not the orchestrator, and preparation is not runtime planning.
   - `npm run lint`
   - `npm run typecheck`
 - Orchestrator:
-  - `npm test --workspace @review-then-codex/orchestrator`
+  - `npm test --workspace @gpt-codexproj/orchestrator`
 - Bridge:
-  - `npm test --workspace @review-then-codex/chatgpt-web-bridge`
+  - `npm test --workspace @gpt-codexproj/chatgpt-web-bridge`
 - Full local guardrail:
   - `npm run ci`
 

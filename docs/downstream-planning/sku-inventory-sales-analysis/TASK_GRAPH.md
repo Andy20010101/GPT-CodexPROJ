@@ -4,8 +4,8 @@
 This task graph is validation-first. It does not start implementation code. It sequences the unresolved validation questions before API contract finalization and implementation readiness.
 
 ## Frozen Inputs
-- [REQUIREMENT_FREEZE.json](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE.json)
-- [ARCHITECTURE_FREEZE.json](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/ARCHITECTURE_FREEZE.json)
+- [REQUIREMENT_FREEZE.json](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE.json)
+- [ARCHITECTURE_FREEZE.json](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/ARCHITECTURE_FREEZE.json)
 
 ## Priority Sequence
 | Order | Task | Primary Question | Output |
@@ -37,8 +37,8 @@ This task graph is validation-first. It does not start implementation code. It s
 ## Task 1 Execution Result
 - Status: `tests_red`
 - Evidence ID: `c5113b1c-b641-437d-b419-0678cf3f70af`
-- Evidence file: [q_008-canonical-sku-key-evidence.md](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/q_008-canonical-sku-key-evidence.md)
-- Required ERP input checklist: [q_008-required-erp-api-inputs.md](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/q_008-required-erp-api-inputs.md)
+- Evidence file: [q_008-canonical-sku-key-evidence.md](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/q_008-canonical-sku-key-evidence.md)
+- Required ERP input checklist: [q_008-required-erp-api-inputs.md](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/q_008-required-erp-api-inputs.md)
 - Reason: Lingxing documentation provides a strong candidate field set, but Task 1 still lacks same-SKU cross-interface payload evidence to prove the canonical join rule and API statistics chain entry point.
 
 ## Boundary Guardrails
@@ -49,4 +49,4 @@ This task graph is validation-first. It does not start implementation code. It s
 - Do not claim implementation readiness while any required validation output is missing.
 
 ## Structured Artifact
-- [TASK_GRAPH.json](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json)
+- [TASK_GRAPH.json](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json)

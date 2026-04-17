@@ -1,6 +1,6 @@
-# review-then-codex-system
+# GPT-CodexPROJ
 
-`review-then-codex-system` is a monorepo for an architecture-first delivery model that separates review-quality thinking from code execution.
+`GPT-CodexPROJ` is a monorepo for an architecture-first delivery model that separates review-quality thinking from code execution.
 
 The system is intentionally split into three planes:
 
@@ -10,7 +10,7 @@ The system is intentionally split into three planes:
 
 The Review Plane is not the orchestrator. It does not own task state, acceptance gates, or repository mutation policy. Its job is narrower: enter the right ChatGPT project, switch model context, upload task files, send prompts, wait for completion, capture results, and export structured outputs for higher layers.
 
-The repository also ships a root [SKILL.md](/home/administrator/code/review-then-codex-system/SKILL.md) and [agents/openai.yaml](/home/administrator/code/review-then-codex-system/agents/openai.yaml) so agentic tooling can treat the repo itself as a reusable skill instead of relying on thread-local memory.
+The repository also ships a root [SKILL.md](/home/administrator/code/GPT-CodexPROJ/SKILL.md) and [agents/openai.yaml](/home/administrator/code/GPT-CodexPROJ/agents/openai.yaml) so agentic tooling can treat the repo itself as a reusable skill instead of relying on thread-local memory.
 
 ## Quick Start
 
@@ -18,22 +18,22 @@ The repository also ships a root [SKILL.md](/home/administrator/code/review-then
 npm install
 npm run ci
 cp .env.example .env.local
-npm run dev --workspace @review-then-codex/chatgpt-web-bridge
-npm run dev --workspace @review-then-codex/orchestrator
+npm run dev --workspace @gpt-codexproj/chatgpt-web-bridge
+npm run dev --workspace @gpt-codexproj/orchestrator
 ```
 
 Use `.env.example` as the baseline local configuration surface. Only enable the real browser-backed or Codex-backed paths when you intentionally have the required local stack available.
 
 ## Repository Guides
 
-- [CONTRIBUTING.md](/home/administrator/code/review-then-codex-system/CONTRIBUTING.md) for development workflow and validation expectations
-- [RELEASING.md](/home/administrator/code/review-then-codex-system/RELEASING.md) for versioning, tags, and GitHub release procedure
-- [SECURITY.md](/home/administrator/code/review-then-codex-system/SECURITY.md) for disclosure and sensitive-surface handling
-- [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md) for the shortest project explanation
-- [SYSTEM_OVERVIEW.md](/home/administrator/code/review-then-codex-system/docs/architecture/SYSTEM_OVERVIEW.md) for the plane model and lifecycle
-- [REPOSITORY_BOUNDARIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/REPOSITORY_BOUNDARIES.md) for what belongs in the monorepo versus what must live outside it
-- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md) for the upstream preparation layer
-- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md) for the bounded live operator path
+- [CONTRIBUTING.md](/home/administrator/code/GPT-CodexPROJ/CONTRIBUTING.md) for development workflow and validation expectations
+- [RELEASING.md](/home/administrator/code/GPT-CodexPROJ/RELEASING.md) for versioning, tags, and GitHub release procedure
+- [SECURITY.md](/home/administrator/code/GPT-CodexPROJ/SECURITY.md) for disclosure and sensitive-surface handling
+- [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md) for the shortest project explanation
+- [SYSTEM_OVERVIEW.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/SYSTEM_OVERVIEW.md) for the plane model and lifecycle
+- [REPOSITORY_BOUNDARIES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REPOSITORY_BOUNDARIES.md) for what belongs in the monorepo versus what must live outside it
+- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md) for the upstream preparation layer
+- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md) for the bounded live operator path
 
 ## Current Scope
 
@@ -41,8 +41,8 @@ This repository currently provides:
 
 - A monorepo skeleton with durable boundaries between apps, services, and shared contracts.
 - Architecture documentation and ADRs for the three-plane system.
-- A human-oriented overview of project purpose and current capabilities in [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md).
-- A concrete operating plan for running external delivery and platform self-improvement in parallel in [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md).
+- A human-oriented overview of project purpose and current capabilities in [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md).
+- A concrete operating plan for running external delivery and platform self-improvement in parallel in [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md).
 - A working `chatgpt-web-bridge` service with typed Fastify routes, in-memory session/conversation state, artifact export, DOM drift checks, and mockable browser boundaries.
 - A first browser-attach hardening layer for the bridge with endpoint discovery, DevTools probing, structured diagnostics, and `openSession` preflight gating for WSL-to-Windows host attach scenarios.
 - A control-plane orchestrator skeleton with requirement freeze, architecture freeze, task graph registration, gate-aware task loop transitions, evidence ledger persistence, a typed bridge client, and execution-plane dispatch through replaceable executors.
@@ -172,7 +172,7 @@ npm test
 Start the bridge service:
 
 ```bash
-npm run dev --workspace @review-then-codex/chatgpt-web-bridge
+npm run dev --workspace @gpt-codexproj/chatgpt-web-bridge
 ```
 
 The bridge listens on `127.0.0.1:3100` by default. Override with `HOST`, `PORT`, and `BRIDGE_ARTIFACT_DIR` as needed.
@@ -180,7 +180,7 @@ The bridge listens on `127.0.0.1:3100` by default. Override with `HOST`, `PORT`,
 Run the browser attach diagnostics against a running bridge:
 
 ```bash
-npm run check:browser-attach --workspace @review-then-codex/chatgpt-web-bridge
+npm run check:browser-attach --workspace @gpt-codexproj/chatgpt-web-bridge
 ```
 
 If your WSL-visible CDP endpoint is a bridged host port such as `172.18.144.1:9225`, probe it explicitly:
@@ -194,13 +194,13 @@ If Windows `portproxy` is already configured, the diagnostics route can also dis
 Run orchestrator tests only:
 
 ```bash
-npm test --workspace @review-then-codex/orchestrator
+npm test --workspace @gpt-codexproj/orchestrator
 ```
 
 Start the orchestrator API:
 
 ```bash
-npm run dev --workspace @review-then-codex/orchestrator
+npm run dev --workspace @gpt-codexproj/orchestrator
 ```
 
 Run the real validation harness only when the local bridge and Codex CLI are intentionally configured:
@@ -289,15 +289,15 @@ CODEX_RUNNER_MODE=cli node --import tsx scripts/run-real-self-improvement.ts
 
 Primary docs:
 
-- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md)
-- [REAL_SELF_IMPROVEMENT_SOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md)
-- [REAL_SELF_IMPROVEMENT_STATUS_AND_BOUNDARY.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_STATUS_AND_BOUNDARY.md)
-- [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md)
+- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md)
+- [REAL_SELF_IMPROVEMENT_SOP.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md)
+- [REAL_SELF_IMPROVEMENT_STATUS_AND_BOUNDARY.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_STATUS_AND_BOUNDARY.md)
+- [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md)
 
 For real planning proof and real review attach, the bridge also needs a Windows-side browser with remote debugging enabled and a DevTools endpoint that is reachable from WSL. Start by running the browser attach diagnostics and see:
 
-- [BROWSER_ATTACH_DIAGNOSTICS.md](/home/administrator/code/review-then-codex-system/docs/architecture/BROWSER_ATTACH_DIAGNOSTICS.md)
-- [WSL_HOST_BROWSER_ATTACH.md](/home/administrator/code/review-then-codex-system/docs/architecture/WSL_HOST_BROWSER_ATTACH.md)
+- [BROWSER_ATTACH_DIAGNOSTICS.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/BROWSER_ATTACH_DIAGNOSTICS.md)
+- [WSL_HOST_BROWSER_ATTACH.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/WSL_HOST_BROWSER_ATTACH.md)
 
 ## Execution Plane Boundary
 
@@ -424,7 +424,7 @@ The worker/runtime layer is still single-process and file-backed. That is delibe
 Start the long-running daemon shell locally with:
 
 ```bash
-npm run daemon --workspace @review-then-codex/orchestrator
+npm run daemon --workspace @gpt-codexproj/orchestrator
 ```
 
 ## Daemon Runtime Boundary

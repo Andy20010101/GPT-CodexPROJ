@@ -1,4 +1,4 @@
-import type { ConversationSnapshot } from '@review-then-codex/shared-contracts/chatgpt';
+import type { ConversationSnapshot } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import { AppError } from '../types/error';
 import type { ChatGPTAdapter, ConversationRecord, SessionRecord } from '../types/runtime';

@@ -1,5 +1,5 @@
 {
-  "name": "@review-then-codex/orchestrator",
+  "name": "@gpt-codexproj/orchestrator",
   "version": "0.1.0",
   "private": true,
   "description": "Control-plane skeleton for requirement freeze, architecture freeze, task loops, evidence, and gates.",
@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@review-then-codex/shared-contracts": "file:../../packages/shared-contracts",
+    "@gpt-codexproj/shared-contracts": "file:../../packages/shared-contracts",
     "fastify": "^5.1.0",
     "zod": "^3.23.8"
   },

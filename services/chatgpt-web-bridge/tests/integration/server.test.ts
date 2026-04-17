@@ -19,7 +19,7 @@ import {
   type ConversationSnapshot,
   type ConversationStatus,
   type SessionSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import { SessionLease } from '../../src/browser/session-lease';
 import { MarkdownExporter } from '../../src/exporters/markdown-exporter';

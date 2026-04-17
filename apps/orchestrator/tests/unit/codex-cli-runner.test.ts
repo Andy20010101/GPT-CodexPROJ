@@ -27,7 +27,7 @@ const payload: CodexExecutionPayload = {
     architectureConstraints: [],
   },
   metadata: {
-    workspacePath: '/tmp/review-then-codex-system-workspace',
+    workspacePath: '/tmp/gpt-codexproj-workspace',
   },
 };
 
@@ -43,12 +43,12 @@ describe('CodexCliCommandBuilder', () => {
     });
 
     expect(command.command).toBe('codex');
-    expect(command.cwd).toBe('/tmp/review-then-codex-system-workspace');
+    expect(command.cwd).toBe('/tmp/gpt-codexproj-workspace');
     expect(command.args).toEqual(
       expect.arrayContaining([
         'exec',
         '--cd',
-        '/tmp/review-then-codex-system-workspace',
+        '/tmp/gpt-codexproj-workspace',
         '--output-schema',
         command.schemaPath,
         '--output-last-message',

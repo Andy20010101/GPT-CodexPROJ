@@ -8,7 +8,7 @@ import type {
   ConversationSnapshot,
   ConversationStatus,
   SessionSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import {
   BrowserAttachDiagnosticResponseSchema,

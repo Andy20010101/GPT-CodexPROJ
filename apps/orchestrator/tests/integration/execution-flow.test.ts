@@ -462,7 +462,7 @@ describe('execution flow integration', () => {
       runId,
       taskId,
       producer: 'tester',
-      workspacePath: '/home/administrator/code/review-then-codex-system',
+      workspacePath: '/home/administrator/code/GPT-CodexPROJ',
       executorType: 'command',
       command: {
         command: 'bash',
@@ -494,7 +494,7 @@ describe('execution flow integration', () => {
       orchestrator.createExecutionRequest({
         runId,
         taskId,
-        workspacePath: '/home/administrator/code/review-then-codex-system',
+        workspacePath: '/home/administrator/code/GPT-CodexPROJ',
         executorType: 'command',
         command: {
           command: 'bash',
@@ -522,7 +522,7 @@ describe('execution flow integration', () => {
       runId,
       taskId,
       producer: 'tester',
-      workspacePath: '/home/administrator/code/review-then-codex-system',
+      workspacePath: '/home/administrator/code/GPT-CodexPROJ',
       executorType: 'command',
       command: {
         command: 'bash',

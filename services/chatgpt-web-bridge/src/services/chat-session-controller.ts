@@ -1,6 +1,6 @@
 import type { ElementHandle, Page } from 'puppeteer-core';
 
-import type { SessionSummary } from '@review-then-codex/shared-contracts/chatgpt';
+import type { SessionSummary } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 import { ChatGPTSelectors } from '../dom/selectors';
 import { AppError } from '../types/error';

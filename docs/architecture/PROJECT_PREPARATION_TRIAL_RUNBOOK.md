@@ -10,10 +10,10 @@ It is intentionally bounded:
 - one downstream handoff
 
 Use this together with:
-- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
-- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_CLI.md)
-- [PROJECT_PREPARATION_SOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_SOP.md)
-- [PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md)
+- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md)
+- [PROJECT_PREPARATION_CLI.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_CLI.md)
+- [PROJECT_PREPARATION_SOP.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_SOP.md)
+- [PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md)
 
 ## Trial Goal
 
@@ -63,7 +63,7 @@ Expected early state:
 ### 1. Start the preparation conversation
 
 Use the new-chat prompt in:
-- [PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md)
+- [PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md](/home/administrator/code/GPT-CodexPROJ/docs/architecture/PROJECT_PREPARATION_NEW_TRIAL_PROMPT.md)
 
 The first conversation goal is not export. It is to establish:
 - whether this is a valid standalone preparation

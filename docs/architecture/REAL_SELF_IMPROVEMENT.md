@@ -17,7 +17,7 @@ This is not "ChatGPT web and Codex sharing one live workspace." The orchestrator
 The first real loop must stay inside these boundaries unless an operator explicitly widens them:
 
 - Preferred write scope: `docs/**`, `scripts/**`
-- First recommended deliverable: [`docs/architecture/REAL_SELF_IMPROVEMENT.md`](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md)
+- First recommended deliverable: [`docs/architecture/REAL_SELF_IMPROVEMENT.md`](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT.md)
 - Allowed low-risk fallback: bridge/orchestrator reliability surfaces that only improve attachment flow, operator ergonomics, or recoverability
 
 The first real loop must not change:
@@ -37,11 +37,11 @@ Before starting a real run:
 
 If any preflight fails, stop and fix the operator path first. Do not silently downgrade to prompt-only planning.
 
-In the supported local self-improvement mode, do not rely on zero-argument defaults for bridge or browser discovery. `scripts/self-improvement-env.ts` can reuse the live orchestrator environment, but its generic fallback defaults are still broader than the currently supported operator path. Use the explicit endpoint commands from [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md) unless `--prepare-only` has already proved the live authoritative values you intend to reuse.
+In the supported local self-improvement mode, do not rely on zero-argument defaults for bridge or browser discovery. `scripts/self-improvement-env.ts` can reuse the live orchestrator environment, but its generic fallback defaults are still broader than the currently supported operator path. Use the explicit endpoint commands from [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md) unless `--prepare-only` has already proved the live authoritative values you intend to reuse.
 
 ## Environment Bootstrap Module
 
-Use [`scripts/self-improvement-env.ts`](/home/administrator/code/review-then-codex-system/scripts/self-improvement-env.ts) as the formal preflight layer.
+Use [`scripts/self-improvement-env.ts`](/home/administrator/code/GPT-CodexPROJ/scripts/self-improvement-env.ts) as the formal preflight layer.
 
 It exposes two operator-facing modes:
 
@@ -124,7 +124,7 @@ The entry script now does five things:
 
 1. Calls the bootstrap module first and consumes the resulting env-state file.
 2. Creates a bounded run through the orchestrator API.
-3. Starts [`scripts/watch-run-until-terminal.mjs`](/home/administrator/code/review-then-codex-system/scripts/watch-run-until-terminal.mjs) immediately so monitoring is not tied to the current chat thread.
+3. Starts [`scripts/watch-run-until-terminal.mjs`](/home/administrator/code/GPT-CodexPROJ/scripts/watch-run-until-terminal.mjs) immediately so monitoring is not tied to the current chat thread.
 4. Builds an analysis bundle under the run artifact root.
 5. Sends requirement, architecture, and task-graph planning requests that attach the analysis bundle through real `inputFiles`.
 

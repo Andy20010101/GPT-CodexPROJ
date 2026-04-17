@@ -92,6 +92,6 @@ Validation and evidence are a sidecar path that can inspect raw, normalized, der
 - `Validation And Evidence -> Analysis Application / ERP Source Gateway / Source Normalization / Canonical Mapping / Metric Derivation`: allowed
 
 ## Supporting Files
-- [ARCHITECTURE_FREEZE.json](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/ARCHITECTURE_FREEZE.json)
-- [REQUIREMENT_FREEZE.json](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE.json)
-- [REQUIREMENT_FREEZE_ENGINEERING_PLAN.md](/home/administrator/code/review-then-codex-system/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE_ENGINEERING_PLAN.md)
+- [ARCHITECTURE_FREEZE.json](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/ARCHITECTURE_FREEZE.json)
+- [REQUIREMENT_FREEZE.json](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE.json)
+- [REQUIREMENT_FREEZE_ENGINEERING_PLAN.md](/home/administrator/code/GPT-CodexPROJ/docs/downstream-planning/sku-inventory-sales-analysis/REQUIREMENT_FREEZE_ENGINEERING_PLAN.md)

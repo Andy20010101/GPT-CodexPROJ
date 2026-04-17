@@ -27,11 +27,11 @@ import {
   type StartConversationRequest,
   type StructuredReviewExtractRequest,
   type WaitConversationRequest,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 import type {
   ConversationSnapshot,
   SessionSummary,
-} from '@review-then-codex/shared-contracts/chatgpt';
+} from '@gpt-codexproj/shared-contracts/chatgpt';
 import { type ZodTypeAny, z } from 'zod';
 
 type BridgeFetch = typeof fetch;

@@ -1,6 +1,6 @@
 # Orchestrator Control Plane
 
-The orchestrator is the Control Plane for `review-then-codex-system`. Its job is to freeze intent, freeze architecture, sequence task loops, track evidence, and evaluate gates. It is deliberately not the place where code is directly written.
+The orchestrator is the Control Plane for `GPT-CodexPROJ`. Its job is to freeze intent, freeze architecture, sequence task loops, track evidence, and evaluate gates. It is deliberately not the place where code is directly written.
 
 ## Responsibility Boundary
 

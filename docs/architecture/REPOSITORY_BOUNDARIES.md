@@ -1,6 +1,6 @@
 # Repository Boundaries
 
-This repository is the platform monorepo for `review-then-codex-system`. It is not the place to vendor every downstream project, nested repo, or ad hoc import.
+This repository is the platform monorepo for `GPT-CodexPROJ`. It is not the place to vendor every downstream project, nested repo, or ad hoc import.
 
 ## In Scope
 

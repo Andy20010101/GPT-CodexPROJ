@@ -32,7 +32,7 @@ describe('ExecutionEvidenceService', () => {
       runId,
       taskId,
       executorType: 'codex',
-      workspacePath: '/home/administrator/code/review-then-codex-system',
+      workspacePath: '/home/administrator/code/GPT-CodexPROJ',
       title: 'Record execution evidence',
       objective: 'Save request/result and write evidence records',
       scope: {

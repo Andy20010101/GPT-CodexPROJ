@@ -100,7 +100,7 @@ With the bridge running:
 
 ```bash
 BRIDGE_BASE_URL=http://127.0.0.1:3115 \
-  npm run check:browser-attach --workspace @review-then-codex/chatgpt-web-bridge
+  npm run check:browser-attach --workspace @gpt-codexproj/chatgpt-web-bridge
 ```
 
 Or directly:
@@ -146,4 +146,4 @@ If Windows localhost works but WSL host IP does not:
 
 This repository currently supports host-local diagnostics for WSL-to-Windows browser attach. It does not provide a general remote browser proxy for other machines.
 
-For the complete supported operator workflow after attach is ready, continue with [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md).
+For the complete supported operator workflow after attach is ready, continue with [`REAL_SELF_IMPROVEMENT_SOP.md`](/home/administrator/code/GPT-CodexPROJ/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md).

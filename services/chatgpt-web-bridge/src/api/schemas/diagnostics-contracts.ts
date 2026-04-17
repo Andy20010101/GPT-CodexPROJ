@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { successEnvelope } from '@review-then-codex/shared-contracts/chatgpt';
+import { successEnvelope } from '@gpt-codexproj/shared-contracts/chatgpt';
 
 export const BrowserEndpointCandidateSourceSchema = z.enum([
   'request_input',
