@@ -8,9 +8,9 @@ The format is based on Keep a Changelog, and this repository currently tracks ch
 
 ### Changed
 
-- Project display name renamed to `GPT-CodexPROJ`
-- Root package name renamed to `gpt-codexproj`
-- Workspace scope renamed from `@review-then-codex/*` to `@gpt-codexproj/*`
+- Project naming standardized as `GPT-CodexPROJ`
+- Root package naming standardized as `gpt-codexproj`
+- Workspace scope standardized as `@gpt-codexproj/*`
 
 ## [0.1.0] - 2026-04-17
 
