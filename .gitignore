@@ -3,11 +3,16 @@ dist/
 coverage/
 .DS_Store
 *.log
+.env
+.env.local
+.env.*.local
 
 services/chatgpt-web-bridge/artifacts/*.json
 services/chatgpt-web-bridge/artifacts/*.md
 services/chatgpt-web-bridge/artifacts/*.tmp
 !services/chatgpt-web-bridge/artifacts/.gitkeep
+# Default local bridge runtime artifacts are generated operator output, not fixtures.
+services/chatgpt-web-bridge/src/artifacts/drift/
 services/chatgpt-web-bridge/src/artifacts/diagnostics/
 services/chatgpt-web-bridge/src/artifacts/health/
 services/chatgpt-web-bridge/src/artifacts/manifests/
@@ -20,8 +25,26 @@ apps/orchestrator/artifacts/runtime/
 !apps/orchestrator/artifacts/.gitkeep
 
 tmp/e2e-targets/
-tmp/orchestrator-validation-1/artifacts/
-tmp/orchestrator-validation-1/planning/
-tmp/orchestrator-validation-2/
-tmp/orchestrator-validation-3/
-tmp/orchestrator-validation-4/
+# Validation harness helper scripts remain explicit, but generated planning/artifact
+# output stays scratch-only across numbered runs.
+tmp/orchestrator-validation-*/artifacts/
+tmp/orchestrator-validation-*/planning/
+tmp/real-self-improvement/
+# Scratch diagnostics live under tmp/, but the authoritative watcher/env-state/run
+# surfaces stay under the active artifact root selected by the runtime.
+tmp/browser-probe/
+tmp/manual-recovery/
+tmp/operator-doc-verification/
+# Top-level tmp probe helpers are one-off diagnostics, not durable fixtures.
+tmp/*-probe*.mjs
+tmp/probe-*.mjs
+tmp/capture-*.mjs
+tmp/inspect-*.mjs
+tmp/manual-*.mjs
+tmp/*.codex
+.omx/
+
+# Repository boundary guards: external sibling repos and one-off file dumps do
+# not belong in the main monorepo history.
+repos/
+files/

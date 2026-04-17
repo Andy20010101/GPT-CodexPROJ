@@ -4,11 +4,35 @@
 
 The system is intentionally split into three planes:
 
-1. Control Plane: a future orchestrator that freezes requirements, freezes architecture, manages task state, and aggregates evidence.
+1. Control Plane: the orchestrator that freezes requirements, freezes architecture, manages task state, aggregates evidence, and runs the current file-backed workflow runtime.
 2. Review Plane: the `chatgpt-web-bridge` service, which connects to an already logged-in ChatGPT web session and turns the browser workflow into a typed service boundary.
 3. Execution Plane: a replaceable executor layer that receives reviewed tasks and implements them under gates. The current repository ships a local execution skeleton with `CodexExecutor`, `CommandExecutor`, and `NoopExecutor`.
 
 The Review Plane is not the orchestrator. It does not own task state, acceptance gates, or repository mutation policy. Its job is narrower: enter the right ChatGPT project, switch model context, upload task files, send prompts, wait for completion, capture results, and export structured outputs for higher layers.
+
+The repository also ships a root [SKILL.md](/home/administrator/code/review-then-codex-system/SKILL.md) and [agents/openai.yaml](/home/administrator/code/review-then-codex-system/agents/openai.yaml) so agentic tooling can treat the repo itself as a reusable skill instead of relying on thread-local memory.
+
+## Quick Start
+
+```bash
+npm install
+npm run ci
+cp .env.example .env.local
+npm run dev --workspace @review-then-codex/chatgpt-web-bridge
+npm run dev --workspace @review-then-codex/orchestrator
+```
+
+Use `.env.example` as the baseline local configuration surface. Only enable the real browser-backed or Codex-backed paths when you intentionally have the required local stack available.
+
+## Repository Guides
+
+- [CONTRIBUTING.md](/home/administrator/code/review-then-codex-system/CONTRIBUTING.md) for development workflow and validation expectations
+- [SECURITY.md](/home/administrator/code/review-then-codex-system/SECURITY.md) for disclosure and sensitive-surface handling
+- [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md) for the shortest project explanation
+- [SYSTEM_OVERVIEW.md](/home/administrator/code/review-then-codex-system/docs/architecture/SYSTEM_OVERVIEW.md) for the plane model and lifecycle
+- [REPOSITORY_BOUNDARIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/REPOSITORY_BOUNDARIES.md) for what belongs in the monorepo versus what must live outside it
+- [PROJECT_PREPARATION_WORKFLOW.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PREPARATION_WORKFLOW.md) for the upstream preparation layer
+- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md) for the bounded live operator path
 
 ## Current Scope
 
@@ -16,6 +40,8 @@ This repository currently provides:
 
 - A monorepo skeleton with durable boundaries between apps, services, and shared contracts.
 - Architecture documentation and ADRs for the three-plane system.
+- A human-oriented overview of project purpose and current capabilities in [PROJECT_PURPOSE_AND_CAPABILITIES.md](/home/administrator/code/review-then-codex-system/docs/architecture/PROJECT_PURPOSE_AND_CAPABILITIES.md).
+- A concrete operating plan for running external delivery and platform self-improvement in parallel in [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md).
 - A working `chatgpt-web-bridge` service with typed Fastify routes, in-memory session/conversation state, artifact export, DOM drift checks, and mockable browser boundaries.
 - A first browser-attach hardening layer for the bridge with endpoint discovery, DevTools probing, structured diagnostics, and `openSession` preflight gating for WSL-to-Windows host attach scenarios.
 - A control-plane orchestrator skeleton with requirement freeze, architecture freeze, task graph registration, gate-aware task loop transitions, evidence ledger persistence, a typed bridge client, and execution-plane dispatch through replaceable executors.
@@ -28,6 +54,10 @@ This repository currently provides:
   - bridge health, drift incident, session resume, and conversation recovery boundaries
   - rollback planning, retained workspace reuse, and debug snapshot capture
   - remediation playbooks, failure-to-task proposals, and self-repair policy decisions
+- A bounded real self-improvement operator surface with:
+  - `scripts/self-improvement-env.ts` for `doctor` / `ensure` bootstrap and persisted env-state
+  - `scripts/run-real-self-improvement.ts` for analysis-bundle creation, watcher startup, planning sequencing, and `--run-id` resume
+  - dedicated operator docs for the supported local mode and artifact-driven monitoring
 
 ## Layout
 
@@ -38,9 +68,18 @@ docs/
   architecture/
 packages/
   shared-contracts/
+references/
+  legacy/
 services/
   chatgpt-web-bridge/
 ```
+
+## Repository Boundaries
+
+- The monorepo owns the platform code and its operating docs: `apps/`, `services/`, `packages/`, `scripts/`, `docs/architecture/`, and preparation/workflow material under `docs/`.
+- External delivery repos or domain-specific skills do not belong inside this worktree as nested repositories. The local `1688-platform-skill` checkout is now expected as a sibling repo at `../1688-platform-skill`, not under this repository.
+- Historical imported reference material, when it must be kept, lives under `references/legacy/`. The legacy ChatGPT CLI snapshot now lives at `references/legacy/ChatGPTCLI`.
+- Scratch import zones such as `repos/` and `files/` are intentionally ignored so Finder dumps, nested `.git` directories, and ad hoc drops do not leak into the main repo again.
 
 ## Current Maturity
 
@@ -79,6 +118,10 @@ The repository now has:
   - `RollbackService`, `DebugSnapshotService`, and `RetainedWorkspaceService` for failure capture and controlled rollback planning
   - `StabilityGovernanceService` for recurring-incident summaries
   - `RemediationPlaybookService`, `FailureToTaskService`, `SelfRepairPolicyService`, and `RemediationService` for low-risk remediation prerequisites
+- a bounded real self-improvement surface with:
+  - `scripts/self-improvement-env.ts` for environment doctor/ensure and authoritative env-state output
+  - `scripts/run-real-self-improvement.ts` for bounded run creation, analysis-bundle attach, planning-sequence driving, watcher startup, and persisted resume
+  - accepted-run-oriented operator docs in `docs/architecture/REAL_SELF_IMPROVEMENT*.md`
 - shared bridge contracts reused across planes
 
 The orchestrator is intentionally not a production workflow engine yet. It models the control-plane lifecycle, enforces state and gate rules, persists runtime/job/release evidence, and now exposes an API plus a daemon shell, but it does not pretend to be a distributed scheduler or that a remote Codex cloud runtime is already present.
@@ -111,6 +154,12 @@ Install dependencies from the repository root:
 
 ```bash
 npm install
+```
+
+Copy the example environment file if you want a single place to edit local values:
+
+```bash
+cp .env.example .env.local
 ```
 
 Run the bridge tests:
@@ -157,6 +206,12 @@ Run the real validation harness only when the local bridge and Codex CLI are int
 
 ```bash
 ENABLE_REAL_E2E_VALIDATION=true npx tsx scripts/run-real-e2e-validation.ts
+```
+
+Run the bounded real self-improvement entrypoint only when the same local bridge/browser/orchestrator stack is intentionally configured:
+
+```bash
+CODEX_RUNNER_MODE=cli node --import tsx scripts/run-real-self-improvement.ts
 ```
 
 Run type checks across the monorepo:
@@ -217,6 +272,26 @@ RUNNER_FORCE_KILL_AFTER_MS=4000
 ```
 
 This is still a local runtime adapter. The repository does not claim that a production Codex API or cloud sandbox is already connected.
+
+## Real Self-Improvement
+
+The repository now includes a bounded real self-improvement workflow for the currently supported local mode.
+
+Use these commands:
+
+```bash
+node --import tsx scripts/self-improvement-env.ts doctor
+node --import tsx scripts/self-improvement-env.ts ensure
+node --import tsx scripts/run-real-self-improvement.ts --prepare-only
+CODEX_RUNNER_MODE=cli node --import tsx scripts/run-real-self-improvement.ts
+```
+
+Primary docs:
+
+- [REAL_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT.md)
+- [REAL_SELF_IMPROVEMENT_SOP.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_SOP.md)
+- [REAL_SELF_IMPROVEMENT_STATUS_AND_BOUNDARY.md](/home/administrator/code/review-then-codex-system/docs/architecture/REAL_SELF_IMPROVEMENT_STATUS_AND_BOUNDARY.md)
+- [PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md](/home/administrator/code/review-then-codex-system/docs/architecture/PARALLEL_DELIVERY_AND_SELF_IMPROVEMENT.md)
 
 For real planning proof and real review attach, the bridge also needs a Windows-side browser with remote debugging enabled and a DevTools endpoint that is reachable from WSL. Start by running the browser attach diagnostics and see:
 
