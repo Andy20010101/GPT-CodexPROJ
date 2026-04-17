@@ -1,0 +1,7 @@
+interface:
+  display_name: "Review Then Codex System"
+  short_description: "Three-plane delivery system with preparation, review, and execution boundaries"
+  default_prompt: "Use $review-then-codex-system when working in this repository to preserve the control-plane, review-plane, and execution-plane boundaries, and to follow the preparation and bounded self-improvement workflows."
+
+policy:
+  allow_implicit_invocation: true
