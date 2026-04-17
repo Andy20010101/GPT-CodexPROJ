@@ -1,0 +1,15 @@
+{
+  "exportId": "export-002",
+  "generatedAt": "2026-04-15T03:50:43.719Z",
+  "sourceConvergenceReportId": "cr_001",
+  "sourceCheckpointId": "c_009",
+  "sourceDecisionIds": [
+    "d_004",
+    "d_005",
+    "d_006",
+    "d_007"
+  ],
+  "status": "exported",
+  "note": "refresh: refresh export with corrected canonical handoff prompt",
+  "supersedes": "export-001"
+}

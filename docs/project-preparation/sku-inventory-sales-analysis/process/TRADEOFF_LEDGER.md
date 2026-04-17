@@ -1,0 +1,302 @@
+# Tradeoff Ledger
+
+## Active Tradeoffs
+
+- none
+
+## Converged Tradeoffs
+
+### t_010 Single External Interface And Export Fallback Pressure
+- Stage: brainstorm
+- Status: converged
+- Pressure Question: If v1 must stay narrow, what boundary should apply to non-ERP exposure and any later fallback path?
+- Must Keep:
+  - ERP APIs as the core source boundary
+  - API-first service positioning
+  - at most one interface for another system
+  - export as the only preferred fallback form if later required
+- Can Drop:
+  - broader multi-system integration
+  - extra consumer-specific polish
+  - additional nonessential endpoints
+- Not Now:
+  - multiple external-system interfaces
+  - source-side integration beyond ERP
+  - default database-table or Excel-CSV ingestion as fallback
+  - generic platform expansion
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - Converged boundary correction: v1 remains centered on ERP APIs as the source boundary, but may expose at most one interface for another system. If a later validated fallback is needed, the preferred fallback form is export rather than default non-API ingestion or source-side system expansion.
+- Still Unresolved:
+  - none
+- Linked Decisions:
+  - none
+
+### t_009 Time-Dimension Linkage Pressure
+- Stage: brainstorm
+- Status: converged
+- Pressure Question: If ERP API historical/time-dimension data cannot be cleanly linked for 30-day outbound and 30/60/90-day sales volume, what must v1 preserve first: API-only purity or the full metric contract?
+- Must Keep:
+  - SKU
+  - current inventory
+  - turnover days
+  - default-warehouse quantity
+  - ERP as the only upstream system
+  - lightweight API-service positioning
+- Can Drop:
+  - secondary analytics fields
+  - nonessential extras
+  - secondary consumer polish
+- Not Now:
+  - generic data platform
+  - broad multi-system integration
+  - real-time refresh
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - Converged time-dimension policy: v1 keeps the API-only ERP boundary. Time-dimension metrics such as 30-day outbound and 30/60/90-day sales volume may be aligned and derived across multiple ERP APIs; direct single-endpoint linkage is not required. Only if validation later proves key metrics impossible through API composition should this trigger a later boundary decision rather than default fallback now.
+- Still Unresolved:
+  - none
+- Linked Decisions:
+  - none
+
+### t_007 Corrected Minimum API Contract
+- Stage: brainstorm
+- Status: converged
+- Pressure Question: If the first version must stay a lightweight API service, what contract is truly non-negotiable after confirming default-warehouse quantity as must-have?
+- Must Keep:
+  - SKU
+  - current inventory
+  - 30-day outbound
+  - turnover days
+  - 30/60/90-day sales volume
+  - default-warehouse quantity
+- Can Drop:
+  - secondary analytics fields
+  - derived comparison views
+  - built-in formatting concerns
+- Not Now:
+  - dashboard delivery
+  - file export delivery
+  - real-time refresh
+  - multi-system reconciliation
+  - generic platform abstractions
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - Converged minimum API contract: SKU, current inventory, 30-day outbound, turnover days, 30/60/90-day sales volume, and default-warehouse quantity are all must-have fields for v1.
+- Still Unresolved:
+  - none
+- Linked Decisions:
+  - none
+
+### t_005 Primary Business Value Pressure API-First
+- Stage: brainstorm
+- Status: converged
+- Pressure Question: If v1 is API-first and cannot optimize every stakeholder equally, which business value must the API preserve first and which audience remains secondary?
+- Must Keep:
+  - ecommerce-primary business value
+  - SKU-level sales statistics
+  - core inventory-cycle metrics
+  - ERP API-only scope
+- Can Drop:
+  - leadership-specific presentation
+  - secondary consumer polish
+  - nonessential extra fields
+- Not Now:
+  - dual-stakeholder parity
+  - separate leader-oriented product surface
+  - generic data platform positioning
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - Converged business priority: even in an API-first delivery model, ecommerce remains the primary business value target. Leadership consumption may exist, but dedicated leader-oriented shaping is not-now for v1.
+- Still Unresolved:
+  - none
+- Linked Decisions:
+  - none
+
+## Superseded Tradeoffs
+
+### t_008 API-Only Hard-Field Pressure
+- Stage: brainstorm
+- Status: superseded
+- Pressure Question: If default-warehouse quantity is must-have but the ERP API cannot reliably provide it, which constraint gives first: API-only boundary or v1 readiness?
+- Must Keep:
+  - default-warehouse quantity as must-have
+  - ERP as the only upstream system
+  - lightweight API-service positioning
+- Can Drop:
+  - secondary analytics fields
+  - nonessential extras
+  - secondary consumer polish
+- Not Now:
+  - broad multi-system expansion
+  - generic platform scope
+  - real-time delivery
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - none
+- Still Unresolved:
+  - Superseded because default-warehouse quantity is generally obtainable through the ERP API; the real remaining pressure is time-dimension historical data that lacks clean API linkage.
+- Linked Decisions:
+  - none
+
+### t_002 API-Only Boundary Pressure
+- Stage: brainstorm
+- Status: superseded
+- Pressure Question: If the ERP API is incomplete or awkward for some desired fields, what can v1 drop before expanding to other access modes or systems?
+- Must Keep:
+  - ERP-only scope
+  - API as authoritative ingestion path
+  - day-level refresh
+  - core SKU metrics
+- Can Drop:
+  - default-warehouse quantity if API coverage is weak
+  - secondary detail fields
+  - nonessential presentation extras
+- Not Now:
+  - database-table ingestion by default
+  - Excel/CSV ingestion by default
+  - WMS/internal-system integration
+  - multi-platform reconciliation
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - Converged boundary: API-only ERP access is a must-have for v1. If the API lacks secondary fields, drop those fields before broadening to database tables, Excel/CSV, WMS, or internal-system integration.
+- Still Unresolved:
+  - Superseded because the earlier convergence allowed dropping default-warehouse quantity if API coverage was weak, but that field is now confirmed as must-have for v1.
+- Linked Decisions:
+  - none
+
+### t_006 Minimum API Contract Pressure
+- Stage: brainstorm
+- Status: superseded
+- Pressure Question: If the first version must stay a lightweight API service, which response fields are must-have, which can drop, and what is explicitly not-now?
+- Must Keep:
+  - SKU
+  - current inventory
+  - turnover days
+  - 30-day outbound
+  - 30/60/90-day sales volume
+- Can Drop:
+  - default-warehouse quantity
+  - secondary analytics fields
+  - derived comparison views
+  - built-in formatting concerns
+- Not Now:
+  - dashboard delivery
+  - file export delivery
+  - real-time refresh
+  - multi-system reconciliation
+  - generic platform abstractions
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - Converged minimum API contract: SKU, current inventory, 30-day outbound, turnover days, 30/60/90-day sales volume, and default-warehouse quantity are all must-have fields. Secondary analytics fields may drop before broadening scope.
+- Still Unresolved:
+  - Superseded because default-warehouse quantity is now confirmed as must-have, so the prior can-drop set is no longer valid.
+- Linked Decisions:
+  - none
+
+### t_004 Delivery Anchor Pressure
+- Stage: brainstorm
+- Status: superseded
+- Pressure Question: If v1 must have one clear primary interaction, is the product anchored on an internal dashboard that users inspect daily, or on exports that users pull for sales analysis?
+- Must Keep:
+  - one clear primary interaction
+  - ecommerce-primary workflow
+  - shared v1 surface rather than separate role products
+- Can Drop:
+  - duplicating the same sales view in both dashboard and export
+  - mixed interaction patterns without a clear anchor
+- Not Now:
+  - two equally primary delivery anchors
+  - fully symmetric dashboard-plus-export experiences for all metrics
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - none
+- Still Unresolved:
+  - Superseded because the dashboard-vs-export anchor question is no longer relevant after clarifying that v1 is API-first rather than page/export-driven.
+- Linked Decisions:
+  - none
+
+### t_003 Minimum Delivery Surface Pressure
+- Stage: brainstorm
+- Status: superseded
+- Pressure Question: What is the minimum internal page/dashboard plus export that would still count as a valid v1, and what can wait?
+- Must Keep:
+  - SKU
+  - current inventory
+  - 30-day outbound
+  - turnover days
+  - 30/60/90-day sales volume
+  - export capability
+- Can Drop:
+  - extra charts
+  - deep drill-downs
+  - custom leader-centric formatting
+  - secondary filters
+- Not Now:
+  - generic data platform
+  - real-time refresh
+  - broad data-sync governance
+  - large-scope warehouse analytics
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - Converged minimum delivery surface: the internal dashboard only needs inventory plus turnover days, while export needs 30/60/90-day sales volume. 30-day outbound, default-warehouse quantity, extra charts, and deep drill-downs are not part of the minimum must-have surface.
+- Still Unresolved:
+  - Superseded because the minimum delivery surface is no longer dashboard-plus-export. The clarified v1 delivery model is API-first.
+- Linked Decisions:
+  - none
+
+### t_001 Primary Value Pressure
+- Stage: brainstorm
+- Status: superseded
+- Pressure Question: If v1 cannot make both ecommerce and leadership equally strong on day one, what must it preserve first and what can be secondary?
+- Must Keep:
+  - ecommerce-primary workflow
+  - SKU-level analysis
+  - sales statistics as the main entry flow
+  - day-level refresh
+- Can Drop:
+  - leadership-first tailoring
+  - separate leader-specific polish
+  - secondary view completeness
+- Not Now:
+  - dual-actor parity
+  - separate role-optimized experiences
+  - broader management cockpit
+- Boundary Implication:
+  - none
+- Failure Implication:
+  - none
+- Current Leaning:
+  - none
+- Still Unresolved:
+  - Superseded because this tradeoff was phrased around a human-facing entry flow. After clarification correction, v1 is API-first; actor priority needs to be expressed without assuming dashboard/export interaction.
+- Linked Decisions:
+  - none
+

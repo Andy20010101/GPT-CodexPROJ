@@ -1,0 +1,749 @@
+{
+  "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+  "tasks": [
+    {
+      "taskId": "8f4373c0-bf76-4ba6-aaab-616ba48e2d33",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Validate canonical SKU key across ERP APIs",
+      "objective": "Resolve q_008 by identifying the canonical SKU key and raw ERP SKU references needed to join SKU, inventory, warehouse, movement, and sales API surfaces.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Inspect ERP API field inventories supplied for SKU, inventory, warehouse, movement, and sales endpoints.",
+          "Produce a SKU identifier mapping artifact with canonical key, raw references, join assumptions, and unresolved mismatches.",
+          "Define the minimum canonical key rule required before downstream joins are trusted."
+        ],
+        "outOfScope": [
+          "Implement production ERP clients.",
+          "Change preparation packet contents.",
+          "Accept non-API sources to resolve SKU identity."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-q008-canonical-key",
+          "description": "A q_008 evidence artifact identifies the canonical SKU key and maps every raw ERP SKU reference needed for required v1 metrics.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "Each relevant ERP API surface has a listed SKU field, join rule, confidence level, and blocker status.",
+          "requiredEvidenceKinds": [
+            "source_mapping_matrix",
+            "identifier_mapping_review"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-q008-review",
+          "description": "Review the SKU mapping artifact against all known ERP API surfaces.",
+          "expectedRedSignal": "Any required API surface lacks a SKU field mapping or the canonical key is ambiguous.",
+          "expectedGreenSignal": "All required API surfaces map to one canonical SKU rule or explicitly documented transform."
+        }
+      ],
+      "implementationNotes": [
+        "This is the first task because every later join and metric depends on stable SKU identity.",
+        "Do not collapse raw ERP identifiers too early; preserve raw references for traceability."
+      ],
+      "evidenceIds": [
+        "c5113b1c-b641-437d-b419-0678cf3f70af"
+      ],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 1,
+        "executionResult": "tests_red",
+        "evidencePath": "docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/q_008-canonical-sku-key-evidence.md",
+        "requiredInputsPath": "docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/q_008-required-erp-api-inputs.md",
+        "blocker": "Strong Lingxing candidate fields are available, but same-SKU cross-interface payload evidence is still missing, so the canonical join rule and API statistics chain entry point are not yet proven.",
+        "questionIds": [
+          "q_008"
+        ],
+        "moduleIds": [
+          "erp_source_gateway",
+          "canonical_mapping"
+        ],
+        "inputs": [
+          "REQUIREMENT_FREEZE.json",
+          "ARCHITECTURE_FREEZE.json",
+          "ERP API field descriptions for SKU, inventory, warehouse, movement, and sales endpoints"
+        ],
+        "outputs": [
+          "q_008 SKU identifier mapping evidence",
+          "canonical SKU key decision candidate",
+          "raw SKU reference inventory"
+        ],
+        "validationMethod": "artifact review"
+      },
+      "status": "tests_red",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:49:35.000Z"
+    },
+    {
+      "taskId": "efd4174d-9a4a-4d83-b27e-da8b2013dd1c",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Validate default local warehouse identifier",
+      "objective": "Resolve q_014 by identifying which ERP warehouse representation corresponds to the default local warehouse business concept used by the required warehouse quantity field.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Inspect ERP warehouse API fields and inventory quantity surfaces.",
+          "Identify the ERP warehouse identifier or identifiers that represent local warehouse quantity.",
+          "Record whether there is a single local warehouse or multiple candidates requiring later mapping."
+        ],
+        "outOfScope": [
+          "Implement local warehouse configuration.",
+          "Resolve q_018 before q_014 evidence exists.",
+          "Use WMS or other systems to define the warehouse source."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/warehouse-mapping/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [
+        "8f4373c0-bf76-4ba6-aaab-616ba48e2d33"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-q014-warehouse-id",
+          "description": "A q_014 evidence artifact identifies how default local warehouse is represented in ERP API data and whether multiple local warehouse candidates exist.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "The artifact lists ERP warehouse id field, local warehouse selection basis, and whether q_018 mapping work is required.",
+          "requiredEvidenceKinds": [
+            "warehouse_mapping_review",
+            "erp_api_field_inventory"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-q014-review",
+          "description": "Review the warehouse mapping evidence against representative inventory records.",
+          "expectedRedSignal": "Default local warehouse cannot be tied to an ERP API warehouse identifier or selection basis.",
+          "expectedGreenSignal": "Default local warehouse has an explicit ERP identifier or a documented set of candidates for q_018."
+        }
+      ],
+      "implementationNotes": [
+        "This task follows q_008 so SKU-specific warehouse quantities can be validated against stable SKU identity.",
+        "Do not treat a single warehouse as unique unless ERP evidence supports it."
+      ],
+      "evidenceIds": [],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 2,
+        "questionIds": [
+          "q_014"
+        ],
+        "moduleIds": [
+          "erp_source_gateway",
+          "canonical_mapping"
+        ],
+        "inputs": [
+          "q_008 SKU identifier mapping evidence",
+          "ERP warehouse and inventory API field descriptions",
+          "ARCHITECTURE_FREEZE.json"
+        ],
+        "outputs": [
+          "q_014 default local warehouse evidence",
+          "local warehouse candidate list",
+          "q_018 required/not-required signal"
+        ],
+        "validationMethod": "artifact review"
+      },
+      "status": "drafted",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:16:31.000Z"
+    },
+    {
+      "taskId": "dd3ec2ba-dabf-4110-8e36-c7ed207acbd2",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Freeze ERP source mapping and normalized record contracts",
+      "objective": "Turn q_008 and q_014 evidence into a complete ERP source mapping matrix and normalized record contract for SKU references, inventory snapshots, warehouse quantities, movement events, and sales events.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Define normalized records for SkuMasterRecord, InventorySnapshotRecord, MovementEventRecord, and SalesEventRecord.",
+          "Map every required v1 contract input to an ERP API field or endpoint group.",
+          "Record provenance fields needed by validation evidence."
+        ],
+        "outOfScope": [
+          "Implement normalization code.",
+          "Compute business metrics.",
+          "Broaden source access beyond ERP APIs."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/source-mapping/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/contracts/source-records/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [
+        "8f4373c0-bf76-4ba6-aaab-616ba48e2d33",
+        "efd4174d-9a4a-4d83-b27e-da8b2013dd1c"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-source-contracts",
+          "description": "The source mapping matrix and normalized record contracts cover all required inputs for current inventory, default-local-warehouse quantity, 30-day outbound, 30/60/90-day sales, and turnover days.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "No required v1 metric input remains unmapped or untyped at the planning artifact level.",
+          "requiredEvidenceKinds": [
+            "source_mapping_matrix",
+            "normalized_record_contracts"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-source-contract-completeness",
+          "description": "Check the source mapping matrix against the v1 metric contract.",
+          "expectedRedSignal": "Any required metric input lacks endpoint, field, provenance, or timestamp mapping.",
+          "expectedGreenSignal": "Every required metric input has endpoint, field, provenance, timestamp, and normalized record placement."
+        }
+      ],
+      "implementationNotes": [
+        "This task produces architecture-level contracts for future implementation; it does not create runtime code.",
+        "The source mapping must preserve raw ERP provenance for later derivation traces."
+      ],
+      "evidenceIds": [],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 3,
+        "questionIds": [
+          "q_008",
+          "q_014"
+        ],
+        "moduleIds": [
+          "erp_source_gateway",
+          "source_normalization",
+          "canonical_mapping"
+        ],
+        "inputs": [
+          "q_008 SKU identifier mapping evidence",
+          "q_014 default local warehouse evidence",
+          "REQUIREMENT_FREEZE.json",
+          "ARCHITECTURE_FREEZE.json"
+        ],
+        "outputs": [
+          "ERP source mapping matrix",
+          "normalized source record contract",
+          "provenance field requirements"
+        ],
+        "validationMethod": "contract completeness review"
+      },
+      "status": "drafted",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:16:31.000Z"
+    },
+    {
+      "taskId": "a89dc964-2495-45de-bbe6-664214a79fa2",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Validate time-dimension ERP API derivation path",
+      "objective": "Resolve q_016 by proving whether 30-day outbound and 30/60/90-day sales can be derived from ERP APIs through normalized records and traceable aggregation.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Select representative SKU samples for time-window validation.",
+          "Define derivation trace shape from raw ERP payload to normalized event to daily fact to final metric.",
+          "Record whether required time-window metrics are derivable inside the ERP API-only boundary."
+        ],
+        "outOfScope": [
+          "Implement production aggregation jobs.",
+          "Accept export or non-API fallback as default behavior.",
+          "Declare metrics complete without representative SKU evidence."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/derivation/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/contracts/metrics/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [
+        "dd3ec2ba-dabf-4110-8e36-c7ed207acbd2"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-q016-derivation-proof",
+          "description": "A q_016 derivation evidence package shows raw ERP records, normalized records, daily aggregations, and final 30/60/90-day outputs for representative SKUs.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "The evidence demonstrates whether each required time-window metric can be derived from ERP APIs without hidden fallback.",
+          "requiredEvidenceKinds": [
+            "derivation_trace",
+            "sample_sku_validation",
+            "aggregation_evidence"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-q016-trace-review",
+          "description": "Review derivation traces for representative SKUs across outbound and sales windows.",
+          "expectedRedSignal": "Any required window lacks traceable raw ERP source data, timestamp rule, or aggregation formula.",
+          "expectedGreenSignal": "Every required window has raw source, normalized event, daily fact, rollup, and final metric trace."
+        }
+      ],
+      "implementationNotes": [
+        "This is the highest-risk validation task and blocks API contract finalization.",
+        "If q_016 fails, the next step is a separate boundary decision; do not silently introduce fallback."
+      ],
+      "evidenceIds": [],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 4,
+        "questionIds": [
+          "q_016"
+        ],
+        "moduleIds": [
+          "source_normalization",
+          "metric_derivation",
+          "validation_evidence"
+        ],
+        "inputs": [
+          "ERP source mapping matrix",
+          "normalized source record contract",
+          "representative SKU sample set",
+          "ARCHITECTURE_FREEZE.json"
+        ],
+        "outputs": [
+          "q_016 time-dimension derivation evidence",
+          "metric derivation trace contract",
+          "derivable/not-derivable decision for required windows"
+        ],
+        "validationMethod": "representative SKU derivation trace review"
+      },
+      "status": "drafted",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:16:31.000Z"
+    },
+    {
+      "taskId": "43c2d229-b70d-4a34-bc5e-19449cb99ba6",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Finalize default_local_wid or explicit local warehouse mapping rule",
+      "objective": "Resolve q_018 by deciding whether default_local_wid configuration or an explicit mapping rule is required, based on q_014 warehouse evidence and q_016 validation context.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Define the local warehouse mapping rule only if multiple local warehouses exist.",
+          "Specify mappingMode values needed in the API response.",
+          "Record how mapping evidence will be reviewed during implementation."
+        ],
+        "outOfScope": [
+          "Implement runtime configuration loading.",
+          "Treat q_018 as required if q_014 proves there is only one local warehouse.",
+          "Use another source system to resolve warehouse semantics."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/warehouse-mapping/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/contracts/local-warehouse/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [
+        "a89dc964-2495-45de-bbe6-664214a79fa2"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-q018-mapping-rule",
+          "description": "A q_018 mapping artifact states whether default_local_wid or explicit mapping is required and defines the exact rule if required.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "The mapping rule can explain default-local-warehouse quantity selection for both single-local-warehouse and multi-local-warehouse cases.",
+          "requiredEvidenceKinds": [
+            "warehouse_mapping_config",
+            "mapping_review"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-q018-mapping-review",
+          "description": "Review mapping rule against q_014 warehouse evidence and representative SKU scenarios.",
+          "expectedRedSignal": "Mapping rule assumes natural uniqueness without evidence or cannot handle multiple local warehouses.",
+          "expectedGreenSignal": "Mapping rule is either proven unnecessary or explicitly defines default_local_wid or equivalent mapping."
+        }
+      ],
+      "implementationNotes": [
+        "This task intentionally follows q_016 in the validation-first sequence, even though it derives from q_014.",
+        "The output should be a planning/config contract, not runtime config code."
+      ],
+      "evidenceIds": [],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 5,
+        "questionIds": [
+          "q_018",
+          "q_014"
+        ],
+        "moduleIds": [
+          "canonical_mapping",
+          "api_surface",
+          "validation_evidence"
+        ],
+        "inputs": [
+          "q_014 default local warehouse evidence",
+          "q_016 derivation validation outcome",
+          "local warehouse candidate list"
+        ],
+        "outputs": [
+          "q_018 mapping rule decision",
+          "default_local_wid requirement decision",
+          "mappingMode contract values"
+        ],
+        "validationMethod": "mapping rule review"
+      },
+      "status": "drafted",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:16:31.000Z"
+    },
+    {
+      "taskId": "ac5f6272-a29c-405e-b647-0edfd74e632a",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Freeze V1 API contract and response fixtures",
+      "objective": "Define the v1 API contract and representative response fixtures after source identity, warehouse semantics, time-window derivation, and mapping rules are validated.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Define request shape, response shape, derivation metadata, and error cases for the primary v1 SKU analysis API.",
+          "Include current inventory, default-local-warehouse quantity, 30-day outbound, turnover days, and 30/60/90-day sales volume.",
+          "Produce response fixtures for normal, zero-sales, ambiguous mapping, and derivation discrepancy cases."
+        ],
+        "outOfScope": [
+          "Implement API handlers.",
+          "Add dashboard or export endpoints.",
+          "Define optional extra consumer interface without concrete need."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/contracts/api/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/api-contract/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [
+        "43c2d229-b70d-4a34-bc5e-19449cb99ba6"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-v1-contract-fixtures",
+          "description": "The v1 API contract artifact and response fixtures include all required fields and make mapping and derivation metadata visible.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "Contract fixtures demonstrate full metric response shape and required metadata without depending on hidden source paths.",
+          "requiredEvidenceKinds": [
+            "api_contract_spec",
+            "response_fixture",
+            "contract_review"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-api-contract-review",
+          "description": "Review the API contract against requirement and architecture freeze invariants.",
+          "expectedRedSignal": "The contract omits a required metric, hides warehouse mapping, or lacks derivation metadata.",
+          "expectedGreenSignal": "The contract includes all required metrics, mapping metadata, derivation metadata, and boundary-safe error cases."
+        }
+      ],
+      "implementationNotes": [
+        "The API contract should be frozen only after q_008, q_014, q_016, and q_018 are resolved or explicitly marked unnecessary.",
+        "Do not add presentation/export concerns to this contract."
+      ],
+      "evidenceIds": [],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 6,
+        "questionIds": [
+          "q_008",
+          "q_014",
+          "q_016",
+          "q_018"
+        ],
+        "moduleIds": [
+          "api_surface",
+          "analysis_application",
+          "metric_derivation",
+          "canonical_mapping"
+        ],
+        "inputs": [
+          "q_008 evidence",
+          "q_014 evidence",
+          "q_016 derivation evidence",
+          "q_018 mapping rule decision",
+          "ARCHITECTURE_FREEZE.json"
+        ],
+        "outputs": [
+          "V1 API contract artifact",
+          "response fixtures",
+          "contract review checklist"
+        ],
+        "validationMethod": "contract review"
+      },
+      "status": "drafted",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:16:31.000Z"
+    },
+    {
+      "taskId": "462d201b-f1b4-46bd-8f43-2d6f72e98b83",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Assemble validation evidence plan and boundary review gate",
+      "objective": "Define the validation evidence package and boundary review gate required before implementation can be accepted as aligned with the ERP API-only architecture.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Define evidence artifacts for source mapping, derivation traces, warehouse mapping, API fixtures, discrepancy reports, and boundary review.",
+          "Define pass/fail gates for hidden fallback, source expansion, and incomplete metric contract.",
+          "Connect validation evidence to the tasks that produce it."
+        ],
+        "outOfScope": [
+          "Run production validation.",
+          "Implement validation harness code.",
+          "Approve fallback or source-boundary changes."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/evidence/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/validation/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [
+        "ac5f6272-a29c-405e-b647-0edfd74e632a"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-validation-gate",
+          "description": "The validation plan defines evidence requirements and pass/fail gates for every requirement-freeze acceptance criterion.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "Every acceptance criterion maps to at least one evidence artifact and one boundary-safe review check.",
+          "requiredEvidenceKinds": [
+            "validation_log",
+            "boundary_review_plan",
+            "evidence_manifest"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-validation-gate-review",
+          "description": "Review validation plan coverage against requirement and architecture freeze.",
+          "expectedRedSignal": "Any required metric, boundary invariant, or unresolved question lacks evidence coverage.",
+          "expectedGreenSignal": "All required metrics, boundary invariants, and q_008/q_014/q_016/q_018 validation points have explicit evidence gates."
+        }
+      ],
+      "implementationNotes": [
+        "This task creates acceptance discipline for implementation without implementing the validation harness.",
+        "The validation sidecar must not become an alternate production data path."
+      ],
+      "evidenceIds": [],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 7,
+        "questionIds": [
+          "q_008",
+          "q_014",
+          "q_016",
+          "q_018"
+        ],
+        "moduleIds": [
+          "validation_evidence"
+        ],
+        "inputs": [
+          "V1 API contract artifact",
+          "source mapping matrix",
+          "derivation trace contract",
+          "warehouse mapping rule",
+          "REQUIREMENT_FREEZE.json",
+          "ARCHITECTURE_FREEZE.json"
+        ],
+        "outputs": [
+          "validation evidence plan",
+          "boundary review gate",
+          "evidence manifest template"
+        ],
+        "validationMethod": "evidence coverage review"
+      },
+      "status": "drafted",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:16:31.000Z"
+    },
+    {
+      "taskId": "034e0a9f-164d-46f5-bcf9-fc0e003c0c71",
+      "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+      "title": "Prepare implementation readiness handoff",
+      "objective": "Produce a downstream implementation readiness package that summarizes validated inputs, frozen interfaces, dependency order, and remaining execution gates without starting code changes.",
+      "executorType": "codex",
+      "scope": {
+        "inScope": [
+          "Summarize completed validation artifacts and unresolved blockers.",
+          "Confirm which modules are ready for implementation sequencing.",
+          "Identify whether implementation can start or must wait on q_008, q_014, q_016, or q_018 outputs."
+        ],
+        "outOfScope": [
+          "Start implementation tasks.",
+          "Modify production source code.",
+          "Reopen requirement or architecture freeze without a material contradiction."
+        ]
+      },
+      "allowedFiles": [
+        "docs/downstream-planning/sku-inventory-sales-analysis/implementation-readiness/**",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.json",
+        "docs/downstream-planning/sku-inventory-sales-analysis/TASK_GRAPH.md"
+      ],
+      "disallowedFiles": [
+        "docs/project-preparation/**",
+        "services/sku-analysis-service/src/**"
+      ],
+      "dependencies": [
+        "462d201b-f1b4-46bd-8f43-2d6f72e98b83"
+      ],
+      "acceptanceCriteria": [
+        {
+          "id": "ac-implementation-readiness",
+          "description": "The readiness package states whether implementation may begin, lists validated inputs, and names any remaining blocker by task and question id.",
+          "verificationMethod": "artifact",
+          "measurableOutcome": "The package gives a clear go/no-go decision for implementation without modifying code.",
+          "requiredEvidenceKinds": [
+            "planning_trace",
+            "readiness_review"
+          ]
+        }
+      ],
+      "testPlan": [
+        {
+          "id": "tp-readiness-review",
+          "description": "Review readiness package against the validation-first dependency chain.",
+          "expectedRedSignal": "Readiness claims implementation can start while required validation artifacts are missing.",
+          "expectedGreenSignal": "Readiness accurately reflects validation completion and blocks implementation if q_008, q_014, q_016, or q_018 gates are incomplete."
+        }
+      ],
+      "implementationNotes": [
+        "This is the terminal planning task before any implementation thread.",
+        "The output should be suitable as a new handoff for implementation, not an implementation itself."
+      ],
+      "evidenceIds": [],
+      "metadata": {
+        "phase": "task_graph_generation",
+        "priority": 8,
+        "questionIds": [
+          "q_008",
+          "q_014",
+          "q_016",
+          "q_018"
+        ],
+        "moduleIds": [
+          "api_surface",
+          "analysis_application",
+          "erp_source_gateway",
+          "source_normalization",
+          "canonical_mapping",
+          "metric_derivation",
+          "validation_evidence"
+        ],
+        "inputs": [
+          "validation evidence plan",
+          "V1 API contract artifact",
+          "source mapping matrix",
+          "derivation evidence",
+          "warehouse mapping evidence"
+        ],
+        "outputs": [
+          "implementation readiness package",
+          "go/no-go decision",
+          "implementation sequencing notes"
+        ],
+        "validationMethod": "readiness gate review"
+      },
+      "status": "drafted",
+      "createdAt": "2026-04-15T06:16:31.000Z",
+      "updatedAt": "2026-04-15T06:16:31.000Z"
+    }
+  ],
+  "edges": [
+    {
+      "fromTaskId": "8f4373c0-bf76-4ba6-aaab-616ba48e2d33",
+      "toTaskId": "efd4174d-9a4a-4d83-b27e-da8b2013dd1c",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "8f4373c0-bf76-4ba6-aaab-616ba48e2d33",
+      "toTaskId": "dd3ec2ba-dabf-4110-8e36-c7ed207acbd2",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "efd4174d-9a4a-4d83-b27e-da8b2013dd1c",
+      "toTaskId": "dd3ec2ba-dabf-4110-8e36-c7ed207acbd2",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "dd3ec2ba-dabf-4110-8e36-c7ed207acbd2",
+      "toTaskId": "a89dc964-2495-45de-bbe6-664214a79fa2",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "a89dc964-2495-45de-bbe6-664214a79fa2",
+      "toTaskId": "43c2d229-b70d-4a34-bc5e-19449cb99ba6",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "43c2d229-b70d-4a34-bc5e-19449cb99ba6",
+      "toTaskId": "ac5f6272-a29c-405e-b647-0edfd74e632a",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "ac5f6272-a29c-405e-b647-0edfd74e632a",
+      "toTaskId": "462d201b-f1b4-46bd-8f43-2d6f72e98b83",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "462d201b-f1b4-46bd-8f43-2d6f72e98b83",
+      "toTaskId": "034e0a9f-164d-46f5-bcf9-fc0e003c0c71",
+      "kind": "blocks"
+    },
+    {
+      "fromTaskId": "efd4174d-9a4a-4d83-b27e-da8b2013dd1c",
+      "toTaskId": "43c2d229-b70d-4a34-bc5e-19449cb99ba6",
+      "kind": "informs"
+    },
+    {
+      "fromTaskId": "a89dc964-2495-45de-bbe6-664214a79fa2",
+      "toTaskId": "ac5f6272-a29c-405e-b647-0edfd74e632a",
+      "kind": "informs"
+    }
+  ],
+  "registeredAt": "2026-04-15T06:16:31.000Z"
+}

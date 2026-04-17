@@ -1,0 +1,222 @@
+{
+  "evidenceId": "c5113b1c-b641-437d-b419-0678cf3f70af",
+  "supersedesEvidenceId": "1f82f673-703a-4eb3-9f45-c8075a5a7e56",
+  "taskId": "8f4373c0-bf76-4ba6-aaab-616ba48e2d33",
+  "questionId": "q_008",
+  "updatedAt": "2026-04-15T06:49:35.000Z",
+  "executionStatus": "tests_red",
+  "result": "strong_candidate_fields_available_but_same_sku_cross_interface_payload_evidence_missing",
+  "correctedFinding": "The issue is not that all field lists are missing. Strong candidate key fields are now available from Lingxing ERP API documentation, but Task 1 still lacks real same-SKU payload evidence proving which candidate key joins all required interfaces correctly.",
+  "chainLevelValidationPosition": {
+    "notAFieldExistenceCheck": true,
+    "businessQuestion": "Whether ERP APIs can support SKU-level sales statistics that the existing ERP page does not provide directly.",
+    "requiredChain": [
+      "same single item identity",
+      "sales quantity by business date",
+      "inventory or warehouse quantity by same item",
+      "stable time-window aggregation",
+      "usable SKU-level sales statistics"
+    ],
+    "task1Scope": "Validate the identity/join-key gate only. Full time-window sales and inventory derivation remains q_016.",
+    "failureMeaning": "If a stable same-SKU join cannot be proven, the API path is not safe for v1 statistics even if individual APIs expose sales or inventory fields."
+  },
+  "evidenceReviewed": [
+    "Repository search found no checked-in real ERP payloads or endpoint field crosswalks.",
+    "User provided Lingxing ERP documentation fields for relevant API surfaces.",
+    "Reviewed REQUIREMENT_FREEZE.json, ARCHITECTURE_FREEZE.json, and TASK_GRAPH.json."
+  ],
+  "availableInterfaceFieldEvidence": [
+    {
+      "category": "product_performance_or_sku_reference_candidate",
+      "endpoint": "/bd/productPerformance/openApi/asinList",
+      "fields": [
+        "local_sku",
+        "seller_sku",
+        "asin",
+        "parent_asin",
+        "sid",
+        "local_name"
+      ],
+      "q008Relevance": "Strong bridge between local SKU, seller SKU, ASIN, and seller/account scope."
+    },
+    {
+      "category": "sales_statistics",
+      "endpoint": "/erp/sc/data/sales_report/sales and /erp/sc/data/sales_report/asinDailyLists",
+      "fields": [
+        "seller_sku",
+        "asin",
+        "r_date",
+        "volume",
+        "order_items",
+        "amount"
+      ],
+      "q008Relevance": "Sales windows can likely join by seller_sku and/or asin with date."
+    },
+    {
+      "category": "platform_statistics",
+      "endpoint": "/basicOpen/platformStatisticsV2/saleStat/pageList",
+      "fields": [
+        "sku",
+        "msku",
+        "mskuId",
+        "spu",
+        "parentAsin",
+        "sid",
+        "date_collect",
+        "volumeTotal"
+      ],
+      "q008Relevance": "Strong candidate bridge between platform sku/msku, internal mskuId, product grouping, seller scope, and sales volume."
+    },
+    {
+      "category": "local_warehouse_inventory_detail",
+      "endpoint": "/inventory/center/openapi/storageReport/local/detail/page",
+      "fields": [
+        "sku",
+        "fnsku",
+        "spu",
+        "spu_name",
+        "seller_name",
+        "sys_wid"
+      ],
+      "q008Relevance": "Inventory-side SKU evidence exists, but must be proven against product/sales SKU fields."
+    },
+    {
+      "category": "fba_or_source_report_side",
+      "endpoint": "exact endpoints TBD",
+      "fields": [
+        "local_sku",
+        "seller_sku",
+        "msku",
+        "sku",
+        "asin",
+        "fnsku",
+        "seller_id",
+        "sid",
+        "wid"
+      ],
+      "q008Relevance": "Multiple bridge fields exist across source/report surfaces, but payload-level alignment is still required."
+    }
+  ],
+  "strongCandidateKeySet": [
+    "local_sku",
+    "seller_sku",
+    "msku",
+    "mskuId",
+    "sku",
+    "asin",
+    "sid",
+    "seller_id",
+    "fnsku",
+    "spu",
+    "sys_wid",
+    "wid"
+  ],
+  "candidateInterpretation": {
+    "local_sku": "Strong business/local SKU candidate if it maps consistently to inventory-side sku and sales-side seller_sku/msku.",
+    "seller_sku_or_msku": "Strong listing/SKU bridge across product performance, sales statistics, and platform statistics.",
+    "mskuId": "Potentially stable platform-statistics identifier if mapped to msku and then to the canonical key.",
+    "sku": "Overloaded across platform statistics and local warehouse inventory; strong only if payloads prove identical semantics.",
+    "asin": "Scoped platform/product reference; not sufficient alone as SKU-grain canonical key unless paired with seller/platform context and proven one-to-one.",
+    "fnsku": "Likely fulfillment/inventory-side reference; preserve as provenance unless mapping is proven.",
+    "spu_or_parent_asin": "Grouping reference, not SKU-grain canonical key.",
+    "sid_seller_id_sys_wid_wid": "Scope or warehouse/source identifiers, not SKU keys by themselves."
+  },
+  "provisionalJoinModel": [
+    "local_sku <-> seller_sku/msku",
+    "seller_sku/msku <-> asin scoped by sid/seller_id",
+    "seller_sku/msku <-> platform sku/mskuId",
+    "platform sku/local_sku <-> local warehouse sku/fnsku scoped by sys_wid or wid"
+  ],
+  "recommendedCanonicalKeyPosition": {
+    "singleCanonicalKeyFrozen": false,
+    "candidateSet": [
+      "local_sku",
+      "seller_sku/msku",
+      "mskuId",
+      "sku"
+    ],
+    "requiredScopeRefs": [
+      "sid/seller_id",
+      "sys_wid/wid where applicable"
+    ],
+    "rawProvenanceRefs": [
+      "asin",
+      "parent_asin/parentAsin",
+      "fnsku",
+      "spu"
+    ],
+    "selectionRule": "Prefer local_sku if payload evidence shows it is stable and maps cleanly to sales seller_sku/msku and inventory sku. Prefer sku if inventory and platform APIs prove sku is the shared stable ERP key. Preserve mskuId as platform-side stable reference if required."
+  },
+  "conflictsOrUnknowns": [
+    "It is not yet proven whether local_sku, seller_sku, msku, and sku are the same value, aliases, or different scoped identifiers.",
+    "It is not yet proven whether sku in platform statistics and sku in local warehouse inventory are semantically identical.",
+    "It is not yet proven whether asin is child ASIN, parent ASIN, or insufficiently granular for SKU-level joins in all cases.",
+    "sid/seller_id may be required to disambiguate seller-scoped values.",
+    "fnsku may be FBA/inventory-specific and may not join to sales statistics directly.",
+    "spu and parent ASIN fields are grouping keys and may create false joins if used as SKU keys."
+  ],
+  "minimumEvidenceNeeded": {
+    "type": "same_sku_cross_interface_payload_crosswalk",
+    "requiredInterfaceCategories": [
+      "/bd/productPerformance/openApi/asinList",
+      "/erp/sc/data/sales_report/sales or /erp/sc/data/sales_report/asinDailyLists",
+      "/basicOpen/platformStatisticsV2/saleStat/pageList",
+      "/inventory/center/openapi/storageReport/local/detail/page",
+      "FBA/source report payload if part of the actual v1 evidence path"
+    ],
+    "requiredColumnsByCategory": {
+      "productPerformance": [
+        "local_sku",
+        "seller_sku",
+        "asin",
+        "parent_asin",
+        "sid",
+        "local_name"
+      ],
+      "salesStatistics": [
+        "seller_sku",
+        "asin",
+        "r_date",
+        "volume or order_items",
+        "amount"
+      ],
+      "platformStatistics": [
+        "sku",
+        "msku",
+        "mskuId",
+        "spu",
+        "parentAsin",
+        "sid",
+        "date_collect",
+        "volumeTotal"
+      ],
+      "localWarehouseInventory": [
+        "sku",
+        "fnsku",
+        "spu",
+        "spu_name",
+        "seller_name",
+        "sys_wid"
+      ],
+      "fbaOrSourceReport": [
+        "local_sku",
+        "seller_sku/msku",
+        "sku",
+        "asin",
+        "fnsku",
+        "seller_id/sid/wid"
+      ]
+    },
+    "chainContextRequired": [
+      "sales quantity candidate such as volume, order_items, or volumeTotal",
+      "inventory or warehouse quantity candidate such as day_end_count",
+      "business date/time candidate such as r_date or date_collect",
+      "scope identifiers where needed, such as sid, seller_id, sys_wid, or wid"
+    ]
+  },
+  "verdict": {
+    "green": false,
+    "reason": "Strong candidate SKU key fields exist, but there is not yet same-SKU cross-interface payload evidence proving the canonical join rule.",
+    "nextAction": "Provide a same-SKU sample payload crosswalk across the 4-5 listed interface categories."
+  }
+}

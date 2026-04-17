@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-
-const TERMINAL_RUN_STAGES = new Set(['accepted', 'rejected', 'failed', 'cancelled']);
-const TERMINAL_RUNTIME_STATUSES = new Set(['accepted', 'failed', 'cancelled']);
+import { classifySelfImprovementRun } from './self-improvement-governor-shared.mjs';
+import { buildSelfImprovementOperatorPlan } from './self-improvement-recovery-shared.mjs';
 
 function parseArgs(argv) {
   const options = {
-    baseUrl: 'http://127.0.0.1:3204',
+    artifactDir: undefined,
+    baseUrl: 'http://127.0.0.1:3200',
     intervalMs: 5000,
     once: false,
     outputJson: undefined,
@@ -18,6 +18,10 @@ function parseArgs(argv) {
     const token = argv[index];
     const next = argv[index + 1];
     switch (token) {
+      case '--artifact-dir':
+        options.artifactDir = next;
+        index += 1;
+        break;
       case '--base-url':
         options.baseUrl = next;
         index += 1;
@@ -86,6 +90,9 @@ function buildMarkdown(snapshot) {
     `- blockedJobs: ${snapshot.runtimeState.blockedJobs}`,
     `- acceptedTasks: ${accepted}/${snapshot.tasks.length}`,
     `- pendingTasks: ${pending}`,
+    `- terminal: ${snapshot.terminalState.terminal}`,
+    `- terminalOutcome: ${snapshot.terminalState.outcome}`,
+    `- terminalReason: ${snapshot.terminalState.reason}`,
     ``,
     `## Tasks`,
     ...snapshot.tasks.map(formatTaskLine),
@@ -99,14 +106,85 @@ function buildMarkdown(snapshot) {
     lines.push('', '## Blocked Task IDs', ...snapshot.runtimeState.blockedTaskIds.map((id) => `- ${id}`));
   }
 
+  if (snapshot.operatorPlan) {
+    lines.push(
+      '',
+      '## Operator Surface',
+      `- envStatePath: ${snapshot.operatorPlan.artifactPaths.envStatePath}`,
+      `- runJsonPath: ${snapshot.operatorPlan.artifactPaths.runJsonPath}`,
+      `- watcherLatestJsonPath: ${snapshot.operatorPlan.artifactPaths.watcherLatestJsonPath}`,
+      `- watcherLatestMarkdownPath: ${snapshot.operatorPlan.artifactPaths.watcherLatestMarkdownPath}`,
+      `- jobsRoot: ${snapshot.operatorPlan.artifactPaths.jobsRoot}`,
+      `- reviewsRoot: ${snapshot.operatorPlan.artifactPaths.reviewsRoot}`,
+      `- watcherRestartCommand: \`${snapshot.operatorPlan.watcher.restartCommand}\``,
+      `- watcherOneShotCommand: \`${snapshot.operatorPlan.watcher.oneShotCommand}\``,
+      `- existingRunPrepareOnly: ${
+        snapshot.operatorPlan.existingRunResume.prepareOnlyCommand
+          ? `\`${snapshot.operatorPlan.existingRunResume.prepareOnlyCommand}\``
+          : 'Unavailable: env-state endpoints are missing.'
+      }`,
+      `- existingRunResumeRecommended: ${snapshot.operatorPlan.existingRunResume.resumeRecommended}`,
+      `- existingRunResumeReason: ${snapshot.operatorPlan.existingRunResume.reason}`,
+      `- existingRunResumeCommand: ${
+        snapshot.operatorPlan.existingRunResume.resumeCommand
+          ? `\`${snapshot.operatorPlan.existingRunResume.resumeCommand}\``
+          : 'Unavailable: env-state endpoints are missing.'
+      }`,
+      `- daemonState: ${snapshot.operatorPlan.daemon.state ?? 'unknown'}`,
+      `- daemonResumeRecommended: ${snapshot.operatorPlan.daemon.resumeRecommended}`,
+      `- daemonResumeReason: ${snapshot.operatorPlan.daemon.reason}`,
+      `- daemonStatusCommand: \`${snapshot.operatorPlan.daemon.statusCommand}\``,
+      `- daemonResumeCommand: \`${snapshot.operatorPlan.daemon.resumeCommand}\``,
+    );
+
+    if (snapshot.operatorPlan.reviewRetry.retryableJobs.length > 0) {
+      lines.push('', '## Review Retry Candidates');
+      for (const job of snapshot.operatorPlan.reviewRetry.retryableJobs) {
+        lines.push(
+          `### ${job.kind} ${job.jobId}`,
+          `- status: ${job.status}`,
+          `- attempt: ${job.attempt}/${job.maxAttempts}`,
+          `- taskId: ${job.taskId ?? 'n/a'}`,
+          `- executionId: ${job.executionId ?? 'n/a'}`,
+          `- reviewId: ${job.reviewId ?? 'n/a'}`,
+          `- jobPath: ${job.jobPath}`,
+          `- reviewRuntimeStatePath: ${job.reviewRuntimeStatePath ?? 'n/a'}`,
+          `- lastError: ${job.lastError?.code ?? 'n/a'} ${job.lastError?.message ?? ''}`.trimEnd(),
+          `- inspectJob: \`${job.inspectCommands.job}\``,
+          `- inspectFailure: \`${job.inspectCommands.failure}\``,
+          `- inspectProcess: \`${job.inspectCommands.process}\``,
+          `- retry: \`${job.retryCommand}\``,
+        );
+      }
+    }
+
+    if (snapshot.operatorPlan.reviewRetry.manualAttentionJobs.length > 0) {
+      lines.push('', '## Review Manual Attention');
+      for (const job of snapshot.operatorPlan.reviewRetry.manualAttentionJobs) {
+        lines.push(
+          `### ${job.kind} ${job.jobId}`,
+          `- status: ${job.status}`,
+          `- attempt: ${job.attempt}/${job.maxAttempts}`,
+          `- taskId: ${job.taskId ?? 'n/a'}`,
+          `- executionId: ${job.executionId ?? 'n/a'}`,
+          `- reviewId: ${job.reviewId ?? 'n/a'}`,
+          `- jobPath: ${job.jobPath}`,
+          `- reviewRuntimeStatePath: ${job.reviewRuntimeStatePath ?? 'n/a'}`,
+          `- lastError: ${job.lastError?.code ?? 'n/a'} ${job.lastError?.message ?? ''}`.trimEnd(),
+          `- inspectJob: \`${job.inspectCommands.job}\``,
+          `- inspectFailure: \`${job.inspectCommands.failure}\``,
+          `- inspectProcess: \`${job.inspectCommands.process}\``,
+          `- retryBlockedReason: ${job.retryBlockedReason ?? 'n/a'}`,
+        );
+      }
+    }
+  }
+
   return `${lines.join('\n')}\n`;
 }
 
 function isTerminal(snapshot) {
-  return (
-    TERMINAL_RUN_STAGES.has(snapshot.run.stage) ||
-    TERMINAL_RUNTIME_STATUSES.has(snapshot.runtimeState.status)
-  );
+  return snapshot.terminalState.terminal;
 }
 
 async function ensureParent(filePath) {
@@ -134,6 +212,33 @@ async function pollSnapshot(options) {
     `${options.baseUrl}/api/runs/${options.runId}/summary`,
   );
   const tasksBody = await fetchJson(`${options.baseUrl}/api/runs/${options.runId}/tasks`);
+  const daemonStatusBody = await fetchJsonOrNull(`${options.baseUrl}/api/daemon/status`);
+  const runFile = options.artifactDir
+    ? path.join(options.artifactDir, 'runs', options.runId, 'run.json')
+    : null;
+  const runAcceptanceFile = options.artifactDir
+    ? path.join(options.artifactDir, 'runs', options.runId, 'run-acceptance.json')
+    : null;
+  const envStateFile = options.artifactDir
+    ? path.join(options.artifactDir, 'runtime', 'self-improvement-env', 'env-state.json')
+    : null;
+  const authoritativeRun =
+    runFile === null ? null : await readJsonIfExists(runFile);
+  const hasRunAcceptance =
+    runAcceptanceFile === null ? false : await fileExists(runAcceptanceFile);
+  const envState = envStateFile === null ? null : await readJsonIfExists(envStateFile);
+  const jobs = options.artifactDir
+    ? await readRunJobs(options.artifactDir, options.runId)
+    : [];
+
+  const terminalState = classifySelfImprovementRun({
+    run: summaryBody.data.run,
+    authoritativeRun: authoritativeRun ?? summaryBody.data.run,
+    runtimeState: summaryBody.data.runtimeState,
+    summary: summaryBody.data.summary,
+    tasks: tasksBody.data,
+    hasRunAcceptance,
+  });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -141,6 +246,22 @@ async function pollSnapshot(options) {
     runtimeState: summaryBody.data.runtimeState,
     summary: summaryBody.data.summary,
     tasks: tasksBody.data,
+    terminalState,
+    ...(options.artifactDir
+      ? {
+          operatorPlan: buildSelfImprovementOperatorPlan({
+            artifactDir: options.artifactDir,
+            baseUrl: options.baseUrl,
+            runId: options.runId,
+            run: authoritativeRun ?? summaryBody.data.run,
+            runtimeState: summaryBody.data.runtimeState,
+            summary: summaryBody.data.summary,
+            envState,
+            jobs,
+            daemonStatus: daemonStatusBody?.data ?? null,
+          }),
+        }
+      : {}),
   };
 }
 
@@ -149,8 +270,48 @@ function printConsoleSummary(snapshot) {
   process.stdout.write(
     `[${snapshot.generatedAt}] stage=${snapshot.run.stage} runtime=${snapshot.runtimeState.status} ` +
       `accepted=${accepted}/${snapshot.tasks.length} runningJobs=${snapshot.runtimeState.runningJobs} ` +
-      `queuedJobs=${snapshot.runtimeState.queuedJobs}\n`,
+      `queuedJobs=${snapshot.runtimeState.queuedJobs} terminal=${snapshot.terminalState.outcome}\n`,
   );
+}
+
+async function readJsonIfExists(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function readRunJobs(artifactDir, runId) {
+  const jobsRoot = path.join(artifactDir, 'runs', runId, 'jobs');
+  try {
+    const entries = await fs.readdir(jobsRoot, { withFileTypes: true });
+    const jobs = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+        .map(async (entry) => readJsonIfExists(path.join(jobsRoot, entry.name))),
+    );
+    return jobs.filter((job) => job !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchJsonOrNull(url) {
+  try {
+    return await fetchJson(url);
+  } catch {
+    return null;
+  }
 }
 
 async function main() {

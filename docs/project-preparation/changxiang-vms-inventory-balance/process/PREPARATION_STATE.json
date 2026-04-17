@@ -1,0 +1,147 @@
+{
+  "preparationId": "prep_changxiang_vms_inventory_balance",
+  "projectSlug": "changxiang-vms-inventory-balance",
+  "title": "changxiang-vms-inventory-balance",
+  "status": "active",
+  "currentStageId": "clarification",
+  "nextStageId": "clarification",
+  "readyForConvergenceGate": false,
+  "readyForPacketExport": false,
+  "activeCheckpointIds": [],
+  "latestConvergenceReportId": null,
+  "latestPacketExportId": null,
+  "latestHandoffId": null,
+  "createdAt": "2026-04-17T06:42:03.685Z",
+  "updatedAt": "2026-04-17T06:44:17.220Z",
+  "stages": [
+    {
+      "stageId": "intake",
+      "status": "completed",
+      "enteredAt": "2026-04-17T06:42:03.685Z",
+      "completedAt": "2026-04-17T06:43:49.192Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Confirmed this is a standalone preparation candidate: a new inventory data foundation project that cleans and consolidates Changxiang and VMS data to calculate month-end inventory balances and monthly changes in quantity and amount."
+    },
+    {
+      "stageId": "clarification",
+      "status": "in_progress",
+      "enteredAt": "2026-04-17T06:43:51.728Z",
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [
+        "q_001",
+        "q_002",
+        "q_003",
+        "q_004",
+        "q_005",
+        "q_006"
+      ],
+      "producedDecisionIds": [],
+      "notes": "Clarifying source access mode, calculation grain, balance valuation rules, movement sign conventions, and cross-system reconciliation policy before any scope freeze."
+    },
+    {
+      "stageId": "brainstorm",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "direction_decision",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "scope_freeze",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "boundary_freeze",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "success_evidence_freeze",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "workstream_shaping",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "convergence_gate",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "packet_export",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "handoff",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    }
+  ],
+  "checkpoints": []
+}

@@ -1,0 +1,12 @@
+{
+  "handoffId": "handoff-001",
+  "sourceExportId": null,
+  "targetPhase": "continued_preparation",
+  "generatedAt": "2026-04-14T03:15:07.513Z",
+  "status": "superseded",
+  "readiness": "needs_refinement",
+  "staleReason": "packet export export-001 superseded export none",
+  "staleAt": "2026-04-16T02:45:40.602Z",
+  "supersededByHandoffId": "handoff-002",
+  "supersededAt": "2026-04-16T02:45:48.684Z"
+}

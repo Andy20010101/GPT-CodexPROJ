@@ -1,0 +1,236 @@
+{
+  "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+  "summary": "Freeze the v1 architecture as a layered SKU analysis service: a consumer-facing API surface calls an analysis application layer, which orchestrates ERP-only source access, source normalization, canonical SKU and local-warehouse mapping, and metric derivation. Validation and evidence run as a sidecar layer that can inspect raw, normalized, derived, and assembled outputs without widening the source boundary beyond ERP APIs.",
+  "moduleDefinitions": [
+    {
+      "moduleId": "api_surface",
+      "name": "API Surface",
+      "responsibility": "Own the outward v1 request and response contract, input validation, response serialization, and consumer-facing endpoint boundaries for SKU analysis queries.",
+      "ownedPaths": [
+        "services/sku-analysis-service/src/api/**",
+        "services/sku-analysis-service/src/contracts/v1/**"
+      ],
+      "publicInterfaces": [
+        "SKU analysis query endpoint",
+        "V1 request schema",
+        "V1 response schema"
+      ],
+      "allowedDependencies": [
+        "analysis_application"
+      ]
+    },
+    {
+      "moduleId": "analysis_application",
+      "name": "Analysis Application",
+      "responsibility": "Coordinate SKU analysis use cases, request windows and as-of dates, call the ERP source and domain layers in the right order, and assemble the final API response without owning ERP-specific transport details or business derivation logic.",
+      "ownedPaths": [
+        "services/sku-analysis-service/src/application/**"
+      ],
+      "publicInterfaces": [
+        "analyzeSkuBatch",
+        "analyzeSingleSku",
+        "runDailyRefresh"
+      ],
+      "allowedDependencies": [
+        "erp_source_gateway",
+        "source_normalization",
+        "canonical_mapping",
+        "metric_derivation"
+      ]
+    },
+    {
+      "moduleId": "erp_source_gateway",
+      "name": "ERP Source Gateway",
+      "responsibility": "Own all ERP API access, authentication, pagination, retry policy, raw endpoint request/response models, and source-specific fetch operations for SKU references, inventory snapshots, warehouse quantities, movement events, and sales events.",
+      "ownedPaths": [
+        "services/sku-analysis-service/src/integrations/erp/**"
+      ],
+      "publicInterfaces": [
+        "fetchSkuReferences",
+        "fetchInventorySnapshots",
+        "fetchWarehouseInventory",
+        "fetchOutboundEvents",
+        "fetchSalesEvents"
+      ],
+      "allowedDependencies": []
+    },
+    {
+      "moduleId": "source_normalization",
+      "name": "Source Normalization",
+      "responsibility": "Translate raw ERP payloads into normalized internal records with explicit provenance, business timestamps, quantities, and warehouse identifiers, without yet freezing unresolved canonical joins as facts.",
+      "ownedPaths": [
+        "services/sku-analysis-service/src/domain/normalization/**",
+        "services/sku-analysis-service/src/domain/source-records/**"
+      ],
+      "publicInterfaces": [
+        "normalizeSkuReferences",
+        "normalizeInventorySnapshots",
+        "normalizeMovementEvents",
+        "normalizeSalesEvents"
+      ],
+      "allowedDependencies": [
+        "erp_source_gateway"
+      ]
+    },
+    {
+      "moduleId": "canonical_mapping",
+      "name": "Canonical Mapping",
+      "responsibility": "Resolve the canonical SKU key across ERP API surfaces and decide how the default local warehouse is identified, including default_local_wid or explicit local-warehouse mapping when required.",
+      "ownedPaths": [
+        "services/sku-analysis-service/src/domain/mapping/**",
+        "services/sku-analysis-service/config/local-warehouse/**"
+      ],
+      "publicInterfaces": [
+        "resolveCanonicalSkuKey",
+        "resolveDefaultLocalWarehouse",
+        "mappingDecision"
+      ],
+      "allowedDependencies": []
+    },
+    {
+      "moduleId": "metric_derivation",
+      "name": "Metric Derivation",
+      "responsibility": "Produce daily facts and required business metrics from normalized records after canonical mapping, including 30-day outbound, 30/60/90-day sales windows, and turnover days with traceable derivation metadata.",
+      "ownedPaths": [
+        "services/sku-analysis-service/src/domain/facts/**",
+        "services/sku-analysis-service/src/domain/metrics/**"
+      ],
+      "publicInterfaces": [
+        "buildDailyFacts",
+        "deriveSkuMetrics",
+        "deriveTurnoverDays",
+        "buildDerivationTrace"
+      ],
+      "allowedDependencies": [
+        "source_normalization",
+        "canonical_mapping"
+      ]
+    },
+    {
+      "moduleId": "validation_evidence",
+      "name": "Validation And Evidence",
+      "responsibility": "Run representative-SKU validation, inspect raw-to-derived lineage, emit discrepancy reports, and prove boundary integrity without adding an alternate production source path.",
+      "ownedPaths": [
+        "services/sku-analysis-service/src/validation/**",
+        "services/sku-analysis-service/evidence/**"
+      ],
+      "publicInterfaces": [
+        "runRepresentativeSkuValidation",
+        "emitDerivationTrace",
+        "emitDiscrepancyReport",
+        "emitBoundaryReview"
+      ],
+      "allowedDependencies": [
+        "analysis_application",
+        "erp_source_gateway",
+        "source_normalization",
+        "canonical_mapping",
+        "metric_derivation"
+      ]
+    }
+  ],
+  "dependencyRules": [
+    {
+      "fromModuleId": "api_surface",
+      "toModuleId": "analysis_application",
+      "rule": "allow",
+      "rationale": "The API layer should delegate orchestration to the application layer instead of owning business flow."
+    },
+    {
+      "fromModuleId": "api_surface",
+      "toModuleId": "erp_source_gateway",
+      "rule": "deny",
+      "rationale": "Consumer-facing endpoints must not call ERP APIs directly."
+    },
+    {
+      "fromModuleId": "api_surface",
+      "toModuleId": "metric_derivation",
+      "rule": "deny",
+      "rationale": "The API surface must not compute business metrics or joins."
+    },
+    {
+      "fromModuleId": "analysis_application",
+      "toModuleId": "erp_source_gateway",
+      "rule": "allow",
+      "rationale": "The application layer orchestrates ERP data retrieval through the single approved source gateway."
+    },
+    {
+      "fromModuleId": "analysis_application",
+      "toModuleId": "source_normalization",
+      "rule": "allow",
+      "rationale": "The application layer must normalize raw ERP payloads before any business derivation."
+    },
+    {
+      "fromModuleId": "analysis_application",
+      "toModuleId": "canonical_mapping",
+      "rule": "allow",
+      "rationale": "Canonical SKU and local-warehouse decisions are orchestration dependencies for building a correct response."
+    },
+    {
+      "fromModuleId": "analysis_application",
+      "toModuleId": "metric_derivation",
+      "rule": "allow",
+      "rationale": "The application layer assembles the final response from derived business metrics."
+    },
+    {
+      "fromModuleId": "source_normalization",
+      "toModuleId": "erp_source_gateway",
+      "rule": "allow",
+      "rationale": "Normalization depends on the raw ERP source models owned by the gateway."
+    },
+    {
+      "fromModuleId": "source_normalization",
+      "toModuleId": "metric_derivation",
+      "rule": "deny",
+      "rationale": "Normalization should produce normalized records only and must not derive business metrics."
+    },
+    {
+      "fromModuleId": "canonical_mapping",
+      "toModuleId": "erp_source_gateway",
+      "rule": "deny",
+      "rationale": "Canonical mapping should work from provided source records and configuration, not become another ERP client."
+    },
+    {
+      "fromModuleId": "metric_derivation",
+      "toModuleId": "canonical_mapping",
+      "rule": "allow",
+      "rationale": "Derived facts and metrics depend on canonical SKU identity and local-warehouse selection semantics."
+    },
+    {
+      "fromModuleId": "metric_derivation",
+      "toModuleId": "erp_source_gateway",
+      "rule": "deny",
+      "rationale": "Metric derivation must consume normalized records, not raw ERP transport models."
+    },
+    {
+      "fromModuleId": "validation_evidence",
+      "toModuleId": "analysis_application",
+      "rule": "allow",
+      "rationale": "Validation should be able to inspect the assembled response path end to end."
+    },
+    {
+      "fromModuleId": "validation_evidence",
+      "toModuleId": "erp_source_gateway",
+      "rule": "allow",
+      "rationale": "Validation needs direct access to raw ERP payloads for traceability and discrepancy analysis."
+    },
+    {
+      "fromModuleId": "validation_evidence",
+      "toModuleId": "api_surface",
+      "rule": "deny",
+      "rationale": "Validation should inspect contracts and assembled outputs without coupling itself to transport handlers."
+    }
+  ],
+  "invariants": [
+    "ERP API calls exist only inside the ERP Source Gateway; no other module may introduce source-side integrations.",
+    "Canonical SKU resolution must happen before cross-endpoint joins or outward skuKey claims are treated as trustworthy.",
+    "Default-local-warehouse quantity may not enter the outward API response until local-warehouse selection semantics are explicit.",
+    "Metric derivation operates on normalized records and mapping decisions only; raw ERP payload math is not allowed in the API or application layer.",
+    "30-day outbound and 30/60/90-day sales must be traceable from raw ERP payloads through normalized records to final response values.",
+    "Validation and evidence are sidecar responsibilities and must not create an alternate production data path.",
+    "Export and non-API fallback are outside the default architecture and must not appear as routine parallel layers.",
+    "The architecture stays API-first and service-bounded; no dashboard or broad data-platform layer is part of v1."
+  ],
+  "frozenAt": "2026-04-15T04:11:12.000Z",
+  "frozenBy": "codex"
+}

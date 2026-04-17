@@ -1,0 +1,16 @@
+{
+  "exportId": "export-001",
+  "generatedAt": "2026-04-15T03:36:43.168Z",
+  "sourceConvergenceReportId": "cr_001",
+  "sourceCheckpointId": "c_009",
+  "sourceDecisionIds": [
+    "d_004",
+    "d_005",
+    "d_006",
+    "d_007"
+  ],
+  "status": "superseded",
+  "note": "First canonical export from approved corrected direction, scope, boundary, and success/evidence after convergence pass cr_001.",
+  "supersedes": null,
+  "supersededByExportId": "export-002"
+}

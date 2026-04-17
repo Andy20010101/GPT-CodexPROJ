@@ -1,0 +1,185 @@
+{
+  "runId": "a6a13566-556c-4cf7-8f0d-020d8012c3a9",
+  "title": "SKU Inventory Sales Analysis V1 Requirement Freeze",
+  "summary": "Freeze v1 as a narrow API-first SKU analysis service sourced from ERP APIs only, with a complete metric contract covering current inventory, default-local-warehouse quantity, 30-day outbound, turnover days, and 30/60/90-day sales volume, and with time-dimension metrics derived through explicit multi-API alignment rather than hidden fallback.",
+  "objectives": [
+    "Deliver a usable v1 API contract for SKU-level inventory-cycle and sales analysis.",
+    "Keep the source boundary on ERP APIs while supporting explicit multi-API derivation for time-dimension metrics.",
+    "Resolve the minimum SKU-key and local-warehouse semantics needed to make the contract correct.",
+    "Provide a validation-first implementation path for 30-day outbound, turnover days, and 30/60/90-day sales volume.",
+    "Carry unresolved process-side questions forward as validation work rather than freezing them as facts."
+  ],
+  "nonGoals": [
+    "Do not integrate WMS or other internal systems as source inputs in v1.",
+    "Do not make dashboard, reporting, or export flow a default v1 deliverable.",
+    "Do not turn the project into a general data platform, sync-governance effort, or broad reconciliation program.",
+    "Do not assume that required time-window metrics come from one direct ERP endpoint."
+  ],
+  "constraints": [
+    {
+      "id": "constraint-erp-api-source-boundary",
+      "title": "ERP APIs only on the source side",
+      "description": "All required v1 data must come from ERP APIs. Direct database ingestion, Excel/CSV ingestion, WMS sourcing, and other internal-system sourcing are outside the approved source boundary.",
+      "severity": "hard",
+      "rationale": "This preserves the frozen boundary and prevents hidden source expansion."
+    },
+    {
+      "id": "constraint-sku-grain",
+      "title": "SKU is the business grain",
+      "description": "Every v1 response and every derivation path must be organized around SKU as the business grain, even if raw ERP identifiers vary across endpoints.",
+      "severity": "hard",
+      "rationale": "The frozen v1 problem is explicitly a SKU-level capability gap."
+    },
+    {
+      "id": "constraint-required-metric-contract",
+      "title": "Complete metric contract is mandatory",
+      "description": "The v1 contract must include current inventory, default-local-warehouse quantity, 30-day outbound, turnover days, and 30/60/90-day sales volume.",
+      "severity": "hard",
+      "rationale": "Success is defined against the complete approved metric set rather than a partial delivery."
+    },
+    {
+      "id": "constraint-local-warehouse-semantics",
+      "title": "Default warehouse means local warehouse business concept",
+      "description": "Default warehouse quantity must be interpreted as the local-warehouse business concept. If multiple local warehouses exist, v1 must use configured default_local_wid or explicit mapping and must not assume natural uniqueness.",
+      "severity": "hard",
+      "rationale": "Warehouse ambiguity would make a required field unreliable."
+    },
+    {
+      "id": "constraint-multi-api-derivation-allowed",
+      "title": "Time-dimension metrics may be derived across ERP APIs",
+      "description": "30-day outbound and 30/60/90-day sales volume may be produced by explicit alignment and derivation across multiple ERP APIs. A single direct ERP endpoint is not required.",
+      "severity": "hard",
+      "rationale": "This keeps the implementation inside the approved boundary while acknowledging ERP API reality."
+    },
+    {
+      "id": "constraint-no-hidden-fallback",
+      "title": "No hidden fallback or default export mode",
+      "description": "Implementation must not rely on hidden non-API fallback or treat export as a routine parallel delivery surface. Export remains only a later validated fallback option outside default v1 behavior.",
+      "severity": "hard",
+      "rationale": "Fallback sprawl would undermine the frozen direction and success definition."
+    },
+    {
+      "id": "constraint-day-level-refresh",
+      "title": "Day-level refresh only",
+      "description": "V1 should be designed for day-level refresh and should not take on real-time or near-real-time delivery obligations.",
+      "severity": "hard",
+      "rationale": "This keeps the service narrow and aligned with approved scope."
+    },
+    {
+      "id": "constraint-validation-order",
+      "title": "Validation order is explicit",
+      "description": "Priority validation order is q_008 canonical SKU key, then q_014 default local warehouse identifier, then q_016 time-dimension ERP API linkage, then q_018 exact default_local_wid or mapping rule.",
+      "severity": "soft",
+      "rationale": "This order reduces join risk first, warehouse semantics second, and only then pushes time-window derivation and final warehouse mapping configuration."
+    }
+  ],
+  "risks": [
+    {
+      "id": "risk-sku-key-mismatch",
+      "title": "SKU identifiers may not align across ERP API surfaces",
+      "description": "Different ERP endpoints may use different SKU fields or references, which can break joins between inventory, warehouse, movement, and sales records.",
+      "severity": "high",
+      "mitigation": "Validate q_008 first and build a source mapping matrix before freezing joins or outward API semantics."
+    },
+    {
+      "id": "risk-local-warehouse-ambiguity",
+      "title": "Local warehouse semantics may be ambiguous",
+      "description": "The required warehouse quantity field may not map cleanly to one ERP warehouse without additional business configuration or explicit mapping.",
+      "severity": "high",
+      "mitigation": "Validate q_014 early and resolve q_018 only after the ERP warehouse model is known."
+    },
+    {
+      "id": "risk-time-dimension-linkage",
+      "title": "Time-window metrics may require complex multi-API linkage",
+      "description": "30-day outbound and 30/60/90-day sales may require event normalization, time-window alignment, and cross-endpoint joins that are not obvious from one ERP API surface.",
+      "severity": "high",
+      "mitigation": "Run a derivation spike on representative SKUs and require traceable validation artifacts before declaring metrics complete."
+    },
+    {
+      "id": "risk-consumer-driven-scope-pressure",
+      "title": "Consumer pressure may widen the contract too early",
+      "description": "Once a first consumer is identified, there may be pressure to add presentation, export, or extra integration work before the minimum metric pipeline is stable.",
+      "severity": "medium",
+      "mitigation": "Keep the main contract narrow and defer any optional extra interface until the core metrics and validation evidence are stable."
+    }
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "ac-source-mapping",
+      "description": "A source mapping artifact exists that maps every required contract field to one or more ERP APIs and explicitly identifies the canonical SKU key and the ERP representation of the default local warehouse.",
+      "verificationMethod": "artifact",
+      "measurableOutcome": "The mapping covers sku_key, current_inventory_qty, default_local_warehouse_qty, outbound inputs, sales inputs, event time, and warehouse identifiers with no required field left unmapped.",
+      "requiredEvidenceKinds": [
+        "source_mapping_matrix",
+        "erp_api_field_inventory",
+        "identifier_mapping_review"
+      ]
+    },
+    {
+      "id": "ac-api-contract",
+      "description": "The v1 API contract is frozen at SKU grain and includes current inventory, default-local-warehouse quantity, 30-day outbound, turnover days, and 30/60/90-day sales volume in one coherent response shape.",
+      "verificationMethod": "review",
+      "measurableOutcome": "A reviewed contract artifact or response fixture shows all required fields and includes local-warehouse selection metadata when applicable.",
+      "requiredEvidenceKinds": [
+        "api_contract_spec",
+        "response_fixture",
+        "contract_review"
+      ]
+    },
+    {
+      "id": "ac-time-dimension-derivation",
+      "description": "30-day outbound and 30/60/90-day sales metrics are derived from ERP APIs through explicit, traceable normalization and aggregation rather than hidden fallback.",
+      "verificationMethod": "artifact",
+      "measurableOutcome": "Representative SKU traces show raw ERP payloads, normalized records, windowed aggregations, and final values for each required time-window metric.",
+      "requiredEvidenceKinds": [
+        "derivation_trace",
+        "sample_sku_validation",
+        "aggregation_evidence"
+      ]
+    },
+    {
+      "id": "ac-turnover-definition",
+      "description": "Turnover days are implemented using the approved business definition and validated against the derived 30-day outbound quantity.",
+      "verificationMethod": "review",
+      "measurableOutcome": "The derivation spec and reviewed examples show turnover_days computed from current inventory and 30-day average outbound with zero-division handling.",
+      "requiredEvidenceKinds": [
+        "derivation_spec",
+        "reviewed_examples"
+      ]
+    },
+    {
+      "id": "ac-local-warehouse-mapping",
+      "description": "If multiple local warehouses exist, the service uses explicit default_local_wid or equivalent mapping configuration and exposes enough metadata to make the selected warehouse auditable.",
+      "verificationMethod": "artifact",
+      "measurableOutcome": "A configuration artifact or mapping rule exists, and response fixtures show the selected default local warehouse identifier when the field is applicable.",
+      "requiredEvidenceKinds": [
+        "warehouse_mapping_config",
+        "response_fixture",
+        "mapping_review"
+      ]
+    },
+    {
+      "id": "ac-boundary-integrity",
+      "description": "Implementation and validation evidence show that source-side integration remains bounded to ERP APIs and does not rely on hidden non-API ingestion or unapproved source expansion.",
+      "verificationMethod": "review",
+      "measurableOutcome": "Source inventory and implementation review contain no WMS, database-table, Excel/CSV, or other internal-system source dependencies in the v1 metric path.",
+      "requiredEvidenceKinds": [
+        "source_boundary_review",
+        "implementation_review",
+        "dependency_inventory"
+      ]
+    },
+    {
+      "id": "ac-validation-order-executed",
+      "description": "The implementation plan executes validation in the required order: q_008, q_014, q_016, then q_018, and does not mark downstream milestones complete out of order.",
+      "verificationMethod": "manual",
+      "measurableOutcome": "Planning notes and validation artifacts show earlier dependency questions closed before later derivation or configuration claims are treated as complete.",
+      "requiredEvidenceKinds": [
+        "validation_log",
+        "planning_trace"
+      ]
+    }
+  ],
+  "frozenAt": "2026-04-15T04:04:44.000Z",
+  "frozenBy": "codex"
+}

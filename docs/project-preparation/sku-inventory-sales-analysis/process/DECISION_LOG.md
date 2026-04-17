@@ -1,0 +1,264 @@
+# Decision Log
+
+## Proposed Decisions
+
+- none
+
+## Approved Decisions
+
+### d_007 Freeze success definition around complete API contract verified ERP-derived metrics and no hidden boundary expansion
+- Stage: success_evidence_freeze
+- Status: approved
+- Decision:
+  - Success requires the v1 API contract to include SKU current inventory default-local-warehouse quantity 30-day outbound turnover days and 30-60-90-day sales volume
+  - Success requires validation evidence that time-dimension metrics are correctly derived from ERP APIs
+  - Success requires explicit default_local_wid or local-warehouse mapping evidence when multiple local warehouses exist
+  - Success requires source-side integration to remain bounded to ERP APIs
+  - Failure includes hidden non-API ingestion silent source expansion or incomplete API delivery
+- Rationale:
+  - This keeps success tied to business-correct metrics rather than just shipping something
+  - This makes the ERP-source boundary reviewable
+  - This prevents presentation-only or fallback-heavy pseudo-completion from counting as success
+  - Approved success/evidence definition under corrected direction, scope, and boundary.
+- Linked Questions:
+  - q_008
+  - q_014
+  - q_015
+  - q_016
+  - q_017
+  - q_018
+- Linked Tradeoffs:
+  - t_007
+  - t_009
+  - t_010
+- Affects Packet Files:
+  - SUCCESS_CRITERIA.md
+  - RISKS_AND_ASSUMPTIONS.md
+- Approved By: human
+- Approved At: 2026-04-15T03:30:34.996Z
+- Rejection Reason: null
+- Checkpoint Id: c_007
+
+### d_006 Freeze corrected boundary around ERP-source APIs one consumer interface and export-only-as-fallback
+- Stage: boundary_freeze
+- Status: approved
+- Decision:
+  - Allowed: ERP API integration surfaces for required metrics
+  - Allowed: default_local_wid or explicit local-warehouse mapping configuration
+  - Allowed: service-side derivation across multiple ERP APIs
+  - Allowed: at most one interface for another system as a consumer-side constraint
+  - Protected: WMS and other-system source integration
+  - Protected: default database-table or Excel-CSV ingestion
+  - Protected: export as a default first-version delivery mode
+  - Danger: silently widening source boundaries or treating export as a routine parallel surface
+- Rationale:
+  - This matches corrected direction and corrected scope
+  - This keeps source-side complexity bounded to ERP APIs
+  - This separates consumer-interface allowance from source integration
+  - This preserves export only as a later validated fallback choice
+  - Approved corrected boundary with default_local_wid or explicit local-warehouse mapping allowed inside the ERP-source boundary.
+- Linked Questions:
+  - q_014
+  - q_015
+  - q_016
+  - q_017
+  - q_018
+- Linked Tradeoffs:
+  - t_007
+  - t_009
+  - t_010
+- Affects Packet Files:
+  - ARCHITECTURE_BOUNDARY.md
+  - RISKS_AND_ASSUMPTIONS.md
+- Approved By: human
+- Approved At: 2026-04-15T03:25:37.358Z
+- Rejection Reason: null
+- Checkpoint Id: c_006
+
+### d_005 Freeze corrected v1 scope around ERP-sourced API contract with one optional external interface
+- Stage: scope_freeze
+- Status: approved
+- Decision:
+  - In scope: ERP APIs as the core source boundary
+  - In scope: SKU-level responses
+  - In scope: current inventory local-warehouse quantity 30-day outbound turnover days and 30-60-90-day sales volume
+  - In scope: time-dimension metric derivation across multiple ERP APIs when needed
+  - In scope: day-level refresh expectations
+  - In scope: at most one interface for another system if it does not turn v1 into multi-system source integration
+  - Out of scope: dashboard delivery and broad system integration
+  - Out of scope by default: export as a required v1 deliverable though export may become a later validated fallback
+- Rationale:
+  - This scope matches corrected direction d_004
+  - This keeps the first version narrow while allowing one controlled downstream interface
+  - This preserves export as a fallback preference without inflating it into a default v1 feature
+  - Approved with correction for default_local_wid or explicit local-warehouse mapping, and with the one-other-system interface treated as a boundary constraint rather than business scope.
+- Linked Questions:
+  - q_006
+  - q_009
+  - q_010
+  - q_011
+  - q_012
+  - q_013
+  - q_016
+  - q_017
+- Linked Tradeoffs:
+  - t_005
+  - t_007
+  - t_009
+  - t_010
+- Affects Packet Files:
+  - MVP_SCOPE.md
+  - NON_GOALS.md
+- Approved By: human
+- Approved At: 2026-04-15T03:15:57.039Z
+- Rejection Reason: null
+- Checkpoint Id: c_005
+
+### d_004 Adopt an ERP-sourced API-first SKU analysis service with one optional external interface
+- Stage: direction_decision
+- Status: approved
+- Decision:
+  - v1 remains a lightweight API-first data service
+  - v1 remains SKU-centric and ecommerce-oriented
+  - ERP APIs remain the core source boundary for primary metrics
+  - v1 may expose at most one interface for another system if it supports later v2 iteration
+  - v1 does not integrate other systems as source inputs by default
+  - The core v1 contract includes SKU current inventory local-warehouse quantity 30-day outbound turnover days and 30-60-90-day sales volume
+  - Time-dimension metrics may be derived by aligning multiple ERP APIs
+  - If a later validated fallback is necessary the preferred fallback form is export rather than default non-API ingestion
+- Rationale:
+  - This preserves the narrow service shape while correcting the earlier overly strict ERP-only framing
+  - This keeps source-side complexity bounded to ERP APIs
+  - This leaves a minimal downstream extension point without turning v1 into multi-system integration
+  - This records export as the fallback preference without making it a default delivery mode
+  - Approved corrected direction with one optional external interface and export-preferred fallback policy.
+- Linked Questions:
+  - q_006
+  - q_009
+  - q_010
+  - q_011
+  - q_012
+  - q_013
+  - q_016
+  - q_017
+- Linked Tradeoffs:
+  - t_005
+  - t_007
+  - t_009
+  - t_010
+- Affects Packet Files:
+  - PROJECT_BRIEF.md
+  - MVP_SCOPE.md
+  - NON_GOALS.md
+  - ARCHITECTURE_BOUNDARY.md
+- Approved By: human
+- Approved At: 2026-04-15T03:10:54.071Z
+- Rejection Reason: null
+- Checkpoint Id: c_004
+
+## Rejected Decisions
+
+### d_003 Freeze v1 boundary as ERP-API-only with derived multi-API metrics but no default fallback
+- Stage: boundary_freeze
+- Status: rejected
+- Decision:
+  - Allowed: ERP API integration surfaces only
+  - Allowed: service-side derivation across multiple ERP APIs
+  - Allowed: one optional extra ERP-scoped endpoint if it stays inside the same boundary
+  - Protected: WMS and other internal-system integrations
+  - Protected: default database-table or Excel-CSV ingestion
+  - Protected: required dashboard or export delivery work
+  - Danger: silently introducing non-API fallback
+  - Danger: freezing unvalidated time-dimension linkage assumptions as fact
+- Rationale:
+  - This keeps v1 inside the approved narrow scope
+  - This allows necessary derived calculations without widening the system boundary
+  - This preserves explicit escalation rules if API validation later fails
+- Linked Questions:
+  - q_015
+  - q_016
+  - q_017
+- Linked Tradeoffs:
+  - t_007
+  - t_009
+- Affects Packet Files:
+  - ARCHITECTURE_BOUNDARY.md
+  - RISKS_AND_ASSUMPTIONS.md
+- Approved By: null
+- Approved At: null
+- Rejection Reason: Rejected because checkpoint c_003 was rejected; boundary must be reformulated under corrected direction d_004.
+- Checkpoint Id: null
+
+## Superseded Decisions
+
+### d_002 Freeze v1 scope as a narrow ERP-only SKU analysis API contract
+- Stage: scope_freeze
+- Status: superseded
+- Decision:
+  - In scope: ERP API-only sourcing
+  - In scope: SKU-level responses
+  - In scope: current inventory local-warehouse quantity 30-day outbound turnover days and 30-60-90-day sales volume
+  - In scope: time-dimension metric derivation across multiple ERP APIs when needed
+  - In scope: day-level refresh expectations
+  - Out of scope: dashboard delivery export workflows WMS/internal-system integration and non-API fallback by default
+- Rationale:
+  - This scope matches the approved API-first direction
+  - This keeps the first version narrow and reviewable
+  - This preserves the business-critical metric contract without expanding into platform or presentation work
+  - Approved with correction that v1 excludes other system integrations and only permits at most one extra ERP-scoped endpoint for later v2 iteration readiness.
+- Linked Questions:
+  - q_006
+  - q_009
+  - q_010
+  - q_011
+  - q_012
+  - q_013
+- Linked Tradeoffs:
+  - t_005
+  - t_007
+  - t_009
+- Affects Packet Files:
+  - MVP_SCOPE.md
+  - NON_GOALS.md
+- Approved By: human
+- Approved At: 2026-04-15T02:59:12.990Z
+- Rejection Reason: Superseded because the previously approved scope was framed as ERP-only in a stricter sense; scope must be re-frozen under corrected direction d_004.
+- Checkpoint Id: c_002
+
+### d_001 Adopt an API-first ERP-only SKU analysis service for v1
+- Stage: direction_decision
+- Status: superseded
+- Decision:
+  - v1 is a lightweight API-first data service
+  - The service stays ERP-only for v1
+  - The preferred ingestion path is ERP APIs only
+  - The primary business target is ecommerce
+  - The core v1 contract includes SKU current inventory default-warehouse quantity 30-day outbound turnover days and 30-60-90-day sales volume
+  - Time-dimension metrics may be derived by aligning multiple ERP APIs
+  - Non-API fallback is not accepted by default and requires a later boundary decision if validation fails
+- Rationale:
+  - This preserves a singular project goal
+  - This avoids expanding into dashboard export or generic platform scope
+  - This matches the clarified source and delivery model
+  - This keeps time-dimension complexity bounded as validation work rather than silent scope expansion
+  - Approved with correction that default-warehouse quantity refers to the local warehouse business concept for v1.
+- Linked Questions:
+  - q_002
+  - q_006
+  - q_009
+  - q_010
+  - q_011
+  - q_012
+  - q_013
+- Linked Tradeoffs:
+  - t_005
+  - t_007
+  - t_009
+- Affects Packet Files:
+  - PROJECT_BRIEF.md
+  - RISKS_AND_ASSUMPTIONS.md
+- Approved By: human
+- Approved At: 2026-04-15T02:56:11.227Z
+- Rejection Reason: Superseded by corrected direction d_004 after boundary rejection clarified that v1 may expose one optional external interface and prefers export rather than default non-API fallback.
+- Checkpoint Id: c_001
+

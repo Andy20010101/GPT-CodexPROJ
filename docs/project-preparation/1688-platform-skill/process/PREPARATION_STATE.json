@@ -1,0 +1,273 @@
+{
+  "preparationId": "prep_1688_platform_skill",
+  "projectSlug": "1688-platform-skill",
+  "title": "1688-platform-skill",
+  "status": "exported",
+  "currentStageId": "packet_export",
+  "nextStageId": "handoff",
+  "readyForConvergenceGate": true,
+  "readyForPacketExport": true,
+  "activeCheckpointIds": [],
+  "latestConvergenceReportId": "cr_002",
+  "latestPacketExportId": "export-001",
+  "latestHandoffId": "handoff-002",
+  "createdAt": "2026-04-14T03:13:55.929Z",
+  "updatedAt": "2026-04-16T02:45:48.684Z",
+  "stages": [
+    {
+      "stageId": "intake",
+      "status": "completed",
+      "enteredAt": "2026-04-14T03:13:55.929Z",
+      "completedAt": "2026-04-16T02:43:49.432Z",
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Confirmed this is a standalone preparation candidate for a narrow OpenClaw skill bundle focused on single-topic 1688 supplier discovery, not a runtime platform change or generic crawler initiative.",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "clarification",
+      "status": "completed",
+      "enteredAt": null,
+      "completedAt": "2026-04-16T02:43:53.187Z",
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Clarification is sufficient to proceed: the operator is an OpenClaw-style sourcing researcher, the first usable outcome is a Markdown supplier short list, and the minimum host prerequisites are browser navigation, page reading, and file output.",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "brainstorm",
+      "status": "completed",
+      "enteredAt": null,
+      "completedAt": "2026-04-16T02:43:59.168Z",
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Brainstorm converged on a browser-first skill bundle rather than a new backend or crawler stack. The retained shape is low-frequency, operator-in-the-loop supplier research on visible 1688 pages with explicit unknowns and constrained output.",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "direction_decision",
+      "status": "completed",
+      "enteredAt": "2026-04-16T02:44:07.241Z",
+      "completedAt": "2026-04-16T02:44:10.198Z",
+      "requiredCheckpointIds": [
+        "c_001"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_001"
+      ],
+      "notes": "",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "scope_freeze",
+      "status": "completed",
+      "enteredAt": "2026-04-16T02:44:25.573Z",
+      "completedAt": "2026-04-16T02:44:30.236Z",
+      "requiredCheckpointIds": [
+        "c_002"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_002"
+      ],
+      "notes": "",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "boundary_freeze",
+      "status": "completed",
+      "enteredAt": "2026-04-16T02:44:48.415Z",
+      "completedAt": "2026-04-16T02:44:52.683Z",
+      "requiredCheckpointIds": [
+        "c_003"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_003"
+      ],
+      "notes": "",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "success_evidence_freeze",
+      "status": "completed",
+      "enteredAt": "2026-04-16T02:45:05.087Z",
+      "completedAt": "2026-04-16T02:45:08.141Z",
+      "requiredCheckpointIds": [
+        "c_004"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_004"
+      ],
+      "notes": "",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "workstream_shaping",
+      "status": "completed",
+      "enteredAt": null,
+      "completedAt": "2026-04-16T02:45:15.451Z",
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Workstreams are shaped at medium granularity around contract and preconditions freeze, OpenClaw skill-bundle authoring, and operator validation plus evidence capture.",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "convergence_gate",
+      "status": "completed",
+      "enteredAt": "2026-04-14T03:30:09.694Z",
+      "completedAt": "2026-04-16T02:45:30.635Z",
+      "requiredCheckpointIds": [
+        "c_005"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "",
+      "rolledBackAt": null
+    },
+    {
+      "stageId": "packet_export",
+      "status": "completed",
+      "enteredAt": "2026-04-16T02:45:34.178Z",
+      "completedAt": "2026-04-16T02:45:40.602Z",
+      "requiredCheckpointIds": [
+        "c_006"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "handoff",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    }
+  ],
+  "checkpoints": [
+    {
+      "checkpointId": "c_001",
+      "stageId": "direction_decision",
+      "type": "direction",
+      "status": "approved",
+      "promptSummary": "Freeze v1 direction as a browser-first OpenClaw skill bundle for single-topic 1688 supplier discovery, with supplier-first Markdown output, representative products as evidence, explicit separation of facts versus heuristics versus unknowns, and no runtime-platform expansion.",
+      "approvalSummary": "Approved direction: the project is frozen as a narrow OpenClaw skill bundle for 1688 supplier research, using browser-first operator-in-the-loop observation and supplier-first Markdown output with explicit unknowns.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-16T02:44:10.198Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_001"
+      ],
+      "createdAt": "2026-04-16T02:44:07.241Z",
+      "updatedAt": "2026-04-16T02:44:10.198Z"
+    },
+    {
+      "checkpointId": "c_002",
+      "stageId": "scope_freeze",
+      "type": "scope",
+      "status": "approved",
+      "promptSummary": "Freeze MVP scope around a single-topic 1688 supplier discovery flow: operator provides a research brief, the skill browses visible 1688 result and supplier/product pages using host browser tools, and returns a fixed supplier-first Markdown report. Keep large-scale crawling, anti-bot work, new services, and multi-platform support out of scope.",
+      "approvalSummary": "Approved scope: the first version is frozen around one reusable supplier-research flow and a fixed Markdown contract, with scale, automation-heavy crawling, and platform expansion kept out of scope.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-16T02:44:30.236Z",
+      "rollbackTargetStageId": "direction_decision",
+      "linkedDecisionIds": [
+        "d_002"
+      ],
+      "createdAt": "2026-04-16T02:44:25.573Z",
+      "updatedAt": "2026-04-16T02:44:30.236Z"
+    },
+    {
+      "checkpointId": "c_003",
+      "stageId": "boundary_freeze",
+      "type": "boundary",
+      "status": "approved",
+      "promptSummary": "Freeze the implementation boundary around a narrow skill bundle plus preparation docs. Depend only on host-provided browser/page/file capabilities and an operator-provided lawful 1688 session. Do not modify orchestrator or bridge runtime surfaces and do not introduce backend infrastructure, anti-bot bypass, or access-circumvention work.",
+      "approvalSummary": "Approved boundary: implementation remains confined to the skill bundle and preparation artifacts, depends on existing host/browser capability, and explicitly excludes runtime-core changes or circumvention-heavy collection work.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-16T02:44:52.683Z",
+      "rollbackTargetStageId": "scope_freeze",
+      "linkedDecisionIds": [
+        "d_003"
+      ],
+      "createdAt": "2026-04-16T02:44:48.415Z",
+      "updatedAt": "2026-04-16T02:44:52.683Z"
+    },
+    {
+      "checkpointId": "c_004",
+      "stageId": "success_evidence_freeze",
+      "type": "success_evidence",
+      "status": "approved",
+      "promptSummary": "Freeze success so that v1 only counts as ready when a valid skill bundle exists, the instructions define the research contract and fallback behavior, and evidence includes at least one happy-path run, one failure-path example, and one operator-readable sample output.",
+      "approvalSummary": "Approved success/evidence definition: readiness requires a valid skill bundle plus concrete happy-path, failure-path, and sample-output evidence, not just a frozen packet.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-16T02:45:08.141Z",
+      "rollbackTargetStageId": "scope_freeze",
+      "linkedDecisionIds": [
+        "d_004"
+      ],
+      "createdAt": "2026-04-16T02:45:05.087Z",
+      "updatedAt": "2026-04-16T02:45:08.141Z"
+    },
+    {
+      "checkpointId": "c_005",
+      "stageId": "convergence_gate",
+      "type": "convergence",
+      "status": "approved",
+      "promptSummary": "Convergence gate passed: the project goal is singular, the primary flow is clear, approved direction/scope/boundary/success decisions now exist on the process side, workstreams are shaped, no blocking questions remain, and exporting the packet would not mislead downstream work. Carryable risks remain around host capability confirmation and lawful 1688 access for validation runs.",
+      "approvalSummary": "Approved convergence gate: remaining host-capability and 1688-access risks stay explicit in the packet and do not block packet export or downstream handoff.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-16T02:45:30.635Z",
+      "rollbackTargetStageId": "workstream_shaping",
+      "linkedDecisionIds": [
+        "d_001",
+        "d_002",
+        "d_003",
+        "d_004"
+      ],
+      "createdAt": "2026-04-16T02:45:27.417Z",
+      "updatedAt": "2026-04-16T02:45:30.635Z"
+    },
+    {
+      "checkpointId": "c_006",
+      "stageId": "packet_export",
+      "type": "packet_export",
+      "status": "approved",
+      "promptSummary": "Publish the frozen packet for 1688-platform-skill from approved decisions d_001 through d_004 and convergence report cr_002. Export the current packet as the canonical downstream handoff while keeping remaining host-capability confirmation and real-site validation work on the process side rather than pretending it is already proven.",
+      "approvalSummary": "Approved packet export: the frozen packet is publishable for downstream use, with unresolved validation work retained as explicit process-side follow-up rather than hidden packet truth.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-16T02:45:37.058Z",
+      "rollbackTargetStageId": "convergence_gate",
+      "linkedDecisionIds": [
+        "d_001",
+        "d_002",
+        "d_003",
+        "d_004"
+      ],
+      "createdAt": "2026-04-16T02:45:34.178Z",
+      "updatedAt": "2026-04-16T02:45:37.058Z"
+    }
+  ]
+}

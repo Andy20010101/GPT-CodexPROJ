@@ -1,0 +1,15 @@
+{
+  "exportId": "export-001",
+  "generatedAt": "2026-04-16T02:45:40.602Z",
+  "sourceConvergenceReportId": "cr_002",
+  "sourceCheckpointId": "c_006",
+  "sourceDecisionIds": [
+    "d_001",
+    "d_002",
+    "d_003",
+    "d_004"
+  ],
+  "status": "exported",
+  "note": "Publish first frozen packet after formal convergence approval.",
+  "supersedes": null
+}

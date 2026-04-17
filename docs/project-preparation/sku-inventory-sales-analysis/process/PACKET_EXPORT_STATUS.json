@@ -1,0 +1,26 @@
+{
+  "latestExportId": "export-002",
+  "status": "exported",
+  "exported": true,
+  "exportedAt": "2026-04-15T03:50:43.719Z",
+  "requiresRefresh": false,
+  "refreshReason": null,
+  "sourceConvergenceReportId": "cr_001",
+  "sourceDecisionIds": [
+    "d_004",
+    "d_005",
+    "d_006",
+    "d_007"
+  ],
+  "packetFiles": [
+    "PROJECT_BRIEF.md",
+    "MVP_SCOPE.md",
+    "NON_GOALS.md",
+    "SUCCESS_CRITERIA.md",
+    "ARCHITECTURE_BOUNDARY.md",
+    "INITIAL_WORKSTREAMS.md",
+    "RISKS_AND_ASSUMPTIONS.md",
+    "NEW_CHAT_HANDOFF_PROMPT.md"
+  ],
+  "supersededByExportId": null
+}

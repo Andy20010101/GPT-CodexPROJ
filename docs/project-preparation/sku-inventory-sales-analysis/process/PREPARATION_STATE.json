@@ -1,0 +1,335 @@
+{
+  "preparationId": "prep_sku_inventory_sales_analysis",
+  "projectSlug": "sku-inventory-sales-analysis",
+  "title": "sku-inventory-sales-analysis",
+  "status": "exported",
+  "currentStageId": "packet_export",
+  "nextStageId": "handoff",
+  "readyForConvergenceGate": true,
+  "readyForPacketExport": true,
+  "activeCheckpointIds": [],
+  "latestConvergenceReportId": "cr_001",
+  "latestPacketExportId": "export-002",
+  "latestHandoffId": "handoff-003",
+  "createdAt": "2026-04-14T06:55:36.546Z",
+  "updatedAt": "2026-04-15T03:50:45.700Z",
+  "stages": [
+    {
+      "stageId": "intake",
+      "status": "completed",
+      "enteredAt": "2026-04-14T06:55:36.546Z",
+      "completedAt": "2026-04-14T06:56:07.721Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Confirmed this is a standalone preparation candidate: a new lightweight data service initiative focused on single-item inventory cycle analysis and single-item sales statistics, not a bugfix, not a downstream task, and not a broad data-platform rebuild."
+    },
+    {
+      "stageId": "clarification",
+      "status": "completed",
+      "enteredAt": "2026-04-14T06:56:12.577Z",
+      "completedAt": "2026-04-15T02:35:00.832Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Corrected clarification is sufficient to move forward: primary business actor remains ecommerce, analysis grain is SKU, core working metrics are defined at a working level, v1 depends on ERP API only, delivery is API-first consumption by an internal system or frontend, and refresh is day-level. Remaining open questions are non-blocking mapping or consumer-detail questions only."
+    },
+    {
+      "stageId": "brainstorm",
+      "status": "completed",
+      "enteredAt": "2026-04-15T01:40:47.112Z",
+      "completedAt": "2026-04-15T03:07:29.154Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Brainstorm reconverged after boundary rejection: ERP APIs remain the core source boundary, v1 may expose at most one interface for another system, and export is the preferred fallback form only if later validation proves it necessary."
+    },
+    {
+      "stageId": "direction_decision",
+      "status": "completed",
+      "enteredAt": "2026-04-15T02:51:47.697Z",
+      "completedAt": "2026-04-15T03:10:51.376Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [
+        "c_001",
+        "c_004"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_001",
+        "d_004"
+      ],
+      "notes": "Revising direction after boundary rejection to replace the earlier strict ERP-only framing."
+    },
+    {
+      "stageId": "scope_freeze",
+      "status": "completed",
+      "enteredAt": "2026-04-15T02:56:22.557Z",
+      "completedAt": "2026-04-15T03:15:51.104Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [
+        "c_002",
+        "c_005"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_002",
+        "d_005"
+      ],
+      "notes": "Re-freezing scope under corrected direction d_004: ERP APIs remain the core source boundary, one optional external interface is allowed, and export is only a later fallback preference if validated."
+    },
+    {
+      "stageId": "boundary_freeze",
+      "status": "completed",
+      "enteredAt": "2026-04-15T02:59:25.934Z",
+      "completedAt": "2026-04-15T03:25:24.275Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [
+        "c_003",
+        "c_006"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_003",
+        "d_006"
+      ],
+      "notes": "Re-freezing boundary under corrected direction and scope: ERP APIs remain the source boundary, one external consumer interface is allowed, and export is only a later validated fallback rather than a default delivery mode."
+    },
+    {
+      "stageId": "success_evidence_freeze",
+      "status": "completed",
+      "enteredAt": "2026-04-15T03:25:50.347Z",
+      "completedAt": "2026-04-15T03:30:28.274Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [
+        "c_007"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [
+        "d_007"
+      ],
+      "notes": "Preparing explicit success definition, required evidence, and failure conditions for the corrected direction/scope/boundary."
+    },
+    {
+      "stageId": "workstream_shaping",
+      "status": "completed",
+      "enteredAt": "2026-04-15T03:30:38.132Z",
+      "completedAt": "2026-04-15T03:31:08.649Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": "Workstreams are shaped at medium granularity around ERP source mapping, time-dimension metric derivation/validation, and API contract plus consumer integration."
+    },
+    {
+      "stageId": "convergence_gate",
+      "status": "completed",
+      "enteredAt": "2026-04-15T03:31:09.229Z",
+      "completedAt": "2026-04-15T03:36:27.502Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [
+        "c_008"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "packet_export",
+      "status": "completed",
+      "enteredAt": "2026-04-15T03:36:33.320Z",
+      "completedAt": "2026-04-15T03:50:43.719Z",
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [
+        "c_009"
+      ],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    },
+    {
+      "stageId": "handoff",
+      "status": "not_started",
+      "enteredAt": null,
+      "completedAt": null,
+      "rolledBackAt": null,
+      "requiredCheckpointIds": [],
+      "blockingQuestionIds": [],
+      "producedDecisionIds": [],
+      "notes": ""
+    }
+  ],
+  "checkpoints": [
+    {
+      "checkpointId": "c_001",
+      "stageId": "direction_decision",
+      "type": "direction",
+      "status": "approved",
+      "promptSummary": "Freeze v1 direction as a lightweight ERP-only API-first SKU inventory and sales analysis service. The core contract includes SKU current inventory default-warehouse quantity 30-day outbound turnover days and 30-60-90-day sales volume. Time-dimension metrics may be derived across multiple ERP APIs, and non-API fallback is not accepted by default.",
+      "approvalSummary": "Direction approved with correction: V1 remains SKU-centric, API-first, and ERP-only; default warehouse should be treated as the local warehouse business concept, and time-dimension metrics may be derived by aligning multiple ERP APIs without defaulting to non-API fallback.",
+      "correctionSummary": "Direction approved with correction: V1 remains SKU-centric, API-first, and ERP-only; default warehouse should be treated as the local warehouse business concept, and time-dimension metrics may be derived by aligning multiple ERP APIs without defaulting to non-API fallback.",
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T02:55:56.719Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_001"
+      ],
+      "createdAt": "2026-04-15T02:51:56.770Z",
+      "updatedAt": "2026-04-15T02:55:56.719Z"
+    },
+    {
+      "checkpointId": "c_002",
+      "stageId": "scope_freeze",
+      "type": "scope",
+      "status": "approved",
+      "promptSummary": "Freeze v1 scope as an ERP-only API contract at SKU grain with current inventory local-warehouse quantity 30-day outbound turnover days and 30-60-90-day sales volume in scope. Keep dashboard delivery export workflows WMS/internal-system integration and default non-API fallback out of scope for v1.",
+      "approvalSummary": "Scope approved with correction: v1 remains ERP-only with no other system integrations. At most one additional API endpoint may be included only if it stays inside the ERP-only boundary and exists solely to reduce friction for a later v2 iteration.",
+      "correctionSummary": "Scope approved with correction: v1 remains ERP-only with no other system integrations. At most one additional API endpoint may be included only if it stays inside the ERP-only boundary and exists solely to reduce friction for a later v2 iteration.",
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T02:59:10.036Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_002"
+      ],
+      "createdAt": "2026-04-15T02:56:51.745Z",
+      "updatedAt": "2026-04-15T02:59:10.036Z"
+    },
+    {
+      "checkpointId": "c_003",
+      "stageId": "boundary_freeze",
+      "type": "boundary",
+      "status": "rejected",
+      "promptSummary": "Freeze v1 boundary as ERP API-only, allow multi-API derived calculations for time-dimension metrics, keep WMS/other-system integration and default non-API fallback outside the boundary, and treat any later need for fallback as a new decision rather than an implicit expansion.",
+      "approvalSummary": null,
+      "correctionSummary": null,
+      "rejectionReason": "Rejected because the proposed boundary was too strict. The corrected rule is: v1 does not integrate other systems as sources, but may expose at most one interface for another system; if a fallback is later needed, the preferred fallback form is export rather than default non-API ingestion.",
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T03:06:24.070Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_003"
+      ],
+      "createdAt": "2026-04-15T02:59:42.866Z",
+      "updatedAt": "2026-04-15T03:06:24.070Z"
+    },
+    {
+      "checkpointId": "c_004",
+      "stageId": "direction_decision",
+      "type": "direction",
+      "status": "approved",
+      "promptSummary": "Freeze corrected v1 direction as an API-first SKU analysis service sourced from ERP APIs, with at most one optional interface for another system, no default source-side integration beyond ERP, and export as the preferred fallback only if later validation proves it necessary.",
+      "approvalSummary": "Approved corrected direction: ERP APIs remain the core source boundary, v1 may expose at most one interface for another system, and export is the preferred fallback only if later validation proves it necessary.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T03:10:51.376Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_004"
+      ],
+      "createdAt": "2026-04-15T03:07:42.855Z",
+      "updatedAt": "2026-04-15T03:10:51.376Z"
+    },
+    {
+      "checkpointId": "c_005",
+      "stageId": "scope_freeze",
+      "type": "scope",
+      "status": "approved",
+      "promptSummary": "Freeze corrected v1 scope around an ERP-sourced API contract at SKU grain, including one optional interface for another system, while keeping dashboard delivery and broad system integration out of scope and treating export only as a possible later validated fallback.",
+      "approvalSummary": "Scope approved with correction: default warehouse quantity must be treated as the local-warehouse business concept; if multiple local warehouses exist, v1 must use configured default_local_wid or explicit mapping rather than assuming a naturally unique local warehouse. Also, the one-other-system interface is a boundary/consumer constraint rather than core business scope. Time-dimension metrics remain required and may be derived across multiple ERP APIs.",
+      "correctionSummary": "Scope approved with correction: default warehouse quantity must be treated as the local-warehouse business concept; if multiple local warehouses exist, v1 must use configured default_local_wid or explicit mapping rather than assuming a naturally unique local warehouse. Also, the one-other-system interface is a boundary/consumer constraint rather than core business scope. Time-dimension metrics remain required and may be derived across multiple ERP APIs.",
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T03:15:51.104Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_005"
+      ],
+      "createdAt": "2026-04-15T03:11:19.370Z",
+      "updatedAt": "2026-04-15T03:15:51.104Z"
+    },
+    {
+      "checkpointId": "c_006",
+      "stageId": "boundary_freeze",
+      "type": "boundary",
+      "status": "approved",
+      "promptSummary": "Freeze corrected boundary so that ERP APIs remain the only source-side integration boundary, default_local_wid or explicit local-warehouse mapping is allowed, at most one interface for another system is allowed only as a consumer-side constraint, and export is not a default v1 delivery mode but may become a later validated fallback.",
+      "approvalSummary": "Approved corrected boundary: ERP APIs remain the only source-side integration boundary; one external interface is allowed only as a consumer-side constraint; export is only a later validated fallback, not a default v1 mode.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T03:25:24.275Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_006"
+      ],
+      "createdAt": "2026-04-15T03:16:30.797Z",
+      "updatedAt": "2026-04-15T03:25:24.275Z"
+    },
+    {
+      "checkpointId": "c_007",
+      "stageId": "success_evidence_freeze",
+      "type": "success_evidence",
+      "status": "approved",
+      "promptSummary": "Freeze success so that v1 only counts as successful if the full required API contract is present, time-dimension metrics are validated as ERP-derived, local-warehouse mapping is explicit when needed, and no hidden source-side boundary expansion is used to make the service appear complete.",
+      "approvalSummary": "Approved success/evidence definition: v1 only counts as successful if the full required API contract is present, time-dimension metrics are validated as ERP-derived, local-warehouse mapping is explicit when needed, and no hidden source-side boundary expansion is used.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T03:30:28.274Z",
+      "rollbackTargetStageId": "brainstorm",
+      "linkedDecisionIds": [
+        "d_007"
+      ],
+      "createdAt": "2026-04-15T03:30:24.906Z",
+      "updatedAt": "2026-04-15T03:30:28.274Z"
+    },
+    {
+      "checkpointId": "c_008",
+      "stageId": "convergence_gate",
+      "type": "convergence",
+      "status": "approved",
+      "promptSummary": "Convergence gate passed: project goal is singular, primary flow is clear, corrected direction/scope/boundary/success are approved, workstreams are shaped, no blocking open question remains, and packet export would not mislead. Carryable risks remain in ERP API linkage validation, local-warehouse mapping configuration, and optional extra consumer-interface need, but they do not currently block freeze.",
+      "approvalSummary": "Approved convergence gate: remaining unfrozen items stay process-side and do not block packet export or handoff.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T03:36:27.502Z",
+      "rollbackTargetStageId": "packet_export",
+      "linkedDecisionIds": [
+        "d_004",
+        "d_005",
+        "d_006",
+        "d_007"
+      ],
+      "createdAt": "2026-04-15T03:31:30.931Z",
+      "updatedAt": "2026-04-15T03:36:27.502Z"
+    },
+    {
+      "checkpointId": "c_009",
+      "stageId": "packet_export",
+      "type": "packet_export",
+      "status": "approved",
+      "promptSummary": "Publish packet export from approved corrected direction d_004, scope d_005, boundary d_006, and success/evidence d_007 using convergence report cr_001. Export the current packet files as the frozen downstream packet, while keeping non-blocking unresolved items such as SKU-field mapping, default_local_wid/local-warehouse mapping details, first concrete API consumer, optional extra interface need, and detailed ERP API linkage validation on the process side.",
+      "approvalSummary": "Approved packet export: remaining non-blocking unresolved items stay process-side and do not block publishing the corrected frozen packet or generating the downstream handoff.",
+      "correctionSummary": null,
+      "rejectionReason": null,
+      "decidedBy": "human",
+      "decidedAt": "2026-04-15T03:36:40.394Z",
+      "rollbackTargetStageId": "packet_export",
+      "linkedDecisionIds": [
+        "d_004",
+        "d_005",
+        "d_006",
+        "d_007"
+      ],
+      "createdAt": "2026-04-15T03:36:33.320Z",
+      "updatedAt": "2026-04-15T03:36:40.394Z"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "handoffId": "handoff-002",
+  "sourceExportId": "export-001",
+  "targetPhase": "requirement_freeze",
+  "generatedAt": "2026-04-16T02:45:48.684Z",
+  "status": "generated",
+  "readiness": "ready_for_downstream_handoff"
+}

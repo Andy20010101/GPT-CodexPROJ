@@ -1,0 +1,32 @@
+# Preparation Timeline
+
+- initialized preparation scaffold
+- 2026-04-14T03:15:07.513Z: generated handoff-001 from no_export for continued_preparation
+- 2026-04-14T03:30:09.694Z: convergence gate fail (cr_001) fallback -> direction_decision
+- 2026-04-16T02:43:49.432Z: stage intake -> completed (Confirmed this is a standalone preparation candidate for a narrow OpenClaw skill bundle focused on single-topic 1688 supplier discovery, not a runtime platform change or generic crawler initiative.)
+- 2026-04-16T02:43:53.187Z: stage clarification -> completed (Clarification is sufficient to proceed: the operator is an OpenClaw-style sourcing researcher, the first usable outcome is a Markdown supplier short list, and the minimum host prerequisites are browser navigation, page reading, and file output.)
+- 2026-04-16T02:43:59.168Z: stage brainstorm -> completed (Brainstorm converged on a browser-first skill bundle rather than a new backend or crawler stack. The retained shape is low-frequency, operator-in-the-loop supplier research on visible 1688 pages with explicit unknowns and constrained output.)
+- 2026-04-16T02:44:03.801Z: proposed decision d_001 (Adopt a browser-first OpenClaw skill for single-topic 1688 supplier discovery)
+- 2026-04-16T02:44:07.241Z: opened checkpoint c_001 for direction_decision (direction)
+- 2026-04-16T02:44:10.198Z: approved checkpoint c_001
+- 2026-04-16T02:44:14.061Z: approved decision d_001 via c_001
+- 2026-04-16T02:44:21.140Z: proposed decision d_002 (Freeze MVP scope around one end-to-end 1688 supplier research flow)
+- 2026-04-16T02:44:25.573Z: opened checkpoint c_002 for scope_freeze (scope)
+- 2026-04-16T02:44:30.236Z: approved checkpoint c_002
+- 2026-04-16T02:44:36.188Z: approved decision d_002 via c_002
+- 2026-04-16T02:44:42.698Z: proposed decision d_003 (Freeze boundary around skill-bundle artifacts and host-provided browser capabilities)
+- 2026-04-16T02:44:48.415Z: opened checkpoint c_003 for boundary_freeze (boundary)
+- 2026-04-16T02:44:52.683Z: approved checkpoint c_003
+- 2026-04-16T02:44:55.828Z: approved decision d_003 via c_003
+- 2026-04-16T02:45:00.936Z: proposed decision d_004 (Freeze success around a runnable skill bundle plus happy-path and failure-path evidence)
+- 2026-04-16T02:45:05.087Z: opened checkpoint c_004 for success_evidence_freeze (success_evidence)
+- 2026-04-16T02:45:08.141Z: approved checkpoint c_004
+- 2026-04-16T02:45:11.275Z: approved decision d_004 via c_004
+- 2026-04-16T02:45:15.451Z: stage workstream_shaping -> completed (Workstreams are shaped at medium granularity around contract and preconditions freeze, OpenClaw skill-bundle authoring, and operator validation plus evidence capture.)
+- 2026-04-16T02:45:18.241Z: convergence gate pass (cr_002)
+- 2026-04-16T02:45:27.417Z: opened checkpoint c_005 for convergence_gate (convergence)
+- 2026-04-16T02:45:30.635Z: approved checkpoint c_005
+- 2026-04-16T02:45:34.178Z: opened checkpoint c_006 for packet_export (packet_export)
+- 2026-04-16T02:45:37.058Z: approved checkpoint c_006
+- 2026-04-16T02:45:40.602Z: published packet export export-001 (Publish first frozen packet after formal convergence approval.)
+- 2026-04-16T02:45:48.684Z: generated handoff-002 from export-001 for requirement_freeze

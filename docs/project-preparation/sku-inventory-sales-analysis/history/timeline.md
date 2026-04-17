@@ -1,0 +1,127 @@
+# Preparation Timeline
+
+- initialized preparation scaffold
+- 2026-04-14T06:56:07.721Z: stage intake -> completed (Confirmed this is a standalone preparation candidate: a new lightweight data service initiative focused on single-item inventory cycle analysis and single-item sales statistics, not a bugfix, not a downstream task, and not a broad data-platform rebuild.)
+- 2026-04-14T06:56:12.577Z: stage clarification -> in_progress (Clarifying primary actor, single-item grain, core metrics, upstream systems, output form, and refresh cadence before entering brainstorm.)
+- 2026-04-14T06:56:20.879Z: added question q_001 at clarification (blocking)
+- 2026-04-14T06:56:23.535Z: added question q_002 at clarification (blocking)
+- 2026-04-14T06:56:25.962Z: added question q_003 at clarification (blocking)
+- 2026-04-14T06:56:28.437Z: added question q_004 at clarification (blocking)
+- 2026-04-14T06:56:31.186Z: added question q_005 at clarification (blocking)
+- 2026-04-14T06:56:33.935Z: added question q_006 at clarification (blocking)
+- 2026-04-14T06:56:36.807Z: added question q_007 at clarification (blocking)
+- 2026-04-14T07:41:34.576Z: question q_002 -> resolved (Working clarification answer: v1 single-item analysis uses SKU as the business grain. Exact ERP identifier/field mapping is still pending and may be tracked separately if it affects implementation details.)
+- 2026-04-14T07:41:39.534Z: question q_007 -> resolved (Working clarification answer: v1 refresh cadence is day-level rather than near-real-time or hourly.)
+- 2026-04-14T07:41:42.592Z: added question q_008 at clarification (non_blocking)
+- 2026-04-14T07:42:21.466Z: question q_001 -> resolved (Working clarification answer: v1 currently has two intended audiences. Ecommerce staff need single-item sales statistics, and leadership needs single-item inventory cycle analysis. The remaining blocker is to choose which audience and workflow should drive v1 primary scope.)
+- 2026-04-14T07:42:24.853Z: added question q_009 at clarification (blocking)
+- 2026-04-14T07:42:27.308Z: question q_003 -> resolved (Working clarification answer: the mandatory inventory-analysis metric set currently includes current inventory, outbound over recent N days, and inventory turnover days. Exact window and calculation definitions still need alignment.)
+- 2026-04-14T07:42:29.909Z: added question q_010 at clarification (blocking)
+- 2026-04-14T07:42:32.309Z: question q_004 -> resolved (Working clarification answer: v1 single-item sales statistics currently start with sales volume as the must-have metric. Exact time windows and whether to net out returns/cancellations remain open.)
+- 2026-04-14T07:42:34.879Z: added question q_011 at clarification (blocking)
+- 2026-04-14T07:42:37.480Z: question q_005 -> resolved (Working clarification answer: v1 only depends on the ERP system as the upstream source. Available access surfaces include API, database tables, and Excel/CSV exports, and current context is limited to a single platform rather than multi-system reconciliation.)
+- 2026-04-14T07:42:40.134Z: added question q_012 at clarification (blocking)
+- 2026-04-14T07:42:42.292Z: question q_006 -> resolved (Working clarification answer: v1 output should be a combination rather than a single standalone surface.)
+- 2026-04-14T07:42:44.908Z: added question q_013 at clarification (blocking)
+- 2026-04-15T01:40:27.883Z: question q_009 -> resolved (Working clarification answer: v1 primary actor and primary entry workflow are ecommerce users consuming single-item sales analysis. Leadership inventory-cycle analysis remains a secondary consumer/view rather than the primary scope driver.)
+- 2026-04-15T01:40:30.445Z: question q_010 -> resolved (Working clarification answer: use a 30-day window for recent outbound in inventory-cycle analysis, and calculate turnover days from current inventory divided by 30-day average outbound.)
+- 2026-04-15T01:40:33.471Z: question q_011 -> resolved (Working clarification answer: sales statistics should expose raw sales volume over 30-day, 60-day, and 90-day windows. Based on the user phrasing, returns/cancellations are currently not modeled as a separate net-sales treatment. The view should also surface a default-warehouse quantity alongside sales statistics.)
+- 2026-04-15T01:40:36.554Z: added question q_014 at clarification (non_blocking)
+- 2026-04-15T01:40:39.117Z: question q_012 -> resolved (Working clarification answer: v1 should treat the ERP API as the preferred authoritative ingestion path.)
+- 2026-04-15T01:40:41.754Z: question q_013 -> resolved (Working clarification answer: the must-have delivery surface for v1 is an internal page/dashboard plus export capability.)
+- 2026-04-15T01:40:44.644Z: stage clarification -> completed (Clarification is sufficient to move forward: primary actor is ecommerce, analysis grain is SKU, core working metrics are defined at a working level, v1 depends on ERP API only, output is internal page/dashboard plus export, and refresh is day-level. Remaining open questions are non-blocking detail mappings only.)
+- 2026-04-15T01:40:47.112Z: stage brainstorm -> in_progress (Pressure-testing v1 boundaries around actor priority, output minimum, and API-only delivery before any direction or scope freeze.)
+- 2026-04-15T01:40:56.531Z: added tradeoff t_001 (Primary Value Pressure)
+- 2026-04-15T01:41:00.185Z: added tradeoff t_002 (API-Only Boundary Pressure)
+- 2026-04-15T01:41:03.620Z: added tradeoff t_003 (Minimum Delivery Surface Pressure)
+- 2026-04-15T01:45:46.194Z: converged tradeoff t_001
+- 2026-04-15T01:45:46.197Z: converged tradeoff t_003
+- 2026-04-15T01:45:46.199Z: converged tradeoff t_002
+- 2026-04-15T01:45:53.331Z: added tradeoff t_004 (Delivery Anchor Pressure)
+- 2026-04-15T02:34:28.010Z: stage brainstorm -> rolled_back (Rolled back because brainstorm pressure had been shaped around dashboard/export output, but the clarified v1 delivery model is API-first data service consumption without dashboard/export as first-version must-haves.)
+- 2026-04-15T02:34:30.534Z: stage clarification -> rolled_back (Rolled back because output-form clarification was materially wrong: v1 is API-first data service consumption, not dashboard-plus-export as a must-have delivery shape.)
+- 2026-04-15T02:34:33.302Z: question q_006 -> open (Reopened because the earlier combination answer was based on a misunderstanding. The clarified v1 delivery model is API-first rather than dashboard-plus-export.)
+- 2026-04-15T02:34:38.470Z: question q_006 -> resolved (Corrected clarification answer: v1 output form is an API-first lightweight data service for internal systems or frontends to consume. Internal dashboards and file exports are not first-version must-haves.)
+- 2026-04-15T02:34:41.411Z: question q_013 -> open (Reopened because the earlier must-have output combination was incorrect. The user clarified that API consumption is the intended v1 delivery mode.)
+- 2026-04-15T02:34:44.421Z: question q_013 -> resolved (Corrected clarification answer: v1 does not require dashboard-plus-export as the must-have surface. The must-have delivery surface is API consumption by an internal system or frontend.)
+- 2026-04-15T02:34:47.478Z: question q_009 -> open (Reopened because the prior resolution assumed a human-facing sales-analysis entry flow. The corrected v1 shape is API-first, so the primary actor and primary consumption path need a corrected statement.)
+- 2026-04-15T02:34:51.912Z: question q_009 -> resolved (Corrected clarification answer: the primary business actor remains ecommerce, but the primary delivery path is API-first. The lightweight data service is intended to be consumed by an internal system or frontend rather than requiring dashboard/export as first-version must-haves.)
+- 2026-04-15T02:34:54.828Z: added question q_015 at clarification (non_blocking)
+- 2026-04-15T02:35:00.832Z: stage clarification -> completed (Corrected clarification is sufficient to move forward: primary business actor remains ecommerce, analysis grain is SKU, core working metrics are defined at a working level, v1 depends on ERP API only, delivery is API-first consumption by an internal system or frontend, and refresh is day-level. Remaining open questions are non-blocking mapping or consumer-detail questions only.)
+- 2026-04-15T02:35:15.167Z: superseded tradeoff t_001 (Superseded because this tradeoff was phrased around a human-facing entry flow. After clarification correction, v1 is API-first; actor priority needs to be expressed without assuming dashboard/export interaction.)
+- 2026-04-15T02:35:18.802Z: superseded tradeoff t_003 (Superseded because the minimum delivery surface is no longer dashboard-plus-export. The clarified v1 delivery model is API-first.)
+- 2026-04-15T02:35:21.256Z: superseded tradeoff t_004 (Superseded because the dashboard-vs-export anchor question is no longer relevant after clarifying that v1 is API-first rather than page/export-driven.)
+- 2026-04-15T02:35:23.750Z: stage brainstorm -> in_progress (Re-entered brainstorm on the corrected premise that v1 is an API-first lightweight data service over ERP, without dashboard/export as first-version must-haves.)
+- 2026-04-15T02:35:27.527Z: added tradeoff t_005 (Primary Business Value Pressure API-First)
+- 2026-04-15T02:35:31.064Z: added tradeoff t_006 (Minimum API Contract Pressure)
+- 2026-04-15T02:35:36.957Z: converged tradeoff t_005
+- 2026-04-15T02:37:27.872Z: converged tradeoff t_006
+- 2026-04-15T02:38:26.692Z: superseded tradeoff t_006 (Superseded because default-warehouse quantity is now confirmed as must-have, so the prior can-drop set is no longer valid.)
+- 2026-04-15T02:38:29.353Z: superseded tradeoff t_002 (Superseded because the earlier convergence allowed dropping default-warehouse quantity if API coverage was weak, but that field is now confirmed as must-have for v1.)
+- 2026-04-15T02:38:32.839Z: added tradeoff t_007 (Corrected Minimum API Contract)
+- 2026-04-15T02:38:35.657Z: converged tradeoff t_007
+- 2026-04-15T02:38:39.070Z: added tradeoff t_008 (API-Only Hard-Field Pressure)
+- 2026-04-15T02:42:39.221Z: superseded tradeoff t_008 (Superseded because default-warehouse quantity is generally obtainable through the ERP API; the real remaining pressure is time-dimension historical data that lacks clean API linkage.)
+- 2026-04-15T02:42:44.074Z: added question q_016 at clarification (blocking)
+- 2026-04-15T02:42:47.725Z: added tradeoff t_009 (Time-Dimension Linkage Pressure)
+- 2026-04-15T02:51:38.608Z: question q_016 -> deferred (Exact ERP API endpoint/linkage validation for time-dimension metrics remains unknown. For current direction shaping, the agreed rule is API-only first: 30-day outbound and 30/60/90-day sales volume may be derived by aligning multiple ERP APIs, and only if validation later proves key metrics impossible via APIs should this escalate into a new boundary decision.)
+- 2026-04-15T02:51:42.007Z: converged tradeoff t_009
+- 2026-04-15T02:51:44.743Z: stage brainstorm -> completed (Brainstorm is sufficiently converged: primary business value, minimum API contract, and time-dimension linkage policy are all explicit, and no blocking clarification question remains open.)
+- 2026-04-15T02:51:47.697Z: stage direction_decision -> in_progress (Preparing a formal direction proposal from the converged API-first ERP-only v1 shape.)
+- 2026-04-15T02:51:53.160Z: proposed decision d_001 (Adopt an API-first ERP-only SKU analysis service for v1)
+- 2026-04-15T02:51:56.770Z: opened checkpoint c_001 for direction_decision (direction)
+- 2026-04-15T02:55:56.719Z: approved checkpoint c_001 with correction
+- 2026-04-15T02:56:11.227Z: approved decision d_001 via c_001
+- 2026-04-15T02:56:22.557Z: stage scope_freeze -> in_progress (Preparing explicit in-scope and out-of-scope boundaries for the approved API-first ERP-only v1 direction.)
+- 2026-04-15T02:56:51.708Z: proposed decision d_002 (Freeze v1 scope as a narrow ERP-only SKU analysis API contract)
+- 2026-04-15T02:56:51.745Z: opened checkpoint c_002 for scope_freeze (scope)
+- 2026-04-15T02:58:55.957Z: approved checkpoint c_002 with correction
+- 2026-04-15T02:58:55.959Z: added question q_017 at scope_freeze (non_blocking)
+- 2026-04-15T02:59:10.036Z: approved checkpoint c_002 with correction
+- 2026-04-15T02:59:12.990Z: approved decision d_002 via c_002
+- 2026-04-15T02:59:25.934Z: stage boundary_freeze -> in_progress (Preparing architecture boundary for the approved ERP-only API-first v1 scope.)
+- 2026-04-15T02:59:42.866Z: opened checkpoint c_003 for boundary_freeze (boundary)
+- 2026-04-15T02:59:42.870Z: proposed decision d_003 (Freeze v1 boundary as ERP-API-only with derived multi-API metrics but no default fallback)
+- 2026-04-15T03:06:24.070Z: rejected checkpoint c_003; rollback -> brainstorm (Rejected because the proposed boundary was too strict. The corrected rule is: v1 does not integrate other systems as sources, but may expose at most one interface for another system; if a fallback is later needed, the preferred fallback form is export rather than default non-API ingestion.)
+- 2026-04-15T03:06:28.276Z: question q_017 -> deferred (Premise corrected: the optional extra interface is not ERP-scoped only; it is an optional single interface for another system, without integrating that system as a source. The exact use case remains non-blocking and can be revisited during later shaping.)
+- 2026-04-15T03:06:31.363Z: question q_016 -> deferred (Time-dimension API linkage remains a validation item. Current policy is still API-first derivation across multiple ERP APIs; if validation later proves fallback is necessary, the preferred fallback form is export rather than default database-table ingestion or broad system integration.)
+- 2026-04-15T03:06:35.448Z: added tradeoff t_010 (Single External Interface And Export Fallback Pressure)
+- 2026-04-15T03:06:40.461Z: converged tradeoff t_010
+- 2026-04-15T03:07:29.154Z: stage brainstorm -> completed (Brainstorm reconverged after boundary rejection: ERP APIs remain the core source boundary, v1 may expose at most one interface for another system, and export is the preferred fallback form only if later validation proves it necessary.)
+- 2026-04-15T03:07:32.105Z: stage direction_decision -> in_progress (Revising direction after boundary rejection to replace the earlier strict ERP-only framing.)
+- 2026-04-15T03:07:37.819Z: proposed decision d_004 (Adopt an ERP-sourced API-first SKU analysis service with one optional external interface)
+- 2026-04-15T03:07:42.855Z: opened checkpoint c_004 for direction_decision (direction)
+- 2026-04-15T03:10:51.376Z: approved checkpoint c_004
+- 2026-04-15T03:10:54.071Z: approved decision d_004 via c_004
+- 2026-04-15T03:10:56.966Z: superseded decision d_001 (Superseded by corrected direction d_004 after boundary rejection clarified that v1 may expose one optional external interface and prefers export rather than default non-API fallback.)
+- 2026-04-15T03:10:59.848Z: superseded decision d_002 (Superseded because the previously approved scope was framed as ERP-only in a stricter sense; scope must be re-frozen under corrected direction d_004.)
+- 2026-04-15T03:11:02.594Z: rejected decision d_003 (Rejected because checkpoint c_003 was rejected; boundary must be reformulated under corrected direction d_004.)
+- 2026-04-15T03:11:07.679Z: stage scope_freeze -> in_progress (Re-freezing scope under corrected direction d_004: ERP APIs remain the core source boundary, one optional external interface is allowed, and export is only a later fallback preference if validated.)
+- 2026-04-15T03:11:16.240Z: proposed decision d_005 (Freeze corrected v1 scope around ERP-sourced API contract with one optional external interface)
+- 2026-04-15T03:11:19.370Z: opened checkpoint c_005 for scope_freeze (scope)
+- 2026-04-15T03:15:51.104Z: approved checkpoint c_005 with correction
+- 2026-04-15T03:15:57.039Z: approved decision d_005 via c_005
+- 2026-04-15T03:16:01.646Z: added question q_018 at scope_freeze (non_blocking)
+- 2026-04-15T03:16:22.221Z: stage boundary_freeze -> in_progress (Re-freezing boundary under corrected direction and scope: ERP APIs remain the source boundary, one external consumer interface is allowed, and export is only a later validated fallback rather than a default delivery mode.)
+- 2026-04-15T03:16:27.476Z: proposed decision d_006 (Freeze corrected boundary around ERP-source APIs one consumer interface and export-only-as-fallback)
+- 2026-04-15T03:16:30.797Z: opened checkpoint c_006 for boundary_freeze (boundary)
+- 2026-04-15T03:25:24.275Z: approved checkpoint c_006
+- 2026-04-15T03:25:37.358Z: approved decision d_006 via c_006
+- 2026-04-15T03:25:50.347Z: stage success_evidence_freeze -> in_progress (Preparing explicit success definition, required evidence, and failure conditions for the corrected direction/scope/boundary.)
+- 2026-04-15T03:26:12.226Z: opened checkpoint c_007 for success_evidence_freeze (success_evidence)
+- 2026-04-15T03:26:12.226Z: proposed decision d_007 (Freeze success definition around complete API contract verified ERP-derived metrics and no hidden boundary expansion)
+- 2026-04-15T03:30:24.906Z: opened checkpoint c_007 for success_evidence_freeze (success_evidence)
+- 2026-04-15T03:30:28.274Z: approved checkpoint c_007
+- 2026-04-15T03:30:34.996Z: approved decision d_007 via c_007
+- 2026-04-15T03:30:38.132Z: stage workstream_shaping -> in_progress (Shaping medium-grained workstreams for the approved ERP-sourced API contract and validation path.)
+- 2026-04-15T03:31:08.649Z: stage workstream_shaping -> completed (Workstreams are shaped at medium granularity around ERP source mapping, time-dimension metric derivation/validation, and API contract plus consumer integration.)
+- 2026-04-15T03:31:09.229Z: convergence gate pass (cr_001)
+- 2026-04-15T03:31:30.931Z: opened checkpoint c_008 for convergence_gate (convergence)
+- 2026-04-15T03:36:27.502Z: approved checkpoint c_008
+- 2026-04-15T03:36:33.320Z: opened checkpoint c_009 for packet_export (packet_export)
+- 2026-04-15T03:36:40.394Z: approved checkpoint c_009
+- 2026-04-15T03:36:43.168Z: published packet export export-001 (First canonical export from approved corrected direction, scope, boundary, and success/evidence after convergence pass cr_001.)
+- 2026-04-15T03:36:47.139Z: generated handoff-001 from export-001 for continued_preparation
+- 2026-04-15T03:50:41.656Z: generated handoff-002 from export-001 for requirement_freeze
+- 2026-04-15T03:50:43.719Z: published packet export export-002 (refresh: refresh export with corrected canonical handoff prompt)
+- 2026-04-15T03:50:45.700Z: generated handoff-003 from export-002 for requirement_freeze
