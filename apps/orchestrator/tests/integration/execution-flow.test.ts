@@ -2,7 +2,9 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { promisify } from 'node:util';
 
 import { describe, expect, it } from 'vitest';
 
@@ -10,6 +12,8 @@ import type { ArchitectureFreeze, RequirementFreeze, TaskEnvelope } from '../../
 import { createOrchestratorService } from '../../src';
 import type { BridgeClient } from '../../src/services/bridge-client';
 import { OrchestratorError } from '../../src/utils/error';
+
+const execFileAsync = promisify(execFile);
 
 function buildRequirementFreeze(runId: string): RequirementFreeze {
   return {
@@ -148,6 +152,19 @@ async function bootstrapExecutionReadyTask(artifactDir: string): Promise<{
     runId: run.runId,
     taskId: task.taskId,
   };
+}
+
+async function createGitWorkspace(prefix: string): Promise<string> {
+  const workspacePath = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
+  await execFileAsync('git', ['init', '-q'], { cwd: workspacePath });
+  await execFileAsync('git', ['config', 'user.email', 'tester@example.com'], {
+    cwd: workspacePath,
+  });
+  await execFileAsync('git', ['config', 'user.name', 'Tester'], { cwd: workspacePath });
+  await fs.writeFile(path.join(workspacePath, 'README.md'), '# temp repo\n', 'utf8');
+  await execFileAsync('git', ['add', 'README.md'], { cwd: workspacePath });
+  await execFileAsync('git', ['commit', '-qm', 'init'], { cwd: workspacePath });
+  return workspacePath;
 }
 
 function createApprovedBridgeClient(): BridgeClient {
@@ -293,133 +310,141 @@ function createApprovedBridgeClient(): BridgeClient {
 describe('execution flow integration', () => {
   it('drives run -> execution -> review -> acceptance on the happy path', async () => {
     const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), 'execution-flow-happy-'));
+    const workspacePath = await createGitWorkspace('execution-flow-workspace-');
     const orchestrator = createOrchestratorService({
       artifactDir,
       bridgeClient: createApprovedBridgeClient(),
     });
-    const run = await orchestrator.createRun({
-      title: 'Execution integration run',
-      createdBy: 'tester',
-    });
+    try {
+      const run = await orchestrator.createRun({
+        title: 'Execution integration run',
+        createdBy: 'tester',
+      });
 
-    await orchestrator.saveRequirementFreeze(run.runId, buildRequirementFreeze(run.runId));
-    await orchestrator.evaluateGate({
-      runId: run.runId,
-      gateType: 'requirement_gate',
-      evaluator: 'tester',
-    });
-    await orchestrator.saveArchitectureFreeze(run.runId, buildArchitectureFreeze(run.runId));
-    await orchestrator.evaluateGate({
-      runId: run.runId,
-      gateType: 'architecture_gate',
-      evaluator: 'tester',
-    });
+      await orchestrator.saveRequirementFreeze(run.runId, buildRequirementFreeze(run.runId));
+      await orchestrator.evaluateGate({
+        runId: run.runId,
+        gateType: 'requirement_gate',
+        evaluator: 'tester',
+      });
+      await orchestrator.saveArchitectureFreeze(run.runId, buildArchitectureFreeze(run.runId));
+      await orchestrator.evaluateGate({
+        runId: run.runId,
+        gateType: 'architecture_gate',
+        evaluator: 'tester',
+      });
 
-    const task = buildTask(run.runId);
-    await orchestrator.registerTaskGraph(run.runId, {
-      runId: run.runId,
-      tasks: [task],
-      edges: [],
-      registeredAt: '2026-04-02T12:07:00.000Z',
-    });
-    await orchestrator.attachTestPlan(run.runId, task.taskId, [
-      {
-        id: 'tp-1',
-        description: 'A red test must exist before implementation starts.',
-        verificationCommand: 'npm test',
-        expectedRedSignal: 'failing tests',
-        expectedGreenSignal: 'passing tests',
-      },
-    ]);
-    await orchestrator.markTestsRed(run.runId, task.taskId);
-    const runId = run.runId;
-    const taskId = task.taskId;
+      const task = buildTask(run.runId);
+      await orchestrator.registerTaskGraph(run.runId, {
+        runId: run.runId,
+        tasks: [task],
+        edges: [],
+        registeredAt: '2026-04-02T12:07:00.000Z',
+      });
+      await orchestrator.attachTestPlan(run.runId, task.taskId, [
+        {
+          id: 'tp-1',
+          description: 'A red test must exist before implementation starts.',
+          verificationCommand: 'npm test',
+          expectedRedSignal: 'failing tests',
+          expectedGreenSignal: 'passing tests',
+        },
+      ]);
+      await orchestrator.markTestsRed(run.runId, task.taskId);
+      const runId = run.runId;
+      const taskId = task.taskId;
 
-    await orchestrator.evaluateGate({
-      runId,
-      taskId,
-      gateType: 'red_test_gate',
-      evaluator: 'tester',
-    });
+      await orchestrator.evaluateGate({
+        runId,
+        taskId,
+        gateType: 'red_test_gate',
+        evaluator: 'tester',
+      });
 
-    const request = await orchestrator.createExecutionRequest({
-      runId,
-      taskId,
-      workspacePath: '/home/administrator/code/review-then-codex-system',
-      executorType: 'command',
-      command: {
+      const command = {
         command: 'bash',
-        args: ['-lc', 'printf "vitest ok"'],
-        purpose: 'test',
+        args: [
+          '-lc',
+          "mkdir -p apps/orchestrator/src/services && printf 'export const executionFlowHappyPath = true;\\n' > apps/orchestrator/src/services/execution-flow-happy-path.ts && printf 'vitest unit ok'",
+        ],
+        purpose: 'test' as const,
         shell: false,
         env: {},
-      },
-    });
-    expect(request.executorType).toBe('command');
+      };
 
-    const execution = await orchestrator.executeTask({
-      runId,
-      taskId,
-      producer: 'tester',
-      workspacePath: '/home/administrator/code/review-then-codex-system',
-      executorType: 'command',
-      command: {
-        command: 'bash',
-        args: ['-lc', 'printf "vitest ok"'],
-        purpose: 'test',
-        shell: false,
-        env: {},
-      },
-      submitForReviewOnSuccess: true,
-    });
+      const request = await orchestrator.createExecutionRequest({
+        runId,
+        taskId,
+        workspacePath,
+        executorType: 'command',
+        command,
+      });
+      expect(request.executorType).toBe('command');
 
-    expect(execution.result.status).toBe('succeeded');
-    expect(execution.task.status).toBe('review_pending');
-    const persistedResult = JSON.parse(
-      await fs.readFile(path.join(execution.executionDir, 'result.json'), 'utf8'),
-    ) as { summary: string };
-    expect(persistedResult.summary).toContain('completed successfully');
+      const execution = await orchestrator.executeTask({
+        runId,
+        taskId,
+        producer: 'tester',
+        workspacePath,
+        executorType: 'command',
+        command,
+        submitForReviewOnSuccess: true,
+      });
 
-    const review = await orchestrator.reviewTaskExecution({
-      runId,
-      taskId,
-      executionId: execution.result.executionId,
-      producer: 'reviewer',
-    });
-    expect(review.result.status).toBe('approved');
-    expect(review.gateResult.passed).toBe(true);
+      expect(execution.result.status).toBe('succeeded');
+      expect(execution.result.patchSummary.changedFiles).toContain(
+        'apps/orchestrator/src/services/execution-flow-happy-path.ts',
+      );
+      expect(execution.task.status).toBe('review_pending');
+      const persistedResult = JSON.parse(
+        await fs.readFile(path.join(execution.executionDir, 'result.json'), 'utf8'),
+      ) as { summary: string };
+      expect(persistedResult.summary).toContain('completed successfully');
 
-    const acceptedTask = await orchestrator.acceptTask(runId, taskId);
-    expect(acceptedTask.status).toBe('accepted');
+      const review = await orchestrator.reviewTaskExecution({
+        runId,
+        taskId,
+        executionId: execution.result.executionId,
+        producer: 'reviewer',
+      });
+      expect(review.result.status).toBe('approved');
+      expect(review.gateResult.passed).toBe(true);
 
-    const taskAcceptanceGate = await orchestrator.evaluateGate({
-      runId,
-      taskId,
-      gateType: 'acceptance_gate',
-      evaluator: 'qa',
-    });
-    expect(taskAcceptanceGate.passed).toBe(true);
+      const acceptedTask = await orchestrator.acceptTask(runId, taskId);
+      expect(acceptedTask.status).toBe('accepted');
 
-    const runAcceptanceGate = await orchestrator.evaluateGate({
-      runId,
-      gateType: 'acceptance_gate',
-      evaluator: 'qa',
-    });
-    expect(runAcceptanceGate.passed).toBe(true);
+      const taskAcceptanceGate = await orchestrator.evaluateGate({
+        runId,
+        taskId,
+        gateType: 'acceptance_gate',
+        evaluator: 'qa',
+      });
+      expect(taskAcceptanceGate.passed).toBe(true);
 
-    const status = await orchestrator.getRunStatusSummary(runId);
-    expect(status.stage).toBe('accepted');
+      const runAcceptanceGate = await orchestrator.evaluateGate({
+        runId,
+        gateType: 'acceptance_gate',
+        evaluator: 'qa',
+      });
+      expect(runAcceptanceGate.passed).toBe(true);
 
-    const executionSummary = await orchestrator.summarizeExecutionForTask(runId, taskId);
-    expect(executionSummary.totalExecutions).toBe(1);
-    expect(executionSummary.byStatus.succeeded).toBe(1);
+      const status = await orchestrator.getRunStatusSummary(runId);
+      expect(status.stage).toBe('accepted');
 
-    const artifacts = await orchestrator.collectExecutionArtifacts(runId, taskId);
-    expect(artifacts.some((artifact) => artifact.kind === 'test-log')).toBe(true);
+      const executionSummary = await orchestrator.summarizeExecutionForTask(runId, taskId);
+      expect(executionSummary.totalExecutions).toBe(1);
+      expect(executionSummary.byStatus.succeeded).toBe(1);
 
-    const evidenceSummary = await orchestrator.summarizeRunEvidence(runId);
-    expect(evidenceSummary.byKind.execution_result).toBe(1);
-    expect(evidenceSummary.byKind.test_report).toBeGreaterThanOrEqual(1);
+      const artifacts = await orchestrator.collectExecutionArtifacts(runId, taskId);
+      expect(artifacts.some((artifact) => artifact.kind === 'patch')).toBe(true);
+      expect(artifacts.some((artifact) => artifact.kind === 'test-log')).toBe(true);
+
+      const evidenceSummary = await orchestrator.summarizeRunEvidence(runId);
+      expect(evidenceSummary.byKind.execution_result).toBe(1);
+      expect(evidenceSummary.byKind.test_report).toBeGreaterThanOrEqual(1);
+    } finally {
+      await fs.rm(workspacePath, { force: true, recursive: true });
+    }
   });
 
   it('writes failed execution evidence and keeps the task in implementation', async () => {
