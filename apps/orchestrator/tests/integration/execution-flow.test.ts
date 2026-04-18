@@ -14,6 +14,7 @@ import type { BridgeClient } from '../../src/services/bridge-client';
 import { OrchestratorError } from '../../src/utils/error';
 
 const execFileAsync = promisify(execFile);
+const repositoryWorkspacePath = path.resolve(process.cwd(), '../..');
 
 function buildRequirementFreeze(runId: string): RequirementFreeze {
   return {
@@ -462,7 +463,7 @@ describe('execution flow integration', () => {
       runId,
       taskId,
       producer: 'tester',
-      workspacePath: '/home/administrator/code/GPT-CodexPROJ',
+      workspacePath: repositoryWorkspacePath,
       executorType: 'command',
       command: {
         command: 'bash',
@@ -494,7 +495,7 @@ describe('execution flow integration', () => {
       orchestrator.createExecutionRequest({
         runId,
         taskId,
-        workspacePath: '/home/administrator/code/GPT-CodexPROJ',
+        workspacePath: repositoryWorkspacePath,
         executorType: 'command',
         command: {
           command: 'bash',
@@ -522,7 +523,7 @@ describe('execution flow integration', () => {
       runId,
       taskId,
       producer: 'tester',
-      workspacePath: '/home/administrator/code/GPT-CodexPROJ',
+      workspacePath: repositoryWorkspacePath,
       executorType: 'command',
       command: {
         command: 'bash',
